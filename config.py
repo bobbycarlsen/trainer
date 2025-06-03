@@ -53,7 +53,7 @@ Keep the explanation detailed but accessible, focusing on the educational aspect
 
 # UI Configuration
 PAGE_TITLE = "Chess Trainer"
-MENU_ITEMS = ["Train", "Analysis", "Insights", "Settings"]
+MENU_ITEMS = ["Train", "Analysis", "Insights", "Spatial Analysis", "Settings"]
 FOOTER_TEXT = "Chess Trainer © 2025"
 
 # Chess Board Appearance
@@ -95,3 +95,22 @@ CALENDAR_COLORS = [
     "#30a14e",  # High activity
     "#216e39"   # Very high activity
 ]
+
+# Spatial Analysis Configuration
+SPATIAL_ANALYSIS = {
+    'polygon_colors': {
+        'white': 'rgba(255, 255, 255, 0.3)',
+        'black': 'rgba(0, 0, 0, 0.3)',
+        'white_border': '#ffffff',
+        'black_border': '#000000'
+    },
+    'centroid_colors': {
+        'white': '#ff0000',
+        'black': '#0000ff'
+    },
+    'animation_duration': 500,  # milliseconds
+    'show_metrics': True,
+    'show_centroid': True,
+    'show_area': True,
+    'show_connectivity': True
+}

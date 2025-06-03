@@ -5,7 +5,9 @@ import json
 import time
 from datetime import datetime
 import os
-import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import matplotlib.dates as mdates
 import seaborn as sns
 from io import StringIO
@@ -18,6 +20,8 @@ import analysis
 import insights
 import settings
 import config
+import pgn_loader
+import spatial_analysis
 
 # Initialize the database if it doesn't exist
 database.init_db()
@@ -41,6 +45,23 @@ if 'last_move_record' not in st.session_state:
     st.session_state.last_move_record = None
 if 'menu_selection' not in st.session_state:
     st.session_state.menu_selection = None
+
+# Spatial analysis session state
+if 'current_game' not in st.session_state:
+    st.session_state.current_game = None
+if 'current_move_index' not in st.session_state:
+    st.session_state.current_move_index = 0
+if 'loaded_games' not in st.session_state:
+    st.session_state.loaded_games = []
+if 'spatial_settings' not in st.session_state:
+    st.session_state.spatial_settings = {
+        'show_white_polygon': True,
+        'show_black_polygon': True,
+        'show_centroids': True,
+        'show_metrics': True,
+        'show_insights': True,
+        'polygon_opacity': 0.3
+    }
 
 # At the beginning of the file, ensure we have the necessary session state variables
 # Add session state initialization at the beginning of the function
@@ -138,9 +159,9 @@ def load_new_position():
 
 def display_train_page():
     """
-    Display the training page.
+    Display the training page with enhanced compact UI.
     """
-    st.title("Chess Position Training")
+    st.title("♔ Chess Position Training")
     
     # Sidebar with position navigation
     with st.sidebar:
@@ -148,12 +169,12 @@ def display_train_page():
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("Random Position", key="random_position_sidebar"):
+            if st.button("🎲 Random", key="random_position_sidebar"):
                 st.session_state.current_position = training.get_random_position()
                 st.session_state.timer_start = time.time()
         
         with col2:
-            if st.button("Next Position", key="next_position_sidebar"):
+            if st.button("▶️ Next", key="next_position_sidebar"):
                 st.session_state.current_position = training.get_sequential_position(st.session_state.user_id)
                 st.session_state.timer_start = time.time()        
         st.divider()
@@ -188,14 +209,184 @@ def display_train_page():
         
         return
 
-    # Display position info
-    col1, col2 = st.columns([2, 2])
+    # Get user performance for KPIs - Fix avg_time issue
+    try:
+        user_summary = analysis.get_user_performance_summary(st.session_state.user_id)
+        avg_time = user_summary.get('avg_time', 0)
+        if avg_time is None or not isinstance(avg_time, (int, float)):
+            avg_time = 0.0
+        user_summary['avg_time'] = avg_time
+    except:
+        user_summary = {'total_attempts': 0, 'accuracy': 0, 'avg_time': 0.0}
+
+    # Turn Display - Make it very prominent and compact
+    turn_color = position['turn'].capitalize()
+    turn_emoji = "⚪" if turn_color == "White" else "⚫"
+    
+    # Create a more compact layout
+    col1, col2 = st.columns([3, 1])
     
     with col1:
-        # Display the chess board 
-        st.subheader("Chess Board")
-        st.code(f"FEN: {position['fen']}")
-        st.info(f"Turn: {position['turn'].capitalize()}, Move: {position['fullmove_number']}")
+        st.markdown(f"""
+        <div style="text-align: center; padding: 12px; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
+                    border-radius: 8px; margin: 10px 0;">
+            <h3 style="color: white; margin: 0; font-size: 1.5em;">
+                {turn_emoji} <strong>{turn_color} to Move</strong> {turn_emoji}
+            </h3>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        # Timer display - more compact
+        if st.session_state.timer_start:
+            elapsed_time = time.time() - st.session_state.timer_start
+            
+            # Color-code timer
+            if elapsed_time < 10:
+                timer_color = "#28a745"
+            elif elapsed_time < 30:
+                timer_color = "#ffc107"  
+            else:
+                timer_color = "#dc3545"
+            
+            st.markdown(f"""
+            <div style="text-align: center; padding: 12px; background-color: {timer_color}; 
+                        border-radius: 8px; margin: 10px 0;">
+                <h4 style="color: white; margin: 0;">⏱️ {elapsed_time:.1f}s</h4>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # Collapsible Stats Section
+    with st.expander("📊 Performance & Position Stats", expanded=False):
+        # User Performance KPIs with colored background
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 15px; border-radius: 10px; margin: 10px 0;">
+            <h4 style="color: white; margin: 0 0 10px 0;">📈 Your Performance</h4>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+        
+        with kpi1:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
+                        padding: 15px; border-radius: 8px; text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 2em;">{user_summary.get('total_attempts', 0):,}</h3>
+                <p style="margin: 5px 0 0 0;">Total Attempts</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with kpi2:
+            accuracy = user_summary.get('accuracy', 0)
+            accuracy_color = "#28a745" if accuracy >= 70 else "#ffc107" if accuracy >= 50 else "#dc3545"
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, {accuracy_color} 0%, {accuracy_color}dd 100%); 
+                        padding: 15px; border-radius: 8px; text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 2em;">{accuracy:.1f}%</h3>
+                <p style="margin: 5px 0 0 0;">Accuracy</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with kpi3:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); 
+                        padding: 15px; border-radius: 8px; text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 2em;">{user_summary.get('avg_time', 0):.1f}s</h3>
+                <p style="margin: 5px 0 0 0;">Avg. Time</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with kpi4:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); 
+                        padding: 15px; border-radius: 8px; text-align: center; color: #333;">
+                <h3 style="margin: 0; font-size: 2em;">#{position['id']}</h3>
+                <p style="margin: 5px 0 0 0;">Position ID</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Position KPIs with colored background
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                    padding: 15px; border-radius: 10px; margin: 15px 0 10px 0;">
+            <h4 style="color: white; margin: 0 0 10px 0;">🏁 Current Position</h4>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        pos_col1, pos_col2, pos_col3, pos_col4 = st.columns(4)
+        
+        with pos_col1:
+            # Determine game phase
+            move_num = position['fullmove_number']
+            if move_num <= 15:
+                phase = "Opening"
+                phase_emoji = "🌅"
+                phase_color = "#ff9a56"
+            elif move_num <= 30:
+                phase = "Middlegame"
+                phase_emoji = "⚔️"
+                phase_color = "#ffad56"
+            else:
+                phase = "Endgame"
+                phase_emoji = "🏰"
+                phase_color = "#ff6b6b"
+            
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, {phase_color} 0%, {phase_color}dd 100%); 
+                        padding: 15px; border-radius: 8px; text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 1.5em;">{phase_emoji}</h3>
+                <p style="margin: 5px 0 0 0;">{phase}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with pos_col2:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); 
+                        padding: 15px; border-radius: 8px; text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 2em;">#{move_num}</h3>
+                <p style="margin: 5px 0 0 0;">Move Number</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with pos_col3:
+            # Count available moves
+            import chess
+            board = chess.Board(position['fen'])
+            legal_moves_count = len(list(board.legal_moves))
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 15px; border-radius: 8px; text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 2em;">{legal_moves_count}</h3>
+                <p style="margin: 5px 0 0 0;">Legal Moves</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with pos_col4:
+            # Top move score
+            top_move_score = position['moves'][0]['score'] if position['moves'] else 0
+            score_color = "#28a745" if top_move_score > 0 else "#dc3545" if top_move_score < 0 else "#6c757d"
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, {score_color} 0%, {score_color}dd 100%); 
+                        padding: 15px; border-radius: 8px; text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 2em;">{top_move_score:+}</h3>
+                <p style="margin: 5px 0 0 0;">Top Move Score</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # Main board and move selection - more compact
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Board controls
+        board_col1, board_col2 = st.columns([3, 1])
+        
+        with board_col1:
+            st.subheader("♜ Chess Board")
+        
+        with board_col2:
+            # Add flip board option
+            flip_board = st.checkbox("🔄 Flip Board", value=position['turn'].lower() == 'black', key="flip_board_train")
         
         # Get user settings for board theme
         user_settings = auth.get_user_settings(st.session_state.user_id)
@@ -203,9 +394,6 @@ def display_train_page():
         
         # Get the top moves for highlighting
         top_moves = position['moves'][:3] if position['moves'] else []
-        
-        # Determine if the board should be flipped (if black to move)
-        flip_board = position['turn'].lower() == 'black'
         
         # Import and use the advanced chess board display
         from chess_board import display_chess_board
@@ -216,14 +404,9 @@ def display_train_page():
             top_moves=top_moves,
             flipped=flip_board
         )
-        
-        # Timer display
-        if st.session_state.timer_start:
-            elapsed_time = time.time() - st.session_state.timer_start
-            st.metric("Time", f"{elapsed_time:.1f} seconds")
 
     with col2:
-        st.subheader("Select Your Move")
+        st.subheader("🎯 Select Your Move")
         
         # Generate all legal moves using python-chess
         import chess
@@ -236,9 +419,9 @@ def display_train_page():
         legal_moves.sort()
         
         # Let user select from all legal moves
-        selected_move = st.selectbox("Choose a move", legal_moves)
+        selected_move = st.selectbox("Choose a move", legal_moves, key="move_selector")
                 
-        if st.button("Submit Move", key="submit_move_button"):
+        if st.button("🚀 Submit Move", key="submit_move_button", type="primary"):
             elapsed_time = time.time() - st.session_state.timer_start
             
             # Find if the selected move is among the top moves
@@ -248,7 +431,7 @@ def display_train_page():
                 validation = training.validate_move(position['id'], selected_move, st.session_state.user_id)
                 
                 if validation['success']:
-                    st.success(f"Correct! {validation['message']}")
+                    st.success(f"✅ Excellent! {validation['message']}")
                     
                     # Record the move
                     move_record_id = training.record_user_move(
@@ -284,7 +467,7 @@ def display_train_page():
                         except (ValueError, chess.IllegalMoveError):
                             pass
                 else:
-                    st.error(f"Incorrect. {validation['message']}")
+                    st.error(f"❌ Not quite. {validation['message']}")
                     
                     # Record the move
                     move_record_id = training.record_user_move(
@@ -302,7 +485,7 @@ def display_train_page():
                     st.session_state.current_moves_data = position['moves'][:10]
             else:
                 # The move is legal but not among the top moves analyzed by the engine
-                st.warning(f"Move {selected_move} is legal but not among the top engine recommendations.")
+                st.warning(f"⚠️ Move {selected_move} is legal but not among the top engine recommendations.")
                 
                 # Find the lowest ranked move to use for recording
                 if position['moves']:
@@ -336,150 +519,22 @@ def display_train_page():
                 st.session_state.show_moves_table = True
                 st.session_state.current_moves_data = position['moves'][:10]
 
-        # Display top moves table (only one instance - after submit or based on session state)
-        if st.session_state.show_moves_table and st.session_state.current_moves_data:
-            # Display top 10 moves table
-            st.divider()
-            st.subheader("Top Engine Moves")
-            
-            # Create DataFrame for the top moves
-            import pandas as pd
-            
-            # Format the principal variation for display with colors
-            formatted_moves = []
-            for move_data in st.session_state.current_moves_data:
-                # Extract and format principal variation
-                pv = move_data.get('principal_variation', '')
-                if not pv:  # Try alternate key if principal_variation is not available
-                    pv = move_data.get('pv', '')
-                
-                # Format the principal variation for display with colored HTML
-                formatted_pv = ""
-                if isinstance(pv, str) and pv:
-                    # Split PV into individual moves
-                    pv_moves = pv.split()
-                    
-                    # Create a temporary board to check for special moves
-                    temp_board = chess.Board(position['fen'])
-                    
-                    # Format moves with colors and highlighting
-                    for i in range(len(pv_moves)):
-                        try:
-                            # Parse the move
-                            move_san = pv_moves[i]
-                            move = temp_board.parse_san(move_san)
-                            
-                            # Determine move type and apply appropriate styling
-                            style = ""
-                            
-                            # Check for captures
-                            if temp_board.is_capture(move):
-                                style += "color: red; font-weight: bold;"
-                            
-                            # Check for castling
-                            elif move.from_square == chess.E1 and move.to_square in [chess.C1, chess.G1] or \
-                                move.from_square == chess.E8 and move.to_square in [chess.C8, chess.G8]:
-                                style += "color: blue; text-decoration: underline;"
-                            
-                            # Check for checks
-                            temp_board.push(move)
-                            if temp_board.is_check():
-                                style += "color: purple; font-weight: bold;"
-                                move_san += "+"
-                            
-                            # Check for promotions
-                            if move.promotion:
-                                style += "color: green; font-weight: bold;"
-                            
-                            # Format move with styling
-                            if style:
-                                styled_move = f'<span style="{style}">{move_san}</span>'
-                            else:
-                                styled_move = move_san
-                            
-                            # Add move number for white moves or first move
-                            if i % 2 == 0 or i == 0:
-                                move_num = (i // 2) + 1
-                                formatted_pv += f"{move_num}.{styled_move} "
-                            else:
-                                formatted_pv += f"{styled_move} "
-                                
-                        except (ValueError, chess.IllegalMoveError, chess.InvalidMoveError):
-                            # If there's an error parsing the move, just add it as plain text
-                            if i % 2 == 0 or i == 0:
-                                move_num = (i // 2) + 1
-                                formatted_pv += f"{move_num}.{pv_moves[i]} "
-                            else:
-                                formatted_pv += f"{pv_moves[i]} "
-                else:
-                    formatted_pv = "N/A"
-                
-                move_dict = {
-                    'Rank': move_data.get('rank', ''),
-                    'Move': move_data.get('move', ''),
-                    'Score': move_data.get('score', ''),
-                    'Centipawn Loss': move_data.get('centipawn_loss', ''),
-                    'Classification': move_data.get('classification', ''),
-                    'Principal Variation': formatted_pv
-                }
-                formatted_moves.append(move_dict)
-            
-            # Enable HTML rendering for the dataframe
-            st.markdown(
-                """
-                <style>
-                .dataframe td {
-                    white-space: normal !important;
-                }
-                </style>
-                """, 
-                unsafe_allow_html=True
-            )
-
-            # Use HTML format for the dataframe
-            moves_df = pd.DataFrame(formatted_moves)
-            st.write(moves_df.to_html(escape=False, index=False), unsafe_allow_html=True)
-            
-            # Show analysis option
-            st.divider()
-            st.subheader("Get OpenAI Analysis")
-            
-            # Find top move for the prompt
-            top_move = next((m['move'] for m in position['moves'] if m['rank'] == 1), None)
-            
-            if st.button("Analyze this position", key="analyze_button"):
-                prompt = config.ANALYSIS_PROMPT_TEMPLATE.format(
-                    fen=position['fen'],
-                    selected_move=selected_move,
-                    top_move=top_move if top_move else "Not available"
-                )
-                
-                st.text_area("Analysis Prompt", prompt, height=200)
-                
-                # In a real app, here you would call OpenAI API
-                # For this example, we'll use a placeholder
-                st.info("In a real implementation, this would call OpenAI for analysis")
-                
-                # Sample analysis text (placeholder)
-                analysis_text = f"Analysis for position {position['id']} with move {selected_move}"
-                
-                # Save the analysis
-                if st.session_state.last_move_record:
-                    training.save_openai_analysis(st.session_state.last_move_record, analysis_text)
-                    st.success("Analysis saved!")
-            
-            # Option to load a new position
-            if st.button("Next Position", key="next_position_button"):
-                load_new_position()
-                st.session_state.show_moves_table = False
-                st.rerun()
+    # Enhanced Top Moves Table
+    if st.session_state.show_moves_table and st.session_state.current_moves_data:
+        display_enhanced_moves_table(position, st.session_state.current_moves_data, selected_move)
+        
+        # Option to load a new position
+        if st.button("➡️ Next Position", key="next_position_button", type="primary"):
+            load_new_position()
+            st.session_state.show_moves_table = False
+            st.rerun()
 
 
 def display_analysis_page():
     """
-    Display the analysis page.
+    Display the analysis page with Plotly charts.
     """
-    st.title("Performance Analysis")
+    st.title("📊 Performance Analysis")
     
     # Get user performance summary
     summary = analysis.get_user_performance_summary(st.session_state.user_id)
@@ -488,18 +543,19 @@ def display_analysis_page():
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Total Attempts", summary['total_attempts'])
+        st.metric("Total Attempts", f"{summary['total_attempts']:,}")
     with col2:
-        st.metric("Correct Moves", summary['correct_moves'])
+        st.metric("Correct Moves", f"{summary['correct_moves']:,}")
     with col3:
-        st.metric("Accuracy", f"{summary['accuracy']:.1f}%")
+        accuracy_color = "normal" if summary['accuracy'] >= 70 else "inverse"
+        st.metric("Accuracy", f"{summary['accuracy']:.1f}%", delta_color=accuracy_color)
     with col4:
         st.metric("Avg. Time", f"{summary['avg_time']:.1f}s")
     
     st.divider()
     
     # Filters for detailed analysis
-    st.subheader("Filter Options")
+    st.subheader("🔍 Filter Options")
     
     col1, col2, col3 = st.columns(3)
     
@@ -527,7 +583,7 @@ def display_analysis_page():
     
     # Display filtered moves in a table
     if filtered_moves:
-        st.subheader(f"Filtered Moves ({len(filtered_moves)} results)")
+        st.subheader(f"📋 Filtered Moves ({len(filtered_moves)} results)")
         
         # Convert to pandas DataFrame for better display
         df = pd.DataFrame(filtered_moves)
@@ -544,88 +600,89 @@ def display_analysis_page():
             'time_taken': 'Time (s)'
         })
         
-        st.dataframe(display_df)
+        st.dataframe(display_df, use_container_width=True)
     else:
         st.info("No moves match the selected filters.")
     
     st.divider()
     
-    # Category analysis
-    st.subheader("Performance by Category")
+    # Category analysis with Plotly
+    if summary['category_stats']:
+        st.subheader("🎯 Performance by Category")
+        
+        # Convert to DataFrame for easier plotting
+        category_df = pd.DataFrame(summary['category_stats'])
+        
+        # Create Plotly bar chart
+        fig = px.bar(
+            category_df, 
+            x='category', 
+            y='accuracy',
+            title='Accuracy by Game Phase',
+            color='accuracy',
+            color_continuous_scale='RdYlGn',
+            range_color=[0, 100]
+        )
+        
+        fig.update_layout(
+            xaxis_title="Game Phase",
+            yaxis_title="Accuracy (%)",
+            yaxis=dict(range=[0, 100]),
+            showlegend=False
+        )
+        
+        # Add value labels
+        fig.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Display raw data in expandable section
+        with st.expander("Show Raw Category Data"):
+            st.dataframe(category_df)
     
-    # Convert to DataFrame for easier plotting
-    category_df = pd.DataFrame(summary['category_stats'])
-    
-    # Plot category data
-    fig, ax = plt.subplots(figsize=(10, 5))
-    bars = ax.bar(category_df['category'], category_df['accuracy'])
-    
-    # Color bars based on accuracy
-    for i, bar in enumerate(bars):
-        if category_df['accuracy'].iloc[i] >= 80:
-            bar.set_color('green')
-        elif category_df['accuracy'].iloc[i] >= 60:
-            bar.set_color('yellowgreen')
-        elif category_df['accuracy'].iloc[i] >= 40:
-            bar.set_color('orange')
-        else:
-            bar.set_color('red')
-    
-    ax.set_xlabel('Game Phase')
-    ax.set_ylabel('Accuracy (%)')
-    ax.set_title('Accuracy by Game Phase')
-    ax.set_ylim(0, 100)
-    
-    # Add value labels
-    for i, v in enumerate(category_df['accuracy']):
-        ax.text(i, v + 2, f"{v:.1f}%", ha='center')
-    
-    st.pyplot(fig)
-    
-    # Display raw data in expandable section
-    with st.expander("Show Raw Category Data"):
-        st.dataframe(category_df)
-    
-    # Color analysis
-    st.subheader("Performance by Color")
-    
-    # Convert to DataFrame for easier plotting
-    color_df = pd.DataFrame(summary['color_stats'])
-    
-    # Plot color data
-    fig, ax = plt.subplots(figsize=(10, 5))
-    bars = ax.bar(color_df['color'], color_df['accuracy'])
-    
-    # Color bars based on color (white/black)
-    for i, bar in enumerate(bars):
-        if color_df['color'].iloc[i] == 'white':
-            bar.set_color('lightgray')
-        else:
-            bar.set_color('darkgray')
-    
-    ax.set_xlabel('Color')
-    ax.set_ylabel('Accuracy (%)')
-    ax.set_title('Accuracy by Color')
-    ax.set_ylim(0, 100)
-    
-    # Add value labels
-    for i, v in enumerate(color_df['accuracy']):
-        ax.text(i, v + 2, f"{v:.1f}%", ha='center')
-    
-    st.pyplot(fig)
-    
-    # Display raw data in expandable section
-    with st.expander("Show Raw Color Data"):
-        st.dataframe(color_df)
+    # Color analysis with Plotly
+    if summary['color_stats']:
+        st.subheader("⚫⚪ Performance by Color")
+        
+        # Convert to DataFrame for easier plotting
+        color_df = pd.DataFrame(summary['color_stats'])
+        
+        # Create Plotly bar chart with custom colors
+        colors_map = {'white': '#f0f0f0', 'black': '#404040'}
+        color_df['chart_color'] = color_df['color'].map(colors_map)
+        
+        fig = go.Figure(data=[
+            go.Bar(
+                x=color_df['color'],
+                y=color_df['accuracy'],
+                marker_color=color_df['chart_color'],
+                text=[f"{acc:.1f}%" for acc in color_df['accuracy']],
+                textposition='outside'
+            )
+        ])
+        
+        fig.update_layout(
+            title='Accuracy by Color',
+            xaxis_title="Color",
+            yaxis_title="Accuracy (%)",
+            yaxis=dict(range=[0, 100]),
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Display raw data in expandable section
+        with st.expander("Show Raw Color Data"):
+            st.dataframe(color_df)
 
 def display_insights_page():
     """
-    Display the insights page.
+    Display the insights page with Plotly charts.
     """
-    st.title("Chess Insights")
+    st.title("🧠 Chess Insights")
     
     # Create tabs for different insights
-    tab1, tab2, tab3, tab4 = st.tabs(["Tactical", "Structural", "Time", "Calendar"])
+    tab1, tab2, tab3, tab4 = st.tabs(["⚔️ Tactical", "🏗️ Structural", "⏱️ Time", "📅 Calendar"])
     
     with tab1:
         st.header("Tactical Analysis")
@@ -637,29 +694,28 @@ def display_insights_page():
             # Convert to DataFrame for easier display
             tactics_df = pd.DataFrame(tactics_data)
             
-            # Plot tactics data
-            fig, ax = plt.subplots(figsize=(12, 6))
-            bars = ax.bar(tactics_df['tactic'], tactics_df['accuracy'])
+            # Create Plotly bar chart
+            fig = px.bar(
+                tactics_df, 
+                x='tactic', 
+                y='accuracy',
+                title='Accuracy by Tactical Pattern',
+                color='accuracy',
+                color_continuous_scale='RdYlGn',
+                range_color=[0, 100]
+            )
             
-            # Color bars based on accuracy
-            for i, bar in enumerate(bars):
-                if tactics_df['accuracy'].iloc[i] >= 80:
-                    bar.set_color('green')
-                elif tactics_df['accuracy'].iloc[i] >= 60:
-                    bar.set_color('yellowgreen')
-                elif tactics_df['accuracy'].iloc[i] >= 40:
-                    bar.set_color('orange')
-                else:
-                    bar.set_color('red')
+            fig.update_layout(
+                xaxis_title="Tactical Pattern",
+                yaxis_title="Accuracy (%)",
+                yaxis=dict(range=[0, 100]),
+                xaxis_tickangle=-45,
+                showlegend=False
+            )
             
-            ax.set_xlabel('Tactical Pattern')
-            ax.set_ylabel('Accuracy (%)')
-            ax.set_title('Accuracy by Tactical Pattern')
-            ax.set_ylim(0, 100)
-            plt.xticks(rotation=45, ha="right")
-            plt.tight_layout()
+            fig.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
             
-            st.pyplot(fig)
+            st.plotly_chart(fig, use_container_width=True)
             
             # Display raw data in expandable section
             with st.expander("Show Raw Tactics Data"):
@@ -680,29 +736,28 @@ def display_insights_page():
             pawn_df = pd.DataFrame(structural_data['pawn_structure'])
             
             if not pawn_df.empty:
-                # Plot pawn structure data
-                fig, ax = plt.subplots(figsize=(10, 5))
-                bars = ax.bar(pawn_df['structure'], pawn_df['accuracy'])
+                # Create Plotly bar chart
+                fig = px.bar(
+                    pawn_df, 
+                    x='structure', 
+                    y='accuracy',
+                    title='Accuracy by Pawn Structure',
+                    color='accuracy',
+                    color_continuous_scale='RdYlGn',
+                    range_color=[0, 100]
+                )
                 
-                # Color bars based on accuracy
-                for i, bar in enumerate(bars):
-                    if pawn_df['accuracy'].iloc[i] >= 80:
-                        bar.set_color('green')
-                    elif pawn_df['accuracy'].iloc[i] >= 60:
-                        bar.set_color('yellowgreen')
-                    elif pawn_df['accuracy'].iloc[i] >= 40:
-                        bar.set_color('orange')
-                    else:
-                        bar.set_color('red')
+                fig.update_layout(
+                    xaxis_title="Pawn Structure",
+                    yaxis_title="Accuracy (%)",
+                    yaxis=dict(range=[0, 100]),
+                    xaxis_tickangle=-45,
+                    showlegend=False
+                )
                 
-                ax.set_xlabel('Pawn Structure')
-                ax.set_ylabel('Accuracy (%)')
-                ax.set_title('Accuracy by Pawn Structure')
-                ax.set_ylim(0, 100)
-                plt.xticks(rotation=45, ha="right")
-                plt.tight_layout()
+                fig.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
                 
-                st.pyplot(fig)
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("Not enough pawn structure data available yet.")
             
@@ -712,27 +767,27 @@ def display_insights_page():
             center_df = pd.DataFrame(structural_data['center_control'])
             
             if not center_df.empty:
-                # Plot center control data
-                fig, ax = plt.subplots(figsize=(10, 5))
-                bars = ax.bar(center_df['control'], center_df['accuracy'])
+                # Create Plotly bar chart
+                fig = px.bar(
+                    center_df, 
+                    x='control', 
+                    y='accuracy',
+                    title='Accuracy by Center Control',
+                    color='accuracy',
+                    color_continuous_scale='RdYlGn',
+                    range_color=[0, 100]
+                )
                 
-                # Color bars based on accuracy
-                for i, bar in enumerate(bars):
-                    if center_df['accuracy'].iloc[i] >= 80:
-                        bar.set_color('green')
-                    elif center_df['accuracy'].iloc[i] >= 60:
-                        bar.set_color('yellowgreen')
-                    elif center_df['accuracy'].iloc[i] >= 40:
-                        bar.set_color('orange')
-                    else:
-                        bar.set_color('red')
+                fig.update_layout(
+                    xaxis_title="Center Control",
+                    yaxis_title="Accuracy (%)",
+                    yaxis=dict(range=[0, 100]),
+                    showlegend=False
+                )
                 
-                ax.set_xlabel('Center Control')
-                ax.set_ylabel('Accuracy (%)')
-                ax.set_title('Accuracy by Center Control')
-                ax.set_ylim(0, 100)
+                fig.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
                 
-                st.pyplot(fig)
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("Not enough center control data available yet.")
             
@@ -742,27 +797,27 @@ def display_insights_page():
             king_df = pd.DataFrame(structural_data['king_safety'])
             
             if not king_df.empty:
-                # Plot king safety data
-                fig, ax = plt.subplots(figsize=(10, 5))
-                bars = ax.bar(king_df['safety'], king_df['accuracy'])
+                # Create Plotly bar chart
+                fig = px.bar(
+                    king_df, 
+                    x='safety', 
+                    y='accuracy',
+                    title='Accuracy by King Safety',
+                    color='accuracy',
+                    color_continuous_scale='RdYlGn',
+                    range_color=[0, 100]
+                )
                 
-                # Color bars based on accuracy
-                for i, bar in enumerate(bars):
-                    if king_df['accuracy'].iloc[i] >= 80:
-                        bar.set_color('green')
-                    elif king_df['accuracy'].iloc[i] >= 60:
-                        bar.set_color('yellowgreen')
-                    elif king_df['accuracy'].iloc[i] >= 40:
-                        bar.set_color('orange')
-                    else:
-                        bar.set_color('red')
+                fig.update_layout(
+                    xaxis_title="King Safety",
+                    yaxis_title="Accuracy (%)",
+                    yaxis=dict(range=[0, 100]),
+                    showlegend=False
+                )
                 
-                ax.set_xlabel('King Safety')
-                ax.set_ylabel('Accuracy (%)')
-                ax.set_title('Accuracy by King Safety')
-                ax.set_ylim(0, 100)
+                fig.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
                 
-                st.pyplot(fig)
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("Not enough king safety data available yet.")
         else:
@@ -781,21 +836,28 @@ def display_insights_page():
             time_df = pd.DataFrame(time_data['time_buckets'])
             
             if not time_df.empty:
-                # Plot time data
-                fig, ax = plt.subplots(figsize=(10, 5))
-                bars = ax.bar(time_df['bucket'], time_df['accuracy'])
-                
-                # Color bars based on time bucket
+                # Create Plotly bar chart with custom colors
                 colors = ['#ff9999', '#ffcc99', '#ffff99', '#99ff99', '#99ccff']
-                for i, bar in enumerate(bars):
-                    bar.set_color(colors[i % len(colors)])
                 
-                ax.set_xlabel('Time Taken')
-                ax.set_ylabel('Accuracy (%)')
-                ax.set_title('Accuracy by Time Taken')
-                ax.set_ylim(0, 100)
+                fig = go.Figure(data=[
+                    go.Bar(
+                        x=time_df['bucket'],
+                        y=time_df['accuracy'],
+                        marker_color=colors[:len(time_df)],
+                        text=[f"{acc:.1f}%" for acc in time_df['accuracy']],
+                        textposition='outside'
+                    )
+                ])
                 
-                st.pyplot(fig)
+                fig.update_layout(
+                    title='Accuracy by Time Taken',
+                    xaxis_title="Time Taken",
+                    yaxis_title="Accuracy (%)",
+                    yaxis=dict(range=[0, 100]),
+                    showlegend=False
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
                 
                 # Display raw data in expandable section
                 with st.expander("Show Raw Time Data"):
@@ -809,11 +871,11 @@ def display_insights_page():
                 
                 with col1:
                     if 'pass' in avg_times:
-                        st.metric("Correct Moves", f"{avg_times['pass']:.1f}s")
+                        st.metric("✅ Correct Moves", f"{avg_times['pass']:.1f}s")
                 
                 with col2:
                     if 'fail' in avg_times:
-                        st.metric("Incorrect Moves", f"{avg_times['fail']:.1f}s")
+                        st.metric("❌ Incorrect Moves", f"{avg_times['fail']:.1f}s")
             else:
                 st.info("Not enough time data available yet.")
         else:
@@ -831,44 +893,56 @@ def display_insights_page():
             cal_df['date'] = pd.to_datetime(cal_df['date'])
             
             if not cal_df.empty:
-                # First plot: Activity over time
+                # Activity over time
                 st.subheader("Training Activity Over Time")
                 
-                fig, ax = plt.subplots(figsize=(12, 6))
-                ax.plot(cal_df['date'], cal_df['attempts'], marker='o', linestyle='-', color='blue', label='Attempts')
-                ax.plot(cal_df['date'], cal_df['correct'], marker='x', linestyle='--', color='green', label='Correct')
+                fig = go.Figure()
                 
-                ax.set_xlabel('Date')
-                ax.set_ylabel('Count')
-                ax.set_title('Training Activity Over Time')
-                ax.legend()
-                ax.grid(True, alpha=0.3)
+                fig.add_trace(go.Scatter(
+                    x=cal_df['date'],
+                    y=cal_df['attempts'],
+                    mode='lines+markers',
+                    name='Attempts',
+                    line=dict(color='blue'),
+                    marker=dict(size=6)
+                ))
                 
-                # Format x-axis to show dates nicely
-                ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-                plt.xticks(rotation=45, ha="right")
-                plt.tight_layout()
+                fig.add_trace(go.Scatter(
+                    x=cal_df['date'],
+                    y=cal_df['correct'],
+                    mode='lines+markers',
+                    name='Correct',
+                    line=dict(color='green', dash='dash'),
+                    marker=dict(size=6, symbol='x')
+                ))
                 
-                st.pyplot(fig)
+                fig.update_layout(
+                    title='Training Activity Over Time',
+                    xaxis_title="Date",
+                    yaxis_title="Count",
+                    hovermode='x unified'
+                )
                 
-                # Second plot: Accuracy over time
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Accuracy over time
                 st.subheader("Accuracy Over Time")
                 
-                fig, ax = plt.subplots(figsize=(12, 6))
-                ax.plot(cal_df['date'], cal_df['accuracy'], marker='o', linestyle='-', color='purple')
+                fig = px.line(
+                    cal_df, 
+                    x='date', 
+                    y='accuracy',
+                    title='Accuracy Over Time',
+                    markers=True
+                )
                 
-                ax.set_xlabel('Date')
-                ax.set_ylabel('Accuracy (%)')
-                ax.set_title('Accuracy Over Time')
-                ax.set_ylim(0, 100)
-                ax.grid(True, alpha=0.3)
+                fig.update_layout(
+                    xaxis_title="Date",
+                    yaxis_title="Accuracy (%)",
+                    yaxis=dict(range=[0, 100])
+                )
                 
-                # Format x-axis to show dates nicely
-                ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-                plt.xticks(rotation=45, ha="right")
-                plt.tight_layout()
-                
-                st.pyplot(fig)
+                st.plotly_chart(fig, use_container_width=True)
                 
                 # Display raw data in expandable section
                 with st.expander("Show Raw Calendar Data"):
@@ -878,11 +952,1034 @@ def display_insights_page():
         else:
             st.info("No calendar progress available yet. Complete more training to see insights.")
 
+def display_enhanced_moves_table(position, moves_data, selected_move):
+    """
+    Display enhanced top moves table with design thinking elements.
+    """
+    with st.expander("🏆 Top Engine Moves Analysis", expanded=True):
+        # Create tabs for different views
+        tab1, tab2 = st.tabs(["📊 Move Rankings", "🎯 Position Analysis"])
+        
+        with tab1:
+            # Color coding for classifications
+            classification_colors = {
+                'great': '#28a745',      # Green
+                'good': '#20c997',       # Teal  
+                'inaccuracy': '#ffc107', # Yellow
+                'mistake': '#fd7e14',    # Orange
+                'blunder': '#dc3545'     # Red
+            }
+            
+            # Create enhanced move cards
+            for i, move_data in enumerate(moves_data):
+                rank = move_data.get('rank', i+1)
+                move = move_data.get('move', '')
+                score = move_data.get('score', 0)
+                centipawn_loss = move_data.get('centipawn_loss', 0)
+                classification = move_data.get('classification', 'unknown')
+                
+                # Color for this move's classification
+                bg_color = classification_colors.get(classification, '#6c757d')
+                
+                # Special highlighting for user's selected move
+                is_selected = (move == selected_move)
+                border_style = "border: 3px solid #007bff;" if is_selected else "border: 1px solid #dee2e6;"
+                
+                # Rank badge
+                rank_emoji = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"#{rank}"
+                
+                # Score display with color
+                score_color = "#28a745" if score > 0 else "#dc3545" if score < 0 else "#6c757d"
+                
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, {bg_color}15 0%, {bg_color}25 100%); 
+                                padding: 15px; border-radius: 10px; margin: 8px 0; {border_style}">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center;">
+                                <span style="font-size: 1.5em; margin-right: 10px;">{rank_emoji}</span>
+                                <div>
+                                    <h4 style="margin: 0; color: {bg_color}; font-weight: bold;">{move}</h4>
+                                    <p style="margin: 2px 0; color: #666; font-size: 0.9em;">
+                                        {classification.title()} • Loss: {centipawn_loss} cp
+                                    </p>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <h3 style="margin: 0; color: {score_color}; font-weight: bold;">{score:+}</h3>
+                                <p style="margin: 0; color: #666; font-size: 0.8em;">Score</p>
+                            </div>
+                        </div>
+                        {'<div style="margin-top: 10px; padding: 8px; background: #007bff; border-radius: 5px; color: white; text-align: center; font-weight: bold;">🎯 Your Choice</div>' if is_selected else ''}
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    # Button to view position after this move
+                    if st.button(f"👁️ View", key=f"view_move_{rank}"):
+                        display_move_popup(position, move_data)
+        
+        with tab2:
+            # Show analysis option
+            st.subheader("🧠 Get AI Analysis")
+            
+            # Find top move for the prompt
+            top_move = next((m['move'] for m in position['moves'] if m['rank'] == 1), None)
+            
+            if st.button("🔍 Analyze this position", key="analyze_button", type="secondary"):
+                prompt = config.ANALYSIS_PROMPT_TEMPLATE.format(
+                    fen=position['fen'],
+                    selected_move=selected_move,
+                    top_move=top_move if top_move else "Not available"
+                )
+                
+                st.text_area("Analysis Prompt", prompt, height=200)
+                
+                # In a real app, here you would call OpenAI API
+                # For this example, we'll use a placeholder
+                st.info("In a real implementation, this would call OpenAI for analysis")
+                
+                # Sample analysis text (placeholder)
+                analysis_text = f"Analysis for position {position['id']} with move {selected_move}"
+                
+                # Save the analysis
+                if st.session_state.last_move_record:
+                    training.save_openai_analysis(st.session_state.last_move_record, analysis_text)
+                    st.success("Analysis saved!")
+
+@st.dialog("Position After Move")
+def display_move_popup(position, move_data):
+    """
+    Display position after a move in a popup dialog.
+    """
+    try:
+        import chess
+        board = chess.Board(position['fen'])
+        
+        # Make the move
+        move_uci = move_data.get('uci')
+        if move_uci:
+            move = chess.Move.from_uci(move_uci)
+            board.push(move)
+            
+            st.subheader(f"Position after {move_data.get('move', 'Unknown')}")
+            
+            # Display the resulting position
+            from chess_board import display_chess_board
+            display_chess_board(board.fen(), 'default')
+            
+            # Show move details
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Score", f"{move_data.get('score', 0):+}")
+                st.metric("Classification", move_data.get('classification', 'Unknown').title())
+            with col2:
+                st.metric("Centipawn Loss", f"{move_data.get('centipawn_loss', 0)}")
+                st.metric("Depth", f"{move_data.get('depth', 0)}")
+            
+            # Show principal variation
+            pv = move_data.get('principal_variation', '') or move_data.get('pv', '')
+            if pv:
+                st.subheader("Principal Variation")
+                st.code(pv)
+    
+    except Exception as e:
+        st.error(f"Error displaying position: {str(e)}")
+
+def display_spatial_analysis_page():
+    """
+    Display the spatial analysis page with PGN loading and polygon visualization.
+    """
+    st.title("🗺️ Spatial Analysis")
+    st.markdown("Analyze chess positions using spatial polygons to visualize piece control and connectivity.")
+    
+    # Sidebar for controls
+    with st.sidebar:
+        st.subheader("Spatial Analysis Controls")
+        
+        # PGN file upload
+        st.subheader("📁 Load PGN File")
+        uploaded_file = st.file_uploader("Upload PGN File", type=['pgn'])
+        
+        if uploaded_file is not None:
+            # Validate and load PGN
+            is_valid, message = pgn_loader.validate_uploaded_file(uploaded_file)
+            
+            if is_valid:
+                # Read file content
+                file_content = uploaded_file.read().decode('utf-8')
+                
+                # Validate PGN content
+                is_valid_content, content_message, game_count = pgn_loader.validate_pgn_file(file_content)
+                
+                if is_valid_content:
+                    st.success(content_message)
+                    
+                    # Load all games instead of just 20
+                    if st.button("🔄 Load All Games"):
+                        # Load games
+                        with st.spinner("Loading all games..."):
+                            games = pgn_loader.load_pgn_games(file_content, max_games=1000)  # Increased limit
+                            st.session_state.loaded_games = games
+                            if games:
+                                st.session_state.current_game = games[0]
+                                st.session_state.current_move_index = 0
+                                st.success(f"Loaded {len(games)} games!")
+                else:
+                    st.error(content_message)
+            else:
+                st.error(message)
+        
+        st.divider()
+        
+        # Game selection with better UX
+        if st.session_state.loaded_games:
+            st.subheader("🎮 Select Game")
+            
+            # Create game options with pagination for better UX
+            games_per_page = 10
+            total_games = len(st.session_state.loaded_games)
+            total_pages = (total_games + games_per_page - 1) // games_per_page
+            
+            if total_pages > 1:
+                page = st.selectbox("Page", range(1, total_pages + 1), 
+                                  format_func=lambda x: f"Page {x} ({(x-1)*games_per_page + 1}-{min(x*games_per_page, total_games)})")
+                start_idx = (page - 1) * games_per_page
+                end_idx = min(start_idx + games_per_page, total_games)
+                games_to_show = st.session_state.loaded_games[start_idx:end_idx]
+                game_indices = list(range(start_idx, end_idx))
+            else:
+                games_to_show = st.session_state.loaded_games
+                game_indices = list(range(total_games))
+            
+            # Create simplified game options for current page
+            game_options = []
+            for i, game in enumerate(games_to_show):
+                metadata = pgn_loader.get_game_metadata(game)
+                option = f"{metadata['white']} vs {metadata['black']} ({metadata['result']})"
+                game_options.append(option)
+            
+            if game_options:
+                selected_local_index = st.selectbox("Choose Game", range(len(game_options)), 
+                                                   format_func=lambda x: f"{game_indices[x]+1}. {game_options[x]}")
+                
+                selected_game_index = game_indices[selected_local_index]
+                
+                if st.session_state.current_game != st.session_state.loaded_games[selected_game_index]:
+                    st.session_state.current_game = st.session_state.loaded_games[selected_game_index]
+                    st.session_state.current_move_index = 0
+            
+            st.divider()
+        
+        # Display options
+        st.subheader("🎛️ Display Options")
+        
+        settings = st.session_state.spatial_settings
+        
+        settings['show_white_polygon'] = st.checkbox("⚪ Show White Polygon", value=settings['show_white_polygon'])
+        settings['show_black_polygon'] = st.checkbox("⚫ Show Black Polygon", value=settings['show_black_polygon'])
+        settings['show_centroids'] = st.checkbox("🎯 Show Centroids", value=settings['show_centroids'])
+        settings['show_metrics'] = st.checkbox("📊 Show Metrics", value=settings['show_metrics'])
+        settings['show_insights'] = st.checkbox("💡 Show Insights", value=settings['show_insights'])
+        settings['polygon_opacity'] = st.slider("Polygon Opacity", 0.1, 1.0, value=settings['polygon_opacity'])
+    
+    # Main content area
+    if not st.session_state.current_game:
+        st.info("👆 Upload a PGN file from the sidebar to begin spatial analysis.")
+        
+        # Show example
+        st.subheader("🤔 What is Spatial Analysis?")
+        st.markdown("""
+        Spatial analysis uses polygons to visualize:
+        - **🗺️ Piece Distribution**: How spread out or concentrated pieces are
+        - **🏰 Space Control**: The area controlled by each player
+        - **🔗 Connectivity**: How well-connected pieces are to each other
+        - **🎯 Centralization**: Whether pieces are centralized or scattered
+        - **📐 Controlled Squares**: Number of squares under attack
+        
+        Upload a PGN file to see these concepts in action!
+        """)
+        
+        return
+    
+    # Game is loaded - display analysis
+    current_game = st.session_state.current_game
+    move_index = st.session_state.current_move_index
+    
+    # Game metadata
+    metadata = pgn_loader.get_game_metadata(current_game)
+    
+    # Game info with colored background
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                padding: 15px; border-radius: 10px; margin: 15px 0;">
+        <h4 style="color: white; margin: 0 0 10px 0;">🏆 Game Information</h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
+                    padding: 15px; border-radius: 8px; text-align: center; color: white;">
+            <h4 style="margin: 0;">{metadata['white']}</h4>
+            <p style="margin: 5px 0 0 0;">⚪ White</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 15px; border-radius: 8px; text-align: center; color: white;">
+            <h4 style="margin: 0;">{metadata['black']}</h4>
+            <p style="margin: 5px 0 0 0;">⚫ Black</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        result_color = "#28a745" if metadata['result'] in ['1-0', '0-1'] else "#ffc107"
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, {result_color} 0%, {result_color}dd 100%); 
+                    padding: 15px; border-radius: 8px; text-align: center; color: white;">
+            <h4 style="margin: 0;">{metadata['result']}</h4>
+            <p style="margin: 5px 0 0 0;">🏁 Result</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        if metadata['opening'] != 'Unknown':
+            opening_display = metadata['opening'][:15] + "..." if len(metadata['opening']) > 15 else metadata['opening']
+        else:
+            opening_display = metadata['date']
+            
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); 
+                    padding: 15px; border-radius: 8px; text-align: center; color: white;">
+            <h4 style="margin: 0;">{opening_display}</h4>
+            <p style="margin: 5px 0 0 0;">📚 Opening</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Navigation controls with better styling
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                padding: 15px; border-radius: 10px; margin: 15px 0 10px 0;">
+        <h4 style="color: white; margin: 0;">🎮 Move Navigation</h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    nav_col1, nav_col2, nav_col3, nav_col4, nav_col5 = st.columns(5)
+    
+    with nav_col1:
+        if st.button("⏮️ Start", key="nav_start"):
+            st.session_state.current_move_index = 0
+            st.rerun()  # Fix: Ensure start button works
+    
+    with nav_col2:
+        if st.button("⏪ Back", key="nav_back"):
+            if st.session_state.current_move_index > 0:
+                st.session_state.current_move_index -= 1
+                st.rerun()
+    
+    with nav_col3:
+        total_moves = len(current_game['positions']) - 1
+        move_slider = st.slider("Move", 0, total_moves, value=move_index, key="move_slider")
+        if move_slider != st.session_state.current_move_index:
+            st.session_state.current_move_index = move_slider
+            st.rerun()
+    
+    with nav_col4:
+        if st.button("⏩ Forward", key="nav_forward"):
+            if st.session_state.current_move_index < len(current_game['positions']) - 1:
+                st.session_state.current_move_index += 1
+                st.rerun()
+    
+    with nav_col5:
+        if st.button("⏭️ End", key="nav_end"):
+            st.session_state.current_move_index = len(current_game['positions']) - 1
+            st.rerun()
+    
+    # Get current position
+    move_index = st.session_state.current_move_index
+    current_fen = current_game['positions'][move_index]
+    
+    # Display current move info
+    if move_index > 0 and move_index <= len(current_game['moves']):
+        current_move = current_game['moves'][move_index - 1]
+        st.info(f"📍 Move {current_move['move_number']}: **{current_move['san']}** ({current_move['turn']})")
+    else:
+        st.info("🚀 Starting position")
+    
+    # Main analysis display
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Board controls
+        board_col1, board_col2 = st.columns([3, 1])
+        
+        with board_col1:
+            st.subheader("♛ Position with Spatial Analysis")
+        
+        with board_col2:
+            # Add flip board option
+            flip_board = st.checkbox("🔄 Flip Board", value=False, key="flip_board_spatial")
+        
+        # Import chess board functionality and display using same method as training
+        try:
+            import chess
+            board = chess.Board(current_fen)
+            
+            # Calculate spatial metrics
+            metrics = spatial_analysis.calculate_spatial_metrics(board)
+            
+            # Display board using the same method as training tab but with spatial overlay
+            display_spatial_board_with_overlay(current_fen, metrics, st.session_state.spatial_settings, flip_board)
+            
+        except Exception as e:
+            st.error(f"Error analyzing position: {str(e)}")
+            st.code(f"FEN: {current_fen}")
+    
+    with col2:
+        # Metrics and insights with colored backgrounds
+        if st.session_state.spatial_settings['show_metrics']:
+            st.markdown("""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 15px; border-radius: 10px; margin: 10px 0;">
+                <h4 style="color: white; margin: 0;">📊 Spatial Metrics</h4>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Display metrics for both colors
+            try:
+                white_metrics = metrics['white']
+                black_metrics = metrics['black']
+                comparison = metrics['comparison']
+                
+                # Controlled area
+                st.markdown("**🗺️ Controlled Area:**")
+                col_w, col_b = st.columns(2)
+                with col_w:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
+                                padding: 10px; border-radius: 5px; text-align: center;">
+                        <h4 style="margin: 0; color: #333;">{white_metrics['area']:.1f}</h4>
+                        <p style="margin: 0; color: #666;">⚪ White</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with col_b:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #495057 0%, #343a40 100%); 
+                                padding: 10px; border-radius: 5px; text-align: center; color: white;">
+                        <h4 style="margin: 0;">{black_metrics['area']:.1f}</h4>
+                        <p style="margin: 0;">⚫ Black</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Squares controlled
+                st.markdown("**📐 Squares Controlled:**")
+                col_w, col_b = st.columns(2)
+                with col_w:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+                                padding: 10px; border-radius: 5px; text-align: center; color: white;">
+                        <h4 style="margin: 0;">{white_metrics['squares_controlled']}</h4>
+                        <p style="margin: 0;">⚪ White</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with col_b:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #dc3545 0%, #e83e8c 100%); 
+                                padding: 10px; border-radius: 5px; text-align: center; color: white;">
+                        <h4 style="margin: 0;">{black_metrics['squares_controlled']}</h4>
+                        <p style="margin: 0;">⚫ Black</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Other metrics with similar styling...
+                st.markdown("**🔗 Connectivity Score:**")
+                col_w, col_b = st.columns(2)
+                with col_w:
+                    st.metric("⚪ White", f"{white_metrics['connectivity_score']:.1f}")
+                with col_b:
+                    st.metric("⚫ Black", f"{black_metrics['connectivity_score']:.1f}")
+                
+                # Center control
+                st.markdown("**🎯 Center Control:**")
+                col_w, col_b = st.columns(2)
+                with col_w:
+                    st.metric("⚪ White", f"{white_metrics['center_control']}")
+                with col_b:
+                    st.metric("⚫ Black", f"{black_metrics['center_control']}")
+                
+                # Connected groups
+                st.markdown("**👥 Connected Groups:**")
+                col_w, col_b = st.columns(2)
+                with col_w:
+                    st.metric("⚪ White", f"{len(white_metrics['connected_components'])}")
+                with col_b:
+                    st.metric("⚫ Black", f"{len(black_metrics['connected_components'])}")
+                
+            except Exception as e:
+                st.error(f"Error displaying metrics: {str(e)}")
+        
+        if st.session_state.spatial_settings['show_insights']:
+            st.markdown("""
+            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                        padding: 15px; border-radius: 10px; margin: 15px 0 10px 0;">
+                <h4 style="color: white; margin: 0;">💡 Insights</h4>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            try:
+                insights_list = spatial_analysis.get_spatial_insights(metrics)
+                for insight in insights_list:
+                    st.markdown(f"""
+                    <div style="background: #e3f2fd; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                        <p style="margin: 0; color: #1976d2;">• {insight}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                if not insights_list:
+                    st.info("No specific insights for this position.")
+                    
+            except Exception as e:
+                st.error(f"Error generating insights: {str(e)}")
+
+    # Show spatial flow analysis
+    st.markdown("---")
+    st.subheader("📈 Spatial Control Flow")
+    
+    if st.button("🔄 Analyze Spatial Evolution", key="spatial_evolution"):
+        with st.spinner("Analyzing spatial control evolution..."):
+            # Calculate metrics for all positions in the game
+            all_positions = current_game['positions']
+            spatial_evolution = []
+            
+            for i, fen in enumerate(all_positions):
+                try:
+                    import chess
+                    board = chess.Board(fen)
+                    pos_metrics = spatial_analysis.calculate_spatial_metrics(board)
+                    
+                    spatial_evolution.append({
+                        'move': i,
+                        'white_area': pos_metrics['white']['area'],
+                        'black_area': pos_metrics['black']['area'],
+                        'white_controlled': pos_metrics['white']['squares_controlled'],
+                        'black_controlled': pos_metrics['black']['squares_controlled'],
+                        'white_connectivity': pos_metrics['white']['connectivity_score'],
+                        'black_connectivity': pos_metrics['black']['connectivity_score']
+                    })
+                except:
+                    continue
+            
+            if spatial_evolution:
+                # Create interactive Plotly charts
+                evolution_df = pd.DataFrame(spatial_evolution)
+                
+                # Area control evolution
+                fig_area = go.Figure()
+                
+                fig_area.add_trace(go.Scatter(
+                    x=evolution_df['move'],
+                    y=evolution_df['white_area'],
+                    mode='lines+markers',
+                    name='White Area',
+                    line=dict(color='lightgray', width=3),
+                    marker=dict(size=6)
+                ))
+                
+                fig_area.add_trace(go.Scatter(
+                    x=evolution_df['move'],
+                    y=evolution_df['black_area'],
+                    mode='lines+markers',
+                    name='Black Area',
+                    line=dict(color='darkgray', width=3),
+                    marker=dict(size=6)
+                ))
+                
+                fig_area.update_layout(
+                    title='🗺️ Spatial Area Control Evolution',
+                    xaxis_title="Move Number",
+                    yaxis_title="Controlled Area",
+                    hovermode='x unified',
+                    height=400
+                )
+                
+                st.plotly_chart(fig_area, use_container_width=True)
+                
+                # Squares controlled evolution
+                fig_squares = go.Figure()
+                
+                fig_squares.add_trace(go.Scatter(
+                    x=evolution_df['move'],
+                    y=evolution_df['white_controlled'],
+                    mode='lines+markers',
+                    name='White Squares',
+                    line=dict(color='#28a745', width=3),
+                    marker=dict(size=6)
+                ))
+                
+                fig_squares.add_trace(go.Scatter(
+                    x=evolution_df['move'],
+                    y=evolution_df['black_controlled'],
+                    mode='lines+markers',
+                    name='Black Squares',
+                    line=dict(color='#dc3545', width=3),
+                    marker=dict(size=6)
+                ))
+                
+                fig_squares.update_layout(
+                    title='📐 Controlled Squares Evolution',
+                    xaxis_title="Move Number",
+                    yaxis_title="Squares Controlled",
+                    hovermode='x unified',
+                    height=400
+                )
+                
+                st.plotly_chart(fig_squares, use_container_width=True)
+                
+                # Connectivity evolution
+                fig_connectivity = go.Figure()
+                
+                fig_connectivity.add_trace(go.Scatter(
+                    x=evolution_df['move'],
+                    y=evolution_df['white_connectivity'],
+                    mode='lines+markers',
+                    name='White Connectivity',
+                    line=dict(color='#4facfe', width=3),
+                    marker=dict(size=6)
+                ))
+                
+                fig_connectivity.add_trace(go.Scatter(
+                    x=evolution_df['move'],
+                    y=evolution_df['black_connectivity'],
+                    mode='lines+markers',
+                    name='Black Connectivity',
+                    line=dict(color='#667eea', width=3),
+                    marker=dict(size=6)
+                ))
+                
+                fig_connectivity.update_layout(
+                    title='🔗 Piece Connectivity Evolution',
+                    xaxis_title="Move Number",
+                    yaxis_title="Connectivity Score",
+                    hovermode='x unified',
+                    height=400
+                )
+                
+                st.plotly_chart(fig_connectivity, use_container_width=True)
+                
+                # Summary insights
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                            padding: 15px; border-radius: 10px; margin: 15px 0;">
+                    <h4 style="color: white; margin: 0;">📊 Evolution Summary</h4>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Calculate trends
+                start_white_area = evolution_df.iloc[0]['white_area']
+                end_white_area = evolution_df.iloc[-1]['white_area']
+                white_area_trend = "📈 Increasing" if end_white_area > start_white_area else "📉 Decreasing"
+                
+                start_black_area = evolution_df.iloc[0]['black_area']
+                end_black_area = evolution_df.iloc[-1]['black_area']
+                black_area_trend = "📈 Increasing" if end_black_area > start_black_area else "📉 Decreasing"
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown(f"""
+                    <div style="background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px; color: #333;">
+                        <h5>⚪ White Trends</h5>
+                        <p>Area Control: {white_area_trend}</p>
+                        <p>Final Area: {end_white_area:.1f}</p>
+                        <p>Final Squares: {evolution_df.iloc[-1]['white_controlled']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    st.markdown(f"""
+                    <div style="background: rgba(0, 0, 0, 0.1); padding: 15px; border-radius: 8px; color: #333;">
+                        <h5>⚫ Black Trends</h5>
+                        <p>Area Control: {black_area_trend}</p>
+                        <p>Final Area: {end_black_area:.1f}</p>
+                        <p>Final Squares: {evolution_df.iloc[-1]['black_controlled']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+def display_spatial_board_with_overlay(fen: str, metrics: dict, settings: dict, flipped: bool = False):
+    """
+    Display chess board with spatial polygon overlays - fixed version.
+    """
+    try:
+        import chess
+        board = chess.Board(fen)
+        
+        # Get user settings for board theme
+        user_settings = auth.get_user_settings(st.session_state.user_id)
+        theme = user_settings.get('theme', 'default') if user_settings else 'default'
+        
+        # Display board using the same method as training tab
+        from chess_board import display_chess_board
+        display_chess_board(fen, theme, flipped=flipped)
+        
+        # Add spatial overlay information as text since polygons are not visible
+        if settings['show_white_polygon'] or settings['show_black_polygon']:
+            st.markdown("""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 10px; border-radius: 8px; margin: 10px 0;">
+                <p style="color: white; margin: 0; text-align: center;">
+                    🔺 Spatial polygons represent controlled squares for each player
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Show controlled squares as text overlay
+        if settings['show_white_polygon']:
+            white_controlled = len(metrics['white']['controlled_squares'])
+            st.markdown(f"""
+            <div style="background: rgba(255, 255, 255, 0.9); 
+                        padding: 8px; border-radius: 5px; margin: 5px 0;">
+                <p style="margin: 0; color: #333; text-align: center;">
+                    ⚪ White controls {white_controlled} squares
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        if settings['show_black_polygon']:
+            black_controlled = len(metrics['black']['controlled_squares'])
+            st.markdown(f"""
+            <div style="background: rgba(0, 0, 0, 0.8); 
+                        padding: 8px; border-radius: 5px; margin: 5px 0;">
+                <p style="margin: 0; color: white; text-align: center;">
+                    ⚫ Black controls {black_controlled} squares
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+    except Exception as e:
+        st.error(f"Error displaying spatial board: {str(e)}")
+        # Fallback to simple board display
+        from chess_board import display_chess_board
+        display_chess_board(fen)
+
+
+def generate_spatial_board_html(fen: str, metrics: dict, settings: dict) -> str:
+    """
+    Generate HTML with chess board and spatial polygon overlays.
+    """
+    board_size = 600
+    square_size = board_size / 8
+    
+    # Start HTML structure
+    html = f"""
+    <div style="position: relative; width: {board_size}px; height: {board_size}px; margin: 0 auto;">
+        <!-- Chess Board -->
+        <svg width="{board_size}" height="{board_size}" style="position: absolute; z-index: 1;">
+    """
+    
+    # Draw board squares
+    for rank in range(8):
+        for file in range(8):
+            x = file * square_size
+            y = rank * square_size
+            
+            # Determine square color
+            is_light = (rank + file) % 2 == 0
+            color = "#F0D9B5" if is_light else "#B58863"
+            
+            html += f'<rect x="{x}" y="{y}" width="{square_size}" height="{square_size}" fill="{color}" />'
+    
+    # Draw coordinate labels
+    files = "abcdefgh"
+    ranks = "87654321"
+    
+    for i, file in enumerate(files):
+        x = i * square_size + square_size/2
+        y = board_size - 10
+        html += f'<text x="{x}" y="{y}" text-anchor="middle" font-size="12" fill="#8B4513">{file}</text>'
+    
+    for i, rank in enumerate(ranks):
+        x = 10
+        y = i * square_size + square_size/2 + 5
+        html += f'<text x="{x}" y="{y}" text-anchor="middle" font-size="12" fill="#8B4513">{rank}</text>'
+    
+    html += "</svg>"
+    
+    # Draw pieces
+    html += f'<svg width="{board_size}" height="{board_size}" style="position: absolute; z-index: 2;">'
+    
+    try:
+        import chess
+        board = chess.Board(fen)
+        
+        # Unicode piece symbols
+        piece_symbols = {
+            'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔',
+            'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚'
+        }
+        
+        for square in chess.SQUARES:
+            piece = board.piece_at(square)
+            if piece:
+                file = chess.square_file(square)
+                rank = 7 - chess.square_rank(square)  # Flip rank
+                
+                x = file * square_size + square_size/2
+                y = rank * square_size + square_size/2 + 5
+                
+                piece_char = piece.symbol()
+                if piece_char in piece_symbols:
+                    color = "#000000" if piece.color == chess.BLACK else "#FFFFFF"
+                    stroke = "#FFFFFF" if piece.color == chess.BLACK else "#000000"
+                    
+                    html += f'''<text x="{x}" y="{y}" text-anchor="middle" font-size="40" 
+                               fill="{color}" stroke="{stroke}" stroke-width="1">
+                               {piece_symbols[piece_char]}</text>'''
+    
+    except Exception as e:
+        pass
+    
+    html += "</svg>"
+    
+    # Draw spatial polygons
+    html += f'<svg width="{board_size}" height="{board_size}" style="position: absolute; z-index: 3;">'
+    
+    try:
+        # White polygon
+        if settings['show_white_polygon'] and metrics['white']['hull_vertices']:
+            white_path = spatial_analysis.generate_polygon_svg_path(
+                metrics['white']['hull_vertices'], board_size
+            )
+            if white_path:
+                opacity = settings['polygon_opacity']
+                html += f'''<path d="{white_path}" 
+                           fill="rgba(255, 255, 255, {opacity})" 
+                           stroke="white" stroke-width="2" />'''
+        
+        # Black polygon
+        if settings['show_black_polygon'] and metrics['black']['hull_vertices']:
+            black_path = spatial_analysis.generate_polygon_svg_path(
+                metrics['black']['hull_vertices'], board_size
+            )
+            if black_path:
+                opacity = settings['polygon_opacity']
+                html += f'''<path d="{black_path}" 
+                           fill="rgba(0, 0, 0, {opacity})" 
+                           stroke="black" stroke-width="2" />'''
+        
+        # Centroids
+        if settings['show_centroids']:
+            # White centroid
+            if metrics['white']['centroid']:
+                cx, cy = metrics['white']['centroid']
+                svg_x = (cx + 0.5) * square_size
+                svg_y = (7.5 - cy) * square_size
+                html += f'<circle cx="{svg_x}" cy="{svg_y}" r="8" fill="red" stroke="white" stroke-width="2" />'
+            
+            # Black centroid
+            if metrics['black']['centroid']:
+                cx, cy = metrics['black']['centroid']
+                svg_x = (cx + 0.5) * square_size
+                svg_y = (7.5 - cy) * square_size
+                html += f'<circle cx="{svg_x}" cy="{svg_y}" r="8" fill="blue" stroke="white" stroke-width="2" />'
+    
+    except Exception as e:
+        pass
+    
+    html += "</svg>"
+    html += "</div>"
+    
+    return html
+
+
+def display_spatial_board_with_overlay(fen: str, metrics: dict, settings: dict, flipped: bool = False):
+    """
+    Display chess board with spatial polygon overlays - enhanced version.
+    """
+    try:
+        import chess
+        board = chess.Board(fen)
+        
+        # Get user settings for board theme
+        user_settings = auth.get_user_settings(st.session_state.user_id)
+        theme = user_settings.get('theme', 'default') if user_settings else 'default'
+        
+        # Display board using the same method as training tab
+        from chess_board import display_chess_board
+        display_chess_board(fen, theme, flipped=flipped)
+        
+        # Create visual overlay for controlled squares using HTML/CSS
+        if settings['show_white_polygon'] or settings['show_black_polygon']:
+            white_squares = metrics['white']['controlled_squares'] if settings['show_white_polygon'] else []
+            black_squares = metrics['black']['controlled_squares'] if settings['show_black_polygon'] else []
+            
+            # Create a visual representation of controlled squares
+            st.markdown("#### 🎯 Controlled Squares Visualization")
+            
+            # Create an 8x8 grid showing controlled squares
+            board_html = create_controlled_squares_grid(white_squares, black_squares, flipped)
+            st.components.v1.html(board_html, height=300)
+            
+        # Show controlled squares as text overlay with better formatting
+        col1, col2 = st.columns(2)
+        
+        if settings['show_white_polygon']:
+            with col1:
+                white_controlled = len(metrics['white']['controlled_squares'])
+                white_area = metrics['white']['area']
+                white_centroid = metrics['white']['centroid']
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
+                            padding: 15px; border-radius: 10px; margin: 5px 0; border: 2px solid #dee2e6;">
+                    <h5 style="margin: 0 0 10px 0; color: #495057;">⚪ White Control</h5>
+                    <p style="margin: 5px 0; color: #6c757d;"><strong>Squares:</strong> {white_controlled}</p>
+                    <p style="margin: 5px 0; color: #6c757d;"><strong>Area:</strong> {white_area:.1f}</p>
+                    <p style="margin: 5px 0; color: #6c757d;"><strong>Center:</strong> ({white_centroid[0]:.1f}, {white_centroid[1]:.1f})</p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        if settings['show_black_polygon']:
+            with col2:
+                black_controlled = len(metrics['black']['controlled_squares'])
+                black_area = metrics['black']['area']
+                black_centroid = metrics['black']['centroid']
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #495057 0%, #343a40 100%); 
+                            padding: 15px; border-radius: 10px; margin: 5px 0; border: 2px solid #6c757d; color: white;">
+                    <h5 style="margin: 0 0 10px 0;">⚫ Black Control</h5>
+                    <p style="margin: 5px 0;"><strong>Squares:</strong> {black_controlled}</p>
+                    <p style="margin: 5px 0;"><strong>Area:</strong> {black_area:.1f}</p>
+                    <p style="margin: 5px 0;"><strong>Center:</strong> ({black_centroid[0]:.1f}, {black_centroid[1]:.1f})</p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Show centroids if enabled
+        if settings['show_centroids']:
+            st.markdown("#### 🎯 Piece Centroids")
+            
+            white_centroid = metrics['white']['centroid']
+            black_centroid = metrics['black']['centroid']
+            
+            # Convert centroid to chess notation
+            white_square = f"{chr(97 + int(white_centroid[0]))}{int(white_centroid[1]) + 1}"
+            black_square = f"{chr(97 + int(black_centroid[0]))}{int(black_centroid[1]) + 1}"
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.info(f"⚪ White centroid: **{white_square}**")
+            with col2:
+                st.info(f"⚫ Black centroid: **{black_square}**")
+        
+    except Exception as e:
+        st.error(f"Error displaying spatial board: {str(e)}")
+        # Fallback to simple board display
+        from chess_board import display_chess_board
+        display_chess_board(fen)
+
+def create_controlled_squares_grid(white_squares, black_squares, flipped=False):
+    """
+    Create an HTML grid showing controlled squares with better contrast.
+    """
+    # Convert squares to a more visual format
+    grid_size = 36  # Size of each square in pixels
+    board_size = grid_size * 8
+    
+    html = f"""
+    <div style="margin: 10px auto; width: {board_size}px; height: {board_size}px; border: 2px solid #8B4513;">
+        <div style="display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); width: 100%; height: 100%;">
+    """
+    
+    for rank in range(8):
+        for file in range(8):
+            # Adjust for flipped board
+            display_rank = rank if not flipped else 7 - rank
+            display_file = file if not flipped else 7 - file
+            
+            actual_rank = 7 - display_rank  # Convert to chess coordinates
+            actual_file = display_file
+            
+            # Check if this square is controlled
+            is_white_controlled = (actual_file, actual_rank) in white_squares
+            is_black_controlled = (actual_file, actual_rank) in black_squares
+            
+            # Determine background color
+            is_light_square = (rank + file) % 2 == 0
+            base_color = "#F0D9B5" if is_light_square else "#B58863"
+            
+            if is_white_controlled and is_black_controlled:
+                # Both control - purple with good contrast
+                bg_color = "#8A2BE2"  # Blue violet
+                border_color = "#4B0082"  # Indigo
+                text_color = "white"
+                symbol = "●"
+            elif is_white_controlled:
+                # White controls - blue background for better contrast
+                bg_color = "#4169E1"  # Royal blue
+                border_color = "#0000CD"  # Medium blue
+                text_color = "white"
+                symbol = "○"
+            elif is_black_controlled:
+                # Black controls - red background for contrast
+                bg_color = "#DC143C"  # Crimson
+                border_color = "#8B0000"  # Dark red
+                text_color = "white"
+                symbol = "●"
+            else:
+                # No control - base color
+                bg_color = base_color
+                border_color = "#8B4513"
+                text_color = "#8B4513"
+                symbol = ""
+            
+            html += f"""
+            <div style="background-color: {bg_color}; border: 1px solid {border_color}; 
+                        display: flex; align-items: center; justify-content: center; 
+                        font-size: 16px; color: {text_color}; font-weight: bold;">
+                {symbol}
+            </div>
+            """
+    
+    html += """
+        </div>
+    </div>
+    <div style="text-align: center; margin-top: 10px; font-size: 14px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+        <h5 style="margin: 0 0 8px 0; color: #333;">🎯 Control Legend</h5>
+        <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+            <span style="display: flex; align-items: center; gap: 5px;">
+                <div style="width: 20px; height: 20px; background: #4169E1; border-radius: 3px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px;">○</div>
+                <span style="color: #333;">White Controlled</span>
+            </span>
+            <span style="display: flex; align-items: center; gap: 5px;">
+                <div style="width: 20px; height: 20px; background: #DC143C; border-radius: 3px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px;">●</div>
+                <span style="color: #333;">Black Controlled</span>
+            </span>
+            <span style="display: flex; align-items: center; gap: 5px;">
+                <div style="width: 20px; height: 20px; background: #8A2BE2; border-radius: 3px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px;">●</div>
+                <span style="color: #333;">Both Players</span>
+            </span>
+            <span style="display: flex; align-items: center; gap: 5px;">
+                <div style="width: 20px; height: 20px; background: #F0D9B5; border: 1px solid #8B4513; border-radius: 3px;"></div>
+                <span style="color: #333;">Uncontrolled</span>
+            </span>
+        </div>
+    </div>
+    """
+    
+    return html
+
 def display_settings_page():
     """
-    Display the settings page.
+    Display the settings page with Plotly charts and enhanced design.
     """
-    st.title("Settings")
+    st.title("⚙️ Settings")
     
     # Get current user settings
     user_settings = auth.get_user_settings(st.session_state.user_id)
@@ -891,28 +1988,33 @@ def display_settings_page():
         user_settings = settings.initialize_default_settings()
     
     # Create tabs for different settings sections
-    tab1, tab2, tab3 = st.tabs(["Training Settings", "Display Settings", "Data Management"])
+    tab1, tab2, tab3 = st.tabs(["🎯 Training Settings", "🎨 Display Settings", "📂 Data Management"])
     
     with tab1:
-        st.header("Training Settings")
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 15px; border-radius: 10px; margin: 15px 0;">
+            <h3 style="color: white; margin: 0;">Training Settings</h3>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Position loading option
-        random_positions = st.checkbox("Load Random Positions", 
+        random_positions = st.checkbox("🎲 Load Random Positions", 
                                      value=user_settings.get('random_positions', True),
                                      help="If checked, positions will be loaded randomly. If unchecked, positions will be loaded in sequence.")
         
         # Top N threshold
-        top_n_threshold = st.slider("Top N Move Threshold", 
+        top_n_threshold = st.slider("🎯 Top N Move Threshold", 
                                   min_value=1, max_value=5, value=user_settings.get('top_n_threshold', 3),
                                   help="Moves within Top N will be considered correct (subject to score difference)")
         
         # Score difference threshold
-        score_diff_threshold = st.slider("Score Difference Threshold", 
+        score_diff_threshold = st.slider("📊 Score Difference Threshold", 
                                        min_value=0, max_value=50, value=user_settings.get('score_difference_threshold', 10),
                                        help="Maximum score difference allowed from the top move (in centipawns)")
         
         # Save training settings
-        if st.button("Save Training Settings"):
+        if st.button("💾 Save Training Settings", type="primary"):
             new_settings = {
                 'random_positions': random_positions,
                 'top_n_threshold': top_n_threshold,
@@ -921,55 +2023,125 @@ def display_settings_page():
             
             success = settings.update_user_settings(st.session_state.user_id, new_settings)
             if success:
-                st.success("Training settings updated successfully!")
+                st.success("✅ Training settings updated successfully!")
     
     with tab2:
-        st.header("Display Settings")
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                    padding: 15px; border-radius: 10px; margin: 15px 0;">
+            <h3 style="color: white; margin: 0;">Display Settings</h3>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Theme selection
-        theme = st.selectbox("Board Theme", 
+        theme = st.selectbox("🎨 Board Theme", 
                            options=list(config.BOARD_THEMES.keys()),
                            index=list(config.BOARD_THEMES.keys()).index(user_settings.get('theme', 'default')),
                            help="Select a chess board theme")
         
+        # Preview theme colors
+        selected_theme = config.BOARD_THEMES[theme]
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"""
+            <div style="background: {selected_theme['light_square']}; padding: 20px; border-radius: 8px; text-align: center; border: 2px solid #dee2e6;">
+                <h5 style="margin: 0; color: #333;">Light Squares</h5>
+                <p style="margin: 5px 0; font-size: 12px; color: #666;">{selected_theme['light_square']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"""
+            <div style="background: {selected_theme['dark_square']}; padding: 20px; border-radius: 8px; text-align: center; border: 2px solid #dee2e6;">
+                <h5 style="margin: 0; color: white;">Dark Squares</h5>
+                <p style="margin: 5px 0; font-size: 12px; color: #ccc;">{selected_theme['dark_square']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
         # Save display settings
-        if st.button("Save Display Settings"):
+        if st.button("💾 Save Display Settings", type="primary"):
             new_settings = {
                 'theme': theme
             }
             
             success = settings.update_user_settings(st.session_state.user_id, new_settings)
             if success:
-                st.success("Display settings updated successfully!")
+                st.success("✅ Display settings updated successfully!")
     
     with tab3:
-        st.header("Data Management")
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
+                    padding: 15px; border-radius: 10px; margin: 15px 0;">
+            <h3 style="color: white; margin: 0;">Data Management</h3>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Database statistics
         db_stats = settings.get_db_stats()
         
+        # Display stats in a nice layout with colored backgrounds
+        st.subheader("📊 Database Statistics")
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("Positions", db_stats['positions_count'])
-        with col2:
-            st.metric("Moves", db_stats['moves_count'])
-        with col3:
-            st.metric("Users", db_stats['users_count'])
-        with col4:
-            st.metric("User Moves", db_stats['user_moves_count'])
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 15px; border-radius: 8px; text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 2em;">{db_stats['positions_count']:,}</h3>
+                <p style="margin: 5px 0 0 0;">📍 Positions</p>
+            </div>
+            """, unsafe_allow_html=True)
         
-        st.metric("Database Size", f"{db_stats['db_size_mb']} MB")
+        with col2:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); 
+                        padding: 15px; border-radius: 8px; text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 2em;">{db_stats['moves_count']:,}</h3>
+                <p style="margin: 5px 0 0 0;">♟️ Moves</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
+                        padding: 15px; border-radius: 8px; text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 2em;">{db_stats['users_count']:,}</h3>
+                <p style="margin: 5px 0 0 0;">👤 Users</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col4:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); 
+                        padding: 15px; border-radius: 8px; text-align: center; color: #333;">
+                <h3 style="margin: 0; font-size: 2em;">{db_stats['user_moves_count']:,}</h3>
+                <p style="margin: 5px 0 0 0;">🎯 User Moves</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 15px; border-radius: 8px; text-align: center; color: white; margin: 15px 0;">
+            <h3 style="margin: 0; font-size: 2em;">{db_stats['db_size_mb']} MB</h3>
+            <p style="margin: 5px 0 0 0;">💾 Database Size</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Import positions from JSONL
-        st.subheader("Import Positions from JSONL")
+        st.subheader("📥 Import Positions from JSONL")
         
         uploaded_file = st.file_uploader("Upload JSONL File", type=['jsonl'])
         
         if uploaded_file is not None:
-            # Display file info
-            file_details = {"FileName": uploaded_file.name, "FileType": uploaded_file.type, "FileSize": f"{uploaded_file.size / 1024:.2f} KB"}
-            st.write(file_details)
+            # Display file info with enhanced styling
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); 
+                        padding: 15px; border-radius: 8px; margin: 15px 0;">
+                <h5 style="margin: 0 0 10px 0; color: #1976d2;">📁 File Information</h5>
+                <p style="margin: 5px 0; color: #333;"><strong>Name:</strong> {uploaded_file.name}</p>
+                <p style="margin: 5px 0; color: #333;"><strong>Type:</strong> {uploaded_file.type}</p>
+                <p style="margin: 5px 0; color: #333;"><strong>Size:</strong> {uploaded_file.size / 1024:.2f} KB</p>
+            </div>
+            """, unsafe_allow_html=True)
             
             # Create a temp file path for the uploaded file
             import tempfile
@@ -980,64 +2152,71 @@ def display_settings_page():
             with open(temp_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
             
+            col1, col2 = st.columns(2)
+            
             # Option to validate file first
-            if st.button("Validate JSONL File"):
-                from jsonl_loader import validate_jsonl_file
-                is_valid, message = validate_jsonl_file(temp_path)
-                
-                if is_valid:
-                    st.success(message)
-                else:
-                    st.error(message)
+            with col1:
+                if st.button("🔍 Validate JSONL File"):
+                    from jsonl_loader import validate_jsonl_file
+                    is_valid, message = validate_jsonl_file(temp_path)
+                    
+                    if is_valid:
+                        st.success(message)
+                    else:
+                        st.error(message)
             
             # Option to import positions
-            if st.button("Import Positions to Database"):
-                from jsonl_loader import import_positions
-                import_result = import_positions(temp_path)
-                
-                if import_result["success"]:
-                    st.success(import_result["message"])
-                    st.info(f"Total positions in database: {import_result['total_positions']}")
-                else:
-                    st.error(import_result["message"])
-                
-                # Clean up temp file
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
+            with col2:
+                if st.button("⬆️ Import Positions", type="primary"):
+                    from jsonl_loader import import_positions
+                    import_result = import_positions(temp_path)
+                    
+                    if import_result["success"]:
+                        st.success(import_result["message"])
+                        st.info(f"Total positions in database: {import_result['total_positions']:,}")
+                    else:
+                        st.error(import_result["message"])
+                    
+                    # Clean up temp file
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
                 
         # Show position statistics if positions exist
         if db_stats['positions_count'] > 0:
-            st.subheader("Position Statistics")
+            st.subheader("📈 Position Statistics")
             
             from jsonl_loader import get_position_stats
             position_stats = get_position_stats()
             
-            # Display phase breakdown
+            # Display phase breakdown with Plotly
             phase_data = position_stats.get('positions_by_phase', {})
             if phase_data:
-                phases = list(phase_data.keys())
-                counts = list(phase_data.values())
+                phases_df = pd.DataFrame({
+                    'Phase': list(phase_data.keys()),
+                    'Count': list(phase_data.values())
+                })
                 
-                fig, ax = plt.subplots(figsize=(10, 5))
-                bars = ax.bar(phases, counts)
+                fig = px.bar(
+                    phases_df, 
+                    x='Phase', 
+                    y='Count',
+                    title='Positions by Game Phase',
+                    color='Count',
+                    color_continuous_scale='viridis'
+                )
                 
-                # Color the bars
-                colors = ['#e8c1a0', '#f47560', '#1e466e']
-                for i, bar in enumerate(bars):
-                    bar.set_color(colors[i % len(colors)])
+                fig.update_layout(
+                    xaxis_title="Game Phase",
+                    yaxis_title="Number of Positions",
+                    showlegend=False
+                )
                 
-                ax.set_xlabel('Game Phase')
-                ax.set_ylabel('Number of Positions')
-                ax.set_title('Positions by Game Phase')
+                fig.update_traces(texttemplate='%{y}', textposition='outside')
                 
-                # Add value labels
-                for i, v in enumerate(counts):
-                    ax.text(i, v + 0.5, str(v), ha='center')
-                
-                st.pyplot(fig)
+                st.plotly_chart(fig, use_container_width=True)
             
-            # Display move classification breakdown
-            st.subheader("Move Classifications")
+            # Display move classification breakdown with Plotly
+            st.subheader("🏆 Move Classifications")
             move_data = position_stats.get('moves_by_classification', {})
             if move_data:
                 # Convert to DataFrame for easier display
@@ -1047,38 +2226,45 @@ def display_settings_page():
                 })
                 move_df = move_df.sort_values('Count', ascending=False)
                 
-                fig, ax = plt.subplots(figsize=(10, 5))
-                bars = ax.bar(move_df['Classification'], move_df['Count'])
-                
-                # Color the bars based on classification
-                colors = {
-                    'great': 'green',
-                    'good': 'lightgreen',
-                    'inaccuracy': 'yellow',
-                    'mistake': 'orange',
-                    'blunder': 'red'
+                # Color mapping for move classifications
+                colors_map = {
+                    'great': '#2E8B57',      # SeaGreen
+                    'good': '#90EE90',       # LightGreen
+                    'inaccuracy': '#FFD700', # Gold
+                    'mistake': '#FF8C00',    # DarkOrange
+                    'blunder': '#DC143C'     # Crimson
                 }
                 
-                for i, classification in enumerate(move_df['Classification']):
-                    bars[i].set_color(colors.get(classification, 'blue'))
+                move_df['color'] = move_df['Classification'].map(
+                    lambda x: colors_map.get(x, '#4472C4')
+                )
                 
-                ax.set_xlabel('Classification')
-                ax.set_ylabel('Number of Moves')
-                ax.set_title('Moves by Classification')
+                fig = go.Figure(data=[
+                    go.Bar(
+                        x=move_df['Classification'],
+                        y=move_df['Count'],
+                        marker_color=move_df['color'],
+                        text=move_df['Count'],
+                        textposition='outside'
+                    )
+                ])
                 
-                # Add value labels
-                for i, v in enumerate(move_df['Count']):
-                    ax.text(i, v + 0.5, str(v), ha='center')
+                fig.update_layout(
+                    title='Moves by Classification',
+                    xaxis_title="Classification",
+                    yaxis_title="Number of Moves",
+                    showlegend=False
+                )
                 
-                st.pyplot(fig)
+                st.plotly_chart(fig, use_container_width=True)
             
             # Option to clear positions (with safety warning)
-            st.subheader("Database Management")
+            st.subheader("🗑️ Database Management")
             
-            with st.expander("Advanced Options"):
-                st.warning("WARNING: The following operations can result in data loss!")
+            with st.expander("⚠️ Advanced Options"):
+                st.warning("**WARNING:** The following operations can result in data loss!")
                 
-                if st.button("Clear All Positions", key="clear_positions"):
+                if st.button("🗑️ Clear All Positions", key="clear_positions", type="secondary"):
                     from jsonl_loader import clear_positions
                     success, message = clear_positions()
                     
@@ -1126,6 +2312,8 @@ def main():
         display_analysis_page()
     elif menu_selection == "Insights":
         display_insights_page()
+    elif menu_selection == "Spatial Analysis":
+        display_spatial_analysis_page()
     elif menu_selection == "Settings":
         display_settings_page()
 
