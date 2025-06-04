@@ -872,7 +872,7 @@ def display_spatial_analysis():
                         # Load games
                         if st.button("⚡ Load Games", use_container_width=True):
                             with st.spinner("🎯 Loading games..."):
-                                games = pgn_loader.parse_multiple_games(file_content, max_games=100)
+                                games = pgn_loader.parse_multiple_games(file_content, max_games=10000)
                                 st.session_state.loaded_games = games
                                 st.session_state.games_file_content = file_content
                                 st.success(f"🎉 Loaded {len(games)} games!")
