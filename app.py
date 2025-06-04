@@ -41,6 +41,10 @@ if 'current_position' not in st.session_state:
     st.session_state.current_position = None
 if 'timer_start' not in st.session_state:
     st.session_state.timer_start = None
+if 'timer_paused' not in st.session_state:
+    st.session_state.timer_paused = False
+if 'paused_time' not in st.session_state:
+    st.session_state.paused_time = 0
 if 'last_move_record' not in st.session_state:
     st.session_state.last_move_record = None
 if 'menu_selection' not in st.session_state:
@@ -62,6 +66,8 @@ if 'spatial_settings' not in st.session_state:
         'show_insights': True,
         'polygon_opacity': 0.3
     }
+if 'games_filter_range' not in st.session_state:
+    st.session_state.games_filter_range = None
 
 # At the beginning of the file, ensure we have the necessary session state variables
 # Add session state initialization at the beginning of the function
@@ -124,6 +130,8 @@ def reset_training_session():
     """
     st.session_state.current_position = None
     st.session_state.timer_start = None
+    st.session_state.timer_paused = False
+    st.session_state.paused_time = 0
     st.session_state.last_move_record = None
 
 
@@ -155,6 +163,78 @@ def load_new_position():
         return
     
     st.session_state.timer_start = time.time()
+    st.session_state.timer_paused = False
+    st.session_state.paused_time = 0
+
+def get_elapsed_time():
+    """
+    Get the current elapsed time considering pauses.
+    """
+    if st.session_state.timer_start is None:
+        return 0
+    
+    if st.session_state.timer_paused:
+        return st.session_state.paused_time
+    else:
+        current_time = time.time() - st.session_state.timer_start
+        return current_time + st.session_state.paused_time
+
+def display_real_time_timer():
+    """
+    Display a real-time updating timer with pause functionality.
+    """
+    if st.session_state.timer_start is None:
+        return
+    
+    # Create placeholder for timer
+    timer_placeholder = st.empty()
+    control_col1, control_col2 = st.columns(2)
+    
+    with control_col1:
+        if st.button("⏸️ Pause" if not st.session_state.timer_paused else "▶️ Resume", key="timer_control"):
+            if not st.session_state.timer_paused:
+                # Pause the timer
+                st.session_state.paused_time = get_elapsed_time()
+                st.session_state.timer_paused = True
+            else:
+                # Resume the timer
+                st.session_state.timer_start = time.time()
+                st.session_state.timer_paused = False
+            st.rerun()
+    
+    with control_col2:
+        if st.button("🔄 Reset Timer", key="timer_reset"):
+            st.session_state.timer_start = time.time()
+            st.session_state.timer_paused = False
+            st.session_state.paused_time = 0
+            st.rerun()
+    
+    # Display current time
+    elapsed_time = get_elapsed_time()
+    
+    # Color-code timer
+    if elapsed_time < 10:
+        timer_color = "#28a745"
+        status = "Excellent"
+    elif elapsed_time < 30:
+        timer_color = "#ffc107"
+        status = "Good"
+    else:
+        timer_color = "#dc3545"
+        status = "Take your time"
+    
+    timer_placeholder.markdown(f"""
+    <div style="text-align: center; padding: 15px; background-color: {timer_color}; 
+                border-radius: 8px; margin: 10px 0;">
+        <h3 style="color: white; margin: 0;">⏱️ {elapsed_time:.1f}s</h3>
+        <p style="color: white; margin: 5px 0 0 0; font-size: 14px;">{status} {'(Paused)' if st.session_state.timer_paused else ''}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Auto-refresh timer every second if not paused
+    if not st.session_state.timer_paused:
+        time.sleep(1)
+        st.rerun()
 
 
 def display_train_page():
@@ -172,11 +252,15 @@ def display_train_page():
             if st.button("🎲 Random", key="random_position_sidebar"):
                 st.session_state.current_position = training.get_random_position()
                 st.session_state.timer_start = time.time()
+                st.session_state.timer_paused = False
+                st.session_state.paused_time = 0
         
         with col2:
             if st.button("▶️ Next", key="next_position_sidebar"):
                 st.session_state.current_position = training.get_sequential_position(st.session_state.user_id)
-                st.session_state.timer_start = time.time()        
+                st.session_state.timer_start = time.time()
+                st.session_state.timer_paused = False
+                st.session_state.paused_time = 0
         st.divider()
         
         # Load specific position
@@ -187,6 +271,8 @@ def display_train_page():
             if position:
                 st.session_state.current_position = position
                 st.session_state.timer_start = time.time()
+                st.session_state.timer_paused = False
+                st.session_state.paused_time = 0
                 st.success(f"Loaded position #{position_id}")
             else:
                 st.error("Position not found")
@@ -239,7 +325,7 @@ def display_train_page():
     with col2:
         # Timer display - more compact
         if st.session_state.timer_start:
-            elapsed_time = time.time() - st.session_state.timer_start
+            elapsed_time = get_elapsed_time()
             
             # Color-code timer
             if elapsed_time < 10:
@@ -253,6 +339,7 @@ def display_train_page():
             <div style="text-align: center; padding: 12px; background-color: {timer_color}; 
                         border-radius: 8px; margin: 10px 0;">
                 <h4 style="color: white; margin: 0;">⏱️ {elapsed_time:.1f}s</h4>
+                <p style="color: white; margin: 0; font-size: 12px;">{'(Paused)' if st.session_state.timer_paused else ''}</p>
             </div>
             """, unsafe_allow_html=True)
 
@@ -422,7 +509,7 @@ def display_train_page():
         selected_move = st.selectbox("Choose a move", legal_moves, key="move_selector")
                 
         if st.button("🚀 Submit Move", key="submit_move_button", type="primary"):
-            elapsed_time = time.time() - st.session_state.timer_start
+            elapsed_time = get_elapsed_time()
             
             # Find if the selected move is among the top moves
             top_move_dict = next((m for m in position['moves'] if m['move'] == selected_move), None)
@@ -519,6 +606,93 @@ def display_train_page():
                 st.session_state.show_moves_table = True
                 st.session_state.current_moves_data = position['moves'][:10]
 
+    # NEW: Enhanced Position Information Section
+    with st.expander("📋 Position Information & Timer", expanded=True):
+        # Timer Section
+        st.markdown("#### ⏱️ Timer Controls")
+        
+        timer_col1, timer_col2, timer_col3 = st.columns(3)
+        
+        with timer_col1:
+            if st.button("⏸️ Pause" if not st.session_state.timer_paused else "▶️ Resume", key="main_timer_control"):
+                if not st.session_state.timer_paused:
+                    st.session_state.paused_time = get_elapsed_time()
+                    st.session_state.timer_paused = True
+                else:
+                    st.session_state.timer_start = time.time()
+                    st.session_state.timer_paused = False
+                st.rerun()
+        
+        with timer_col2:
+            if st.button("🔄 Reset Timer", key="main_timer_reset"):
+                st.session_state.timer_start = time.time()
+                st.session_state.timer_paused = False
+                st.session_state.paused_time = 0
+                st.rerun()
+        
+        with timer_col3:
+            elapsed_time = get_elapsed_time()
+            st.metric("Current Time", f"{elapsed_time:.1f}s", 
+                     delta="Paused" if st.session_state.timer_paused else "Running")
+        
+        # Real-time timer display
+        timer_placeholder = st.empty()
+        if st.session_state.timer_start and not st.session_state.timer_paused:
+            current_elapsed = get_elapsed_time()
+            timer_placeholder.markdown(f"""
+            <div style="text-align: center; padding: 10px; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
+                        border-radius: 5px; margin: 10px 0;">
+                <h4 style="color: white; margin: 0;">Live Timer: {current_elapsed:.1f}s</h4>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # FEN Section
+        st.markdown("#### 🎲 Position FEN")
+        st.code(position['fen'], language="text")
+        
+        if st.button("📋 Copy FEN", key="copy_fen"):
+            st.success("FEN copied to clipboard! (In a real app, this would copy to clipboard)")
+        
+        # Position Metadata
+        if position.get('metadata'):
+            metadata = position['metadata']
+            
+            st.markdown("#### 📊 Position Metadata")
+            
+            # Material Balance
+            if 'material' in metadata:
+                material = metadata['material']
+                st.markdown("**Material Balance:**")
+                mat_col1, mat_col2, mat_col3 = st.columns(3)
+                with mat_col1:
+                    st.metric("White Total", material.get('white_total', 0))
+                with mat_col2:
+                    st.metric("Black Total", material.get('black_total', 0))
+                with mat_col3:
+                    st.metric("Imbalance", f"{material.get('imbalance', 0):+}")
+            
+            # King Safety
+            if 'king_safety' in metadata:
+                king_safety = metadata['king_safety']
+                st.markdown("**King Safety:**")
+                ks_col1, ks_col2 = st.columns(2)
+                with ks_col1:
+                    white_ks = king_safety.get('white', {})
+                    st.metric("White Pawn Shield", white_ks.get('pawn_shield', 0))
+                with ks_col2:
+                    black_ks = king_safety.get('black', {})
+                    st.metric("Black Pawn Shield", black_ks.get('pawn_shield', 0))
+            
+            # Center Control
+            if 'center_control' in metadata:
+                center = metadata['center_control']
+                st.markdown("**Center Control:**")
+                cc_col1, cc_col2 = st.columns(2)
+                with cc_col1:
+                    st.metric("White", center.get('white', 0))
+                with cc_col2:
+                    st.metric("Black", center.get('black', 0))
+
     # Enhanced Top Moves Table
     if st.session_state.show_moves_table and st.session_state.current_moves_data:
         display_enhanced_moves_table(position, st.session_state.current_moves_data, selected_move)
@@ -606,6 +780,45 @@ def display_analysis_page():
     
     st.divider()
     
+    # Enhanced Material Analysis
+    material_stats = analysis.get_material_analysis(st.session_state.user_id)
+    if material_stats:
+        st.subheader("⚖️ Material Balance Analysis")
+        
+        # Create tabs for different material analyses
+        tab1, tab2 = st.tabs(["Material Imbalance", "Piece-specific Performance"])
+        
+        with tab1:
+            material_df = pd.DataFrame(material_stats['imbalance_performance'])
+            if not material_df.empty:
+                fig = px.bar(material_df, x='imbalance_range', y='accuracy',
+                           title='Accuracy by Material Imbalance',
+                           color='accuracy', color_continuous_scale='RdYlGn')
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
+        
+        with tab2:
+            piece_df = pd.DataFrame(material_stats['piece_performance'])
+            if not piece_df.empty:
+                fig = px.bar(piece_df, x='piece_advantage', y='accuracy',
+                           title='Performance with Piece Advantages',
+                           color='accuracy', color_continuous_scale='RdYlGn')
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
+    
+    # Enhanced Mobility Analysis
+    mobility_stats = analysis.get_mobility_analysis(st.session_state.user_id)
+    if mobility_stats:
+        st.subheader("🏃 Mobility Analysis")
+        
+        mobility_df = pd.DataFrame(mobility_stats)
+        if not mobility_df.empty:
+            fig = px.scatter(mobility_df, x='mobility_advantage', y='accuracy',
+                           size='total_positions', title='Accuracy vs Mobility Advantage',
+                           color='accuracy', color_continuous_scale='RdYlGn')
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+    
     # Category analysis with Plotly
     if summary['category_stats']:
         st.subheader("🎯 Performance by Category")
@@ -628,7 +841,8 @@ def display_analysis_page():
             xaxis_title="Game Phase",
             yaxis_title="Accuracy (%)",
             yaxis=dict(range=[0, 100]),
-            showlegend=False
+            showlegend=False,
+            height=400
         )
         
         # Add value labels
@@ -666,7 +880,8 @@ def display_analysis_page():
             xaxis_title="Color",
             yaxis_title="Accuracy (%)",
             yaxis=dict(range=[0, 100]),
-            showlegend=False
+            showlegend=False,
+            height=400
         )
         
         st.plotly_chart(fig, use_container_width=True)
@@ -682,7 +897,7 @@ def display_insights_page():
     st.title("🧠 Chess Insights")
     
     # Create tabs for different insights
-    tab1, tab2, tab3, tab4 = st.tabs(["⚔️ Tactical", "🏗️ Structural", "⏱️ Time", "📅 Calendar"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["⚔️ Tactical", "🏗️ Structural", "⏱️ Time", "📅 Calendar", "⚖️ Material"])
     
     with tab1:
         st.header("Tactical Analysis")
@@ -710,7 +925,8 @@ def display_insights_page():
                 yaxis_title="Accuracy (%)",
                 yaxis=dict(range=[0, 100]),
                 xaxis_tickangle=-45,
-                showlegend=False
+                showlegend=False,
+                height=400
             )
             
             fig.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
@@ -726,100 +942,42 @@ def display_insights_page():
     with tab2:
         st.header("Structural Analysis")
         
-        # Get structural analysis data
-        structural_data = insights.get_structural_analysis(st.session_state.user_id)
+        # Get enhanced structural analysis data
+        structural_data = insights.get_enhanced_structural_analysis(st.session_state.user_id)
         
         if structural_data:
-            st.subheader("Pawn Structure")
-            
-            # Convert to DataFrame for easier display
+            # Pawn Structure Analysis
+            st.subheader("♟️ Pawn Structure Performance")
             pawn_df = pd.DataFrame(structural_data['pawn_structure'])
             
             if not pawn_df.empty:
-                # Create Plotly bar chart
-                fig = px.bar(
-                    pawn_df, 
-                    x='structure', 
-                    y='accuracy',
-                    title='Accuracy by Pawn Structure',
-                    color='accuracy',
-                    color_continuous_scale='RdYlGn',
-                    range_color=[0, 100]
-                )
-                
-                fig.update_layout(
-                    xaxis_title="Pawn Structure",
-                    yaxis_title="Accuracy (%)",
-                    yaxis=dict(range=[0, 100]),
-                    xaxis_tickangle=-45,
-                    showlegend=False
-                )
-                
-                fig.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
-                
+                fig = px.bar(pawn_df, x='structure', y='accuracy',
+                           title='Performance by Pawn Structure Type',
+                           color='accuracy', color_continuous_scale='RdYlGn')
+                fig.update_layout(height=350, xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Not enough pawn structure data available yet.")
             
-            st.subheader("Center Control")
-            
-            # Convert to DataFrame for easier display
-            center_df = pd.DataFrame(structural_data['center_control'])
-            
-            if not center_df.empty:
-                # Create Plotly bar chart
-                fig = px.bar(
-                    center_df, 
-                    x='control', 
-                    y='accuracy',
-                    title='Accuracy by Center Control',
-                    color='accuracy',
-                    color_continuous_scale='RdYlGn',
-                    range_color=[0, 100]
-                )
-                
-                fig.update_layout(
-                    xaxis_title="Center Control",
-                    yaxis_title="Accuracy (%)",
-                    yaxis=dict(range=[0, 100]),
-                    showlegend=False
-                )
-                
-                fig.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
-                
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Not enough center control data available yet.")
-            
-            st.subheader("King Safety")
-            
-            # Convert to DataFrame for easier display
+            # King Safety Analysis
+            st.subheader("👑 King Safety Performance")
             king_df = pd.DataFrame(structural_data['king_safety'])
             
             if not king_df.empty:
-                # Create Plotly bar chart
-                fig = px.bar(
-                    king_df, 
-                    x='safety', 
-                    y='accuracy',
-                    title='Accuracy by King Safety',
-                    color='accuracy',
-                    color_continuous_scale='RdYlGn',
-                    range_color=[0, 100]
-                )
-                
-                fig.update_layout(
-                    xaxis_title="King Safety",
-                    yaxis_title="Accuracy (%)",
-                    yaxis=dict(range=[0, 100]),
-                    showlegend=False
-                )
-                
-                fig.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
-                
+                fig = px.bar(king_df, x='safety_level', y='accuracy',
+                           title='Performance by King Safety Level',
+                           color='accuracy', color_continuous_scale='RdYlGn')
+                fig.update_layout(height=350)
                 st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Not enough king safety data available yet.")
+            
+            # Center Control Analysis
+            st.subheader("🎯 Center Control Performance")
+            center_df = pd.DataFrame(structural_data['center_control'])
+            
+            if not center_df.empty:
+                fig = px.bar(center_df, x='control_advantage', y='accuracy',
+                           title='Performance by Center Control Advantage',
+                           color='accuracy', color_continuous_scale='RdYlGn')
+                fig.update_layout(height=350)
+                st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No structural patterns analyzed yet. Complete more training to see insights.")
     
@@ -854,7 +1012,8 @@ def display_insights_page():
                     xaxis_title="Time Taken",
                     yaxis_title="Accuracy (%)",
                     yaxis=dict(range=[0, 100]),
-                    showlegend=False
+                    showlegend=False,
+                    height=400
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
@@ -920,7 +1079,8 @@ def display_insights_page():
                     title='Training Activity Over Time',
                     xaxis_title="Date",
                     yaxis_title="Count",
-                    hovermode='x unified'
+                    hovermode='x unified',
+                    height=400
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
@@ -939,7 +1099,8 @@ def display_insights_page():
                 fig.update_layout(
                     xaxis_title="Date",
                     yaxis_title="Accuracy (%)",
-                    yaxis=dict(range=[0, 100])
+                    yaxis=dict(range=[0, 100]),
+                    height=400
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
@@ -951,6 +1112,42 @@ def display_insights_page():
                 st.info("No calendar data available yet.")
         else:
             st.info("No calendar progress available yet. Complete more training to see insights.")
+    
+    with tab5:
+        st.header("Material Analysis")
+        
+        # Get material insights
+        material_insights = insights.get_material_insights(st.session_state.user_id)
+        
+        if material_insights:
+            # Material imbalance performance
+            st.subheader("⚖️ Performance by Material Imbalance")
+            
+            imbalance_df = pd.DataFrame(material_insights['imbalance_performance'])
+            if not imbalance_df.empty:
+                fig = px.bar(imbalance_df, x='imbalance_range', y='accuracy',
+                           title='Accuracy in Different Material Imbalances',
+                           color='accuracy', color_continuous_scale='RdYlGn')
+                fig.update_layout(height=350)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Piece count analysis
+            st.subheader("👑 Performance by Total Pieces on Board")
+            
+            pieces_df = pd.DataFrame(material_insights['piece_count_performance'])
+            if not pieces_df.empty:
+                fig = px.line(pieces_df, x='total_pieces', y='accuracy',
+                            title='Accuracy vs Total Pieces on Board',
+                            markers=True)
+                fig.update_layout(height=350)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Display key insights
+            st.subheader("🔍 Key Material Insights")
+            for insight in material_insights.get('key_insights', []):
+                st.info(insight)
+        else:
+            st.info("No material analysis available yet. Complete more training to see insights.")
 
 def display_enhanced_moves_table(position, moves_data, selected_move):
     """
@@ -1052,41 +1249,72 @@ def display_enhanced_moves_table(position, moves_data, selected_move):
 @st.dialog("Position After Move")
 def display_move_popup(position, move_data):
     """
-    Display position after a move in a popup dialog.
+    Display position after a move in a popup dialog with enhanced error handling.
     """
     try:
         import chess
         board = chess.Board(position['fen'])
         
-        # Make the move
+        # Make the move with enhanced error checking
         move_uci = move_data.get('uci')
         if move_uci:
-            move = chess.Move.from_uci(move_uci)
-            board.push(move)
-            
-            st.subheader(f"Position after {move_data.get('move', 'Unknown')}")
-            
-            # Display the resulting position
-            from chess_board import display_chess_board
-            display_chess_board(board.fen(), 'default')
-            
-            # Show move details
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Score", f"{move_data.get('score', 0):+}")
-                st.metric("Classification", move_data.get('classification', 'Unknown').title())
-            with col2:
-                st.metric("Centipawn Loss", f"{move_data.get('centipawn_loss', 0)}")
-                st.metric("Depth", f"{move_data.get('depth', 0)}")
-            
-            # Show principal variation
-            pv = move_data.get('principal_variation', '') or move_data.get('pv', '')
-            if pv:
-                st.subheader("Principal Variation")
-                st.code(pv)
+            try:
+                # Validate UCI format
+                if len(move_uci) < 4:
+                    st.error(f"Invalid UCI format: {move_uci}")
+                    return
+                
+                # Try to create and validate the move
+                move = chess.Move.from_uci(move_uci)
+                
+                # Check if move is legal in current position
+                if move not in board.legal_moves:
+                    st.error(f"Move {move_uci} is not legal in this position")
+                    return
+                
+                # Make the move
+                board.push(move)
+                
+                st.subheader(f"Position after {move_data.get('move', 'Unknown')}")
+                
+                # Display the resulting position
+                from chess_board import display_chess_board
+                display_chess_board(board.fen(), 'default')
+                
+                # Show move details
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Score", f"{move_data.get('score', 0):+}")
+                    st.metric("Classification", move_data.get('classification', 'Unknown').title())
+                with col2:
+                    st.metric("Centipawn Loss", f"{move_data.get('centipawn_loss', 0)}")
+                    st.metric("Depth", f"{move_data.get('depth', 0)}")
+                
+                # Show principal variation
+                pv = move_data.get('principal_variation', '') or move_data.get('pv', '')
+                if pv:
+                    st.subheader("Principal Variation")
+                    st.code(pv)
+                    
+            except (ValueError, chess.IllegalMoveError, chess.InvalidMoveError) as e:
+                st.error(f"Error processing move {move_uci}: {str(e)}")
+                st.info("This might be due to an invalid UCI notation in the database.")
+                
+                # Still show move details even if we can't display the position
+                st.subheader(f"Move Details: {move_data.get('move', 'Unknown')}")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Score", f"{move_data.get('score', 0):+}")
+                    st.metric("Classification", move_data.get('classification', 'Unknown').title())
+                with col2:
+                    st.metric("Centipawn Loss", f"{move_data.get('centipawn_loss', 0)}")
+                    st.metric("Depth", f"{move_data.get('depth', 0)}")
+        else:
+            st.error("No UCI notation available for this move")
     
     except Exception as e:
         st.error(f"Error displaying position: {str(e)}")
+        st.info("There was an issue processing this position. The move data may be corrupted.")
 
 def display_spatial_analysis_page():
     """
@@ -1117,11 +1345,11 @@ def display_spatial_analysis_page():
                 if is_valid_content:
                     st.success(content_message)
                     
-                    # Load all games instead of just 20
+                    # Load all games without limit
                     if st.button("🔄 Load All Games"):
-                        # Load games
-                        with st.spinner("Loading all games..."):
-                            games = pgn_loader.load_pgn_games(file_content, max_games=1000)  # Increased limit
+                        # Load games without the 1000 limit
+                        with st.spinner(f"Loading all {game_count} games..."):
+                            games = pgn_loader.load_pgn_games(file_content, max_games=game_count)
                             st.session_state.loaded_games = games
                             if games:
                                 st.session_state.current_game = games[0]
@@ -1134,27 +1362,43 @@ def display_spatial_analysis_page():
         
         st.divider()
         
-        # Game selection with better UX
+        # Enhanced Game selection with filter tiles
         if st.session_state.loaded_games:
             st.subheader("🎮 Select Game")
             
-            # Create game options with pagination for better UX
-            games_per_page = 10
             total_games = len(st.session_state.loaded_games)
-            total_pages = (total_games + games_per_page - 1) // games_per_page
             
-            if total_pages > 1:
-                page = st.selectbox("Page", range(1, total_pages + 1), 
-                                  format_func=lambda x: f"Page {x} ({(x-1)*games_per_page + 1}-{min(x*games_per_page, total_games)})")
-                start_idx = (page - 1) * games_per_page
-                end_idx = min(start_idx + games_per_page, total_games)
+            # Create filter tiles for better UX
+            st.markdown("**Game Range Filter:**")
+            games_per_tile = 500
+            total_tiles = (total_games + games_per_tile - 1) // games_per_tile
+            
+            # Create filter tile buttons
+            tile_cols = st.columns(min(4, total_tiles))
+            selected_tile = None
+            
+            for i in range(total_tiles):
+                start_idx = i * games_per_tile
+                end_idx = min(start_idx + games_per_tile, total_games)
+                
+                with tile_cols[i % 4]:
+                    if st.button(f"{start_idx + 1}-{end_idx}", key=f"tile_{i}"):
+                        st.session_state.games_filter_range = (start_idx, end_idx)
+                        selected_tile = i
+            
+            # Show current filter range
+            if st.session_state.games_filter_range:
+                start_idx, end_idx = st.session_state.games_filter_range
+                st.info(f"Showing games {start_idx + 1} to {end_idx}")
+                
                 games_to_show = st.session_state.loaded_games[start_idx:end_idx]
                 game_indices = list(range(start_idx, end_idx))
             else:
-                games_to_show = st.session_state.loaded_games
-                game_indices = list(range(total_games))
+                # Default to first 500 games
+                games_to_show = st.session_state.loaded_games[:min(500, total_games)]
+                game_indices = list(range(min(500, total_games)))
             
-            # Create simplified game options for current page
+            # Create simplified game options for current range
             game_options = []
             for i, game in enumerate(games_to_show):
                 metadata = pgn_loader.get_game_metadata(game)
@@ -1276,7 +1520,7 @@ def display_spatial_analysis_page():
     with nav_col1:
         if st.button("⏮️ Start", key="nav_start"):
             st.session_state.current_move_index = 0
-            st.rerun()  # Fix: Ensure start button works
+            st.rerun()
     
     with nav_col2:
         if st.button("⏪ Back", key="nav_back"):
@@ -1506,7 +1750,7 @@ def display_spatial_analysis_page():
                     xaxis_title="Move Number",
                     yaxis_title="Controlled Area",
                     hovermode='x unified',
-                    height=400
+                    height=350
                 )
                 
                 st.plotly_chart(fig_area, use_container_width=True)
@@ -1537,7 +1781,7 @@ def display_spatial_analysis_page():
                     xaxis_title="Move Number",
                     yaxis_title="Squares Controlled",
                     hovermode='x unified',
-                    height=400
+                    height=350
                 )
                 
                 st.plotly_chart(fig_squares, use_container_width=True)
@@ -1568,7 +1812,7 @@ def display_spatial_analysis_page():
                     xaxis_title="Move Number",
                     yaxis_title="Connectivity Score",
                     hovermode='x unified',
-                    height=400
+                    height=350
                 )
                 
                 st.plotly_chart(fig_connectivity, use_container_width=True)
@@ -1611,192 +1855,6 @@ def display_spatial_analysis_page():
                         <p>Final Squares: {evolution_df.iloc[-1]['black_controlled']}</p>
                     </div>
                     """, unsafe_allow_html=True)
-
-def display_spatial_board_with_overlay(fen: str, metrics: dict, settings: dict, flipped: bool = False):
-    """
-    Display chess board with spatial polygon overlays - fixed version.
-    """
-    try:
-        import chess
-        board = chess.Board(fen)
-        
-        # Get user settings for board theme
-        user_settings = auth.get_user_settings(st.session_state.user_id)
-        theme = user_settings.get('theme', 'default') if user_settings else 'default'
-        
-        # Display board using the same method as training tab
-        from chess_board import display_chess_board
-        display_chess_board(fen, theme, flipped=flipped)
-        
-        # Add spatial overlay information as text since polygons are not visible
-        if settings['show_white_polygon'] or settings['show_black_polygon']:
-            st.markdown("""
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                        padding: 10px; border-radius: 8px; margin: 10px 0;">
-                <p style="color: white; margin: 0; text-align: center;">
-                    🔺 Spatial polygons represent controlled squares for each player
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Show controlled squares as text overlay
-        if settings['show_white_polygon']:
-            white_controlled = len(metrics['white']['controlled_squares'])
-            st.markdown(f"""
-            <div style="background: rgba(255, 255, 255, 0.9); 
-                        padding: 8px; border-radius: 5px; margin: 5px 0;">
-                <p style="margin: 0; color: #333; text-align: center;">
-                    ⚪ White controls {white_controlled} squares
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        if settings['show_black_polygon']:
-            black_controlled = len(metrics['black']['controlled_squares'])
-            st.markdown(f"""
-            <div style="background: rgba(0, 0, 0, 0.8); 
-                        padding: 8px; border-radius: 5px; margin: 5px 0;">
-                <p style="margin: 0; color: white; text-align: center;">
-                    ⚫ Black controls {black_controlled} squares
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-    except Exception as e:
-        st.error(f"Error displaying spatial board: {str(e)}")
-        # Fallback to simple board display
-        from chess_board import display_chess_board
-        display_chess_board(fen)
-
-
-def generate_spatial_board_html(fen: str, metrics: dict, settings: dict) -> str:
-    """
-    Generate HTML with chess board and spatial polygon overlays.
-    """
-    board_size = 600
-    square_size = board_size / 8
-    
-    # Start HTML structure
-    html = f"""
-    <div style="position: relative; width: {board_size}px; height: {board_size}px; margin: 0 auto;">
-        <!-- Chess Board -->
-        <svg width="{board_size}" height="{board_size}" style="position: absolute; z-index: 1;">
-    """
-    
-    # Draw board squares
-    for rank in range(8):
-        for file in range(8):
-            x = file * square_size
-            y = rank * square_size
-            
-            # Determine square color
-            is_light = (rank + file) % 2 == 0
-            color = "#F0D9B5" if is_light else "#B58863"
-            
-            html += f'<rect x="{x}" y="{y}" width="{square_size}" height="{square_size}" fill="{color}" />'
-    
-    # Draw coordinate labels
-    files = "abcdefgh"
-    ranks = "87654321"
-    
-    for i, file in enumerate(files):
-        x = i * square_size + square_size/2
-        y = board_size - 10
-        html += f'<text x="{x}" y="{y}" text-anchor="middle" font-size="12" fill="#8B4513">{file}</text>'
-    
-    for i, rank in enumerate(ranks):
-        x = 10
-        y = i * square_size + square_size/2 + 5
-        html += f'<text x="{x}" y="{y}" text-anchor="middle" font-size="12" fill="#8B4513">{rank}</text>'
-    
-    html += "</svg>"
-    
-    # Draw pieces
-    html += f'<svg width="{board_size}" height="{board_size}" style="position: absolute; z-index: 2;">'
-    
-    try:
-        import chess
-        board = chess.Board(fen)
-        
-        # Unicode piece symbols
-        piece_symbols = {
-            'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔',
-            'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚'
-        }
-        
-        for square in chess.SQUARES:
-            piece = board.piece_at(square)
-            if piece:
-                file = chess.square_file(square)
-                rank = 7 - chess.square_rank(square)  # Flip rank
-                
-                x = file * square_size + square_size/2
-                y = rank * square_size + square_size/2 + 5
-                
-                piece_char = piece.symbol()
-                if piece_char in piece_symbols:
-                    color = "#000000" if piece.color == chess.BLACK else "#FFFFFF"
-                    stroke = "#FFFFFF" if piece.color == chess.BLACK else "#000000"
-                    
-                    html += f'''<text x="{x}" y="{y}" text-anchor="middle" font-size="40" 
-                               fill="{color}" stroke="{stroke}" stroke-width="1">
-                               {piece_symbols[piece_char]}</text>'''
-    
-    except Exception as e:
-        pass
-    
-    html += "</svg>"
-    
-    # Draw spatial polygons
-    html += f'<svg width="{board_size}" height="{board_size}" style="position: absolute; z-index: 3;">'
-    
-    try:
-        # White polygon
-        if settings['show_white_polygon'] and metrics['white']['hull_vertices']:
-            white_path = spatial_analysis.generate_polygon_svg_path(
-                metrics['white']['hull_vertices'], board_size
-            )
-            if white_path:
-                opacity = settings['polygon_opacity']
-                html += f'''<path d="{white_path}" 
-                           fill="rgba(255, 255, 255, {opacity})" 
-                           stroke="white" stroke-width="2" />'''
-        
-        # Black polygon
-        if settings['show_black_polygon'] and metrics['black']['hull_vertices']:
-            black_path = spatial_analysis.generate_polygon_svg_path(
-                metrics['black']['hull_vertices'], board_size
-            )
-            if black_path:
-                opacity = settings['polygon_opacity']
-                html += f'''<path d="{black_path}" 
-                           fill="rgba(0, 0, 0, {opacity})" 
-                           stroke="black" stroke-width="2" />'''
-        
-        # Centroids
-        if settings['show_centroids']:
-            # White centroid
-            if metrics['white']['centroid']:
-                cx, cy = metrics['white']['centroid']
-                svg_x = (cx + 0.5) * square_size
-                svg_y = (7.5 - cy) * square_size
-                html += f'<circle cx="{svg_x}" cy="{svg_y}" r="8" fill="red" stroke="white" stroke-width="2" />'
-            
-            # Black centroid
-            if metrics['black']['centroid']:
-                cx, cy = metrics['black']['centroid']
-                svg_x = (cx + 0.5) * square_size
-                svg_y = (7.5 - cy) * square_size
-                html += f'<circle cx="{svg_x}" cy="{svg_y}" r="8" fill="blue" stroke="white" stroke-width="2" />'
-    
-    except Exception as e:
-        pass
-    
-    html += "</svg>"
-    html += "</div>"
-    
-    return html
-
 
 def display_spatial_board_with_overlay(fen: str, metrics: dict, settings: dict, flipped: bool = False):
     """
@@ -2208,7 +2266,8 @@ def display_settings_page():
                 fig.update_layout(
                     xaxis_title="Game Phase",
                     yaxis_title="Number of Positions",
-                    showlegend=False
+                    showlegend=False,
+                    height=350
                 )
                 
                 fig.update_traces(texttemplate='%{y}', textposition='outside')
@@ -2253,7 +2312,8 @@ def display_settings_page():
                     title='Moves by Classification',
                     xaxis_title="Classification",
                     yaxis_title="Number of Moves",
-                    showlegend=False
+                    showlegend=False,
+                    height=350
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)

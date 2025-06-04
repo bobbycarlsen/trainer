@@ -48,13 +48,13 @@ def validate_pgn_file(file_content: str) -> Tuple[bool, str, int]:
     except Exception as e:
         return False, f"Error parsing PGN file: {str(e)}", 0
 
-def load_pgn_games(file_content: str, max_games: int = 50) -> List[Dict[str, Any]]:
+def load_pgn_games(file_content: str, max_games: int = None) -> List[Dict[str, Any]]:
     """
     Load chess games from PGN content.
     
     Args:
         file_content: String content of the PGN file
-        max_games: Maximum number of games to load
+        max_games: Maximum number of games to load (None for no limit)
         
     Returns:
         List of game dictionaries
@@ -63,7 +63,7 @@ def load_pgn_games(file_content: str, max_games: int = 50) -> List[Dict[str, Any
     pgn_io = io.StringIO(file_content)
     
     game_count = 0
-    while game_count < max_games:
+    while max_games is None or game_count < max_games:
         game = chess.pgn.read_game(pgn_io)
         if game is None:
             break
@@ -167,12 +167,13 @@ def create_game_navigation_data(game_info: Dict[str, Any]) -> Dict[str, Any]:
     
     return navigation
 
-def parse_multiple_games(file_content: str) -> List[Dict[str, Any]]:
+def parse_multiple_games(file_content: str, max_games: int = None) -> List[Dict[str, Any]]:
     """
     Parse multiple games from a PGN file and return basic info.
     
     Args:
         file_content: String content of the PGN file
+        max_games: Maximum number of games to parse (None for no limit)
         
     Returns:
         List of basic game information dictionaries
@@ -181,7 +182,7 @@ def parse_multiple_games(file_content: str) -> List[Dict[str, Any]]:
     pgn_io = io.StringIO(file_content)
     
     game_index = 0
-    while True:
+    while max_games is None or game_index < max_games:
         game = chess.pgn.read_game(pgn_io)
         if game is None:
             break
@@ -208,10 +209,6 @@ def parse_multiple_games(file_content: str) -> List[Dict[str, Any]]:
         
         games_info.append(game_summary)
         game_index += 1
-        
-        # Limit to prevent memory issues
-        if game_index >= 100:
-            break
     
     return games_info
 
@@ -274,8 +271,128 @@ def validate_uploaded_file(uploaded_file) -> Tuple[bool, str]:
     if not uploaded_file.name.lower().endswith('.pgn'):
         return False, "File must have .pgn extension"
     
-    # Check file size (limit to 10MB)
-    if uploaded_file.size > 10 * 1024 * 1024:
-        return False, "File too large. Maximum size is 10MB"
+    # Check file size (increased limit to 50MB for larger PGN files)
+    if uploaded_file.size > 50 * 1024 * 1024:
+        return False, "File too large. Maximum size is 50MB"
     
     return True, "File validation passed"
+
+def get_file_statistics(file_content: str) -> Dict[str, Any]:
+    """
+    Get statistics about a PGN file without fully loading all games.
+    
+    Args:
+        file_content: String content of the PGN file
+        
+    Returns:
+        Dictionary with file statistics
+    """
+    try:
+        # Count games by counting [Event] headers
+        total_games = file_content.count('[Event ')
+        
+        # Sample first few games for additional stats
+        pgn_io = io.StringIO(file_content)
+        sample_games = []
+        sample_count = min(10, total_games)
+        
+        for i in range(sample_count):
+            game = chess.pgn.read_game(pgn_io)
+            if game is None:
+                break
+            
+            headers = dict(game.headers)
+            move_count = sum(1 for _ in game.mainline_moves())
+            
+            sample_games.append({
+                'headers': headers,
+                'move_count': move_count
+            })
+        
+        # Calculate statistics from sample
+        if sample_games:
+            avg_moves = sum(g['move_count'] for g in sample_games) / len(sample_games)
+            events = [g['headers'].get('Event', 'Unknown') for g in sample_games]
+            unique_events = len(set(events))
+            
+            # Extract date range
+            dates = [g['headers'].get('Date', '') for g in sample_games if g['headers'].get('Date', '').replace('?', '')]
+            date_range = f"{min(dates)} to {max(dates)}" if dates else "Unknown"
+        else:
+            avg_moves = 0
+            unique_events = 0
+            date_range = "Unknown"
+        
+        return {
+            'total_games': total_games,
+            'sample_size': len(sample_games),
+            'avg_moves_per_game': avg_moves,
+            'unique_events': unique_events,
+            'date_range': date_range,
+            'file_size_kb': len(file_content.encode('utf-8')) / 1024
+        }
+    
+    except Exception as e:
+        return {
+            'error': f"Error analyzing file: {str(e)}",
+            'total_games': 0
+        }
+
+def load_games_in_batches(file_content: str, batch_size: int = 100) -> List[List[Dict[str, Any]]]:
+    """
+    Load PGN games in batches for memory efficiency.
+    
+    Args:
+        file_content: String content of the PGN file
+        batch_size: Number of games per batch
+        
+    Returns:
+        List of batches, where each batch is a list of game dictionaries
+    """
+    batches = []
+    pgn_io = io.StringIO(file_content)
+    
+    while True:
+        batch = []
+        for _ in range(batch_size):
+            game = chess.pgn.read_game(pgn_io)
+            if game is None:
+                break
+            
+            # Extract minimal game information for memory efficiency
+            game_info = {
+                'headers': dict(game.headers),
+                'moves': [],
+                'positions': [],
+                'game_index': len(batches) * batch_size + len(batch)
+            }
+            
+            # Extract moves and positions
+            board = game.board()
+            game_info['positions'].append(board.fen())
+            
+            for move in game.mainline_moves():
+                san_move = board.san(move)
+                uci_move = move.uci()
+                
+                game_info['moves'].append({
+                    'san': san_move,
+                    'uci': uci_move,
+                    'move_number': board.fullmove_number,
+                    'turn': 'white' if board.turn else 'black'
+                })
+                
+                board.push(move)
+                game_info['positions'].append(board.fen())
+            
+            game_info['result'] = game.headers.get('Result', '*')
+            game_info['total_moves'] = len(game_info['moves'])
+            
+            batch.append(game_info)
+        
+        if not batch:
+            break
+        
+        batches.append(batch)
+    
+    return batches
