@@ -145,7 +145,7 @@ def validate_move_enhanced(position_id, selected_move, user_id, position_data, t
     
     # Get all moves within top N to check for score equality
     cursor.execute('''
-        SELECT score, rank, move
+        SELECT score, rank, move, centipawn_loss
         FROM moves
         WHERE position_id = ? AND rank <= ?
         ORDER BY rank
@@ -162,7 +162,12 @@ def validate_move_enhanced(position_id, selected_move, user_id, position_data, t
         similar_scores_threshold = 5
         all_moves_similar = score_range <= similar_scores_threshold
         
-        if all_moves_similar:
+        # find top centipawn losses and check if selected move has same centipawn loss
+        top_move_centipawn_loss = min(move['centipawn_loss'] for move in top_n_moves if move['centipawn_loss'] is not None)
+        if selected_move_data['centipawn_loss'] <= top_move_centipawn_loss:
+            is_success = True
+            message = f"Move ranked #{rank} with acceptable centipawn loss: {selected_move_data['centipawn_loss']} centipawns"
+        elif all_moves_similar:
             # All top moves are essentially equal, so check if within top N
             is_success = rank <= top_n_threshold
             message = f"Move ranked #{rank} - all top {top_n_threshold} moves are equivalent"

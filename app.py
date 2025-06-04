@@ -682,6 +682,9 @@ def display_train_page():
         else:
             st.error(f"❌ {validation_result['message']}")
         
+        # show the message for 3 seconds
+        time.sleep(3)
+
         # Show moves table
         st.session_state.show_moves_section = True
         st.session_state.current_moves_data = position['moves'][:10]
