@@ -485,7 +485,7 @@ def display_simple_train_page():
                 """, unsafe_allow_html=True)
             
             # Auto-load next position after delay
-            time.sleep(2)
+            time.sleep(300)
             st.session_state.current_position = training.get_random_position()
             st.session_state.show_result = False
             reset_timer()
