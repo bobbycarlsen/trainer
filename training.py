@@ -4,9 +4,7 @@ from datetime import datetime
 from database import get_db_connection
 
 def get_random_position():
-    """
-    Get a random position from the database.
-    """
+    """Get a random position from the database."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -20,9 +18,7 @@ def get_random_position():
     return None
 
 def get_position_by_id(position_id):
-    """
-    Get a specific position by ID.
-    """
+    """Get a specific position by ID."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -67,9 +63,7 @@ def get_position_by_id(position_id):
     return position_data
 
 def get_sequential_position(user_id):
-    """
-    Get the next position in sequence for a user based on their training history.
-    """
+    """Get the next position in sequence for a user based on their training history."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -103,10 +97,10 @@ def get_sequential_position(user_id):
         return get_position_by_id(next_position_id)
     return None
 
-def validate_move(position_id, selected_move, user_id):
+def validate_move_enhanced(position_id, selected_move, user_id, position_data, time_taken):
     """
-    Validate if the selected move is among the top moves with enhanced scoring logic.
-    Returns a dict with validation results.
+    Enhanced move validation with comprehensive position tracking.
+    Returns validation results and records detailed move data.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -119,23 +113,28 @@ def validate_move(position_id, selected_move, user_id):
     
     # Find the selected move in the moves table
     cursor.execute('''
-        SELECT id, rank, score, classification, centipawn_loss
+        SELECT id, rank, score, classification, centipawn_loss, uci, tactics, position_impact
         FROM moves
         WHERE position_id = ? AND move = ?
     ''', (position_id, selected_move))
-    selected_move_data = cursor.fetchone()
+    selected_move_row = cursor.fetchone()
     
     # Get the top move for comparison
     cursor.execute('''
-        SELECT score
+        SELECT score, move, uci
         FROM moves
         WHERE position_id = ? AND rank = 1
     ''', (position_id, ))
     top_move = cursor.fetchone()
     
-    if not selected_move_data or not top_move:
+    if not selected_move_row or not top_move:
         conn.close()
         return {"success": False, "message": "Move not found or position invalid"}
+    
+    # Convert Row object to dictionary
+    selected_move_data = dict(selected_move_row)
+    selected_move_data['tactics'] = json.loads(selected_move_data['tactics']) if selected_move_data['tactics'] else []
+    selected_move_data['position_impact'] = json.loads(selected_move_data['position_impact']) if selected_move_data['position_impact'] else {}
     
     # Enhanced scoring algorithm
     move_id = selected_move_data['id']
@@ -146,14 +145,12 @@ def validate_move(position_id, selected_move, user_id):
     
     # Get all moves within top N to check for score equality
     cursor.execute('''
-        SELECT score, rank
+        SELECT score, rank, move
         FROM moves
         WHERE position_id = ? AND rank <= ?
         ORDER BY rank
     ''', (position_id, top_n_threshold))
     top_n_moves = cursor.fetchall()
-    
-    conn.close()
     
     # Enhanced logic: Check if all top moves have similar scores
     if top_n_moves:
@@ -184,6 +181,14 @@ def validate_move(position_id, selected_move, user_id):
     
     result = "pass" if is_success else "fail"
     
+    # Record enhanced move data with detailed position tracking
+    move_record_id = record_enhanced_user_move(
+        user_id, position_id, move_id, time_taken, result, 
+        position_data, selected_move_data
+    )
+    
+    conn.close()
+    
     return {
         "success": is_success,
         "move_id": move_id,
@@ -194,12 +199,299 @@ def validate_move(position_id, selected_move, user_id):
         "centipawn_loss": selected_move_data['centipawn_loss'],
         "score_difference": score_difference,
         "result": result,
-        "message": message
+        "message": message,
+        "move_record_id": move_record_id
     }
+
+def record_enhanced_user_move(user_id, position_id, move_id, time_taken, result, position_data, selected_move_data):
+    """
+    Record enhanced user move with comprehensive position and move analysis.
+    Tracks all available JSONL metadata for detailed insights.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Extract comprehensive position analysis
+    metadata = position_data.get('metadata', {})
+    
+    # Material analysis
+    material_analysis = extract_material_analysis(metadata, position_data.get('turn'))
+    
+    # Positional analysis
+    positional_analysis = extract_positional_analysis(metadata, position_data.get('turn'))
+    
+    # Tactical analysis
+    tactical_analysis = extract_tactical_analysis(selected_move_data, metadata)
+    
+    # King safety analysis
+    king_safety_analysis = extract_king_safety_analysis(metadata, position_data.get('turn'))
+    
+    # Pawn structure analysis
+    pawn_structure_analysis = extract_pawn_structure_analysis(metadata)
+    
+    # Mobility analysis
+    mobility_analysis = extract_mobility_analysis(metadata, position_data.get('turn'))
+    
+    # Development analysis
+    development_analysis = extract_development_analysis(metadata, position_data.get('fullmove_number'))
+    
+    # Game phase analysis
+    game_phase_analysis = extract_game_phase_analysis(position_data.get('fullmove_number'), metadata)
+    
+    # Combine all analysis into comprehensive move record
+    enhanced_analysis = {
+        'position_id': position_id,
+        'move_selected': selected_move_data.get('move'),
+        'move_rank': selected_move_data.get('rank'),
+        'move_score': selected_move_data.get('score'),
+        'move_classification': selected_move_data.get('classification'),
+        'centipawn_loss': selected_move_data.get('centipawn_loss'),
+        'time_taken': time_taken,
+        'result': result,
+        
+        # Position metadata
+        'game_phase': game_phase_analysis,
+        'fullmove_number': position_data.get('fullmove_number'),
+        'turn': position_data.get('turn'),
+        'position_classifications': position_data.get('position_classification', []),
+        
+        # Detailed analysis
+        'material_analysis': material_analysis,
+        'positional_analysis': positional_analysis,
+        'tactical_analysis': tactical_analysis,
+        'king_safety_analysis': king_safety_analysis,
+        'pawn_structure_analysis': pawn_structure_analysis,
+        'mobility_analysis': mobility_analysis,
+        'development_analysis': development_analysis,
+        
+        # Move-specific analysis
+        'move_tactics': selected_move_data.get('tactics', []),
+        'move_impact': selected_move_data.get('position_impact', {}),
+        'principal_variation': selected_move_data.get('principal_variation', ''),
+        
+        # Timestamp and session data
+        'timestamp': datetime.now().isoformat(),
+        'session_id': f"{user_id}_{datetime.now().strftime('%Y%m%d_%H')}"  # Session grouping
+    }
+    
+    # Insert basic user move record
+    cursor.execute('''
+        INSERT INTO user_moves (user_id, position_id, move_id, time_taken, result)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (user_id, position_id, move_id, time_taken, result))
+    
+    move_record_id = cursor.lastrowid
+    
+    # Insert enhanced analysis data
+    cursor.execute('''
+        INSERT OR REPLACE INTO user_move_analysis 
+        (move_record_id, user_id, analysis_data)
+        VALUES (?, ?, ?)
+    ''', (move_record_id, user_id, json.dumps(enhanced_analysis)))
+    
+    conn.commit()
+    conn.close()
+    
+    return move_record_id
+
+def extract_material_analysis(metadata, turn):
+    """Extract detailed material analysis from position metadata."""
+    material = metadata.get('material', {})
+    
+    white_total = material.get('white_total', 0)
+    black_total = material.get('black_total', 0)
+    imbalance = material.get('imbalance', 0)
+    
+    # Calculate material advantage from player's perspective
+    if turn == 'white':
+        player_advantage = imbalance
+    else:
+        player_advantage = -imbalance
+    
+    return {
+        'white_total': white_total,
+        'black_total': black_total,
+        'total_material': white_total + black_total,
+        'imbalance': imbalance,
+        'player_advantage': player_advantage,
+        'piece_counts': {
+            'white_pawns': material.get('white_pawns', 0),
+            'black_pawns': material.get('black_pawns', 0),
+            'white_knights': material.get('white_knights', 0),
+            'black_knights': material.get('black_knights', 0),
+            'white_bishops': material.get('white_bishops', 0),
+            'black_bishops': material.get('black_bishops', 0),
+            'white_rooks': material.get('white_rooks', 0),
+            'black_rooks': material.get('black_rooks', 0),
+            'white_queens': material.get('white_queens', 0),
+            'black_queens': material.get('black_queens', 0)
+        }
+    }
+
+def extract_positional_analysis(metadata, turn):
+    """Extract positional analysis from metadata."""
+    center_control = metadata.get('center_control', {})
+    
+    white_center = center_control.get('white', 0)
+    black_center = center_control.get('black', 0)
+    
+    if turn == 'white':
+        player_center_advantage = white_center - black_center
+    else:
+        player_center_advantage = black_center - white_center
+    
+    return {
+        'center_control': {
+            'white': white_center,
+            'black': black_center,
+            'player_advantage': player_center_advantage
+        },
+        'piece_development': metadata.get('piece_development', {}),
+        'castling_rights': metadata.get('castling_rights', {})
+    }
+
+def extract_tactical_analysis(selected_move_data, metadata):
+    """Extract tactical analysis from move and position data."""
+    tactics = selected_move_data.get('tactics', [])
+    position_impact = selected_move_data.get('position_impact', {})
+    
+    return {
+        'move_tactics': tactics,
+        'has_tactics': len(tactics) > 0,
+        'tactical_complexity': len(tactics),
+        'position_impact': position_impact,
+        'material_change': position_impact.get('material_change', 0),
+        'king_safety_impact': position_impact.get('king_safety_impact', 0),
+        'center_control_change': position_impact.get('center_control_change', 0),
+        'development_impact': position_impact.get('development_impact', 0)
+    }
+
+def extract_king_safety_analysis(metadata, turn):
+    """Extract king safety analysis from metadata."""
+    king_safety = metadata.get('king_safety', {})
+    
+    white_king = king_safety.get('white', {})
+    black_king = king_safety.get('black', {})
+    
+    player_king = white_king if turn == 'white' else black_king
+    opponent_king = black_king if turn == 'white' else white_king
+    
+    return {
+        'player_king_safety': {
+            'attack_count': player_king.get('attack_count', 0),
+            'defender_count': player_king.get('defender_count', 0),
+            'pawn_shield': player_king.get('pawn_shield', 0),
+            'open_files': player_king.get('open_files', 0)
+        },
+        'opponent_king_safety': {
+            'attack_count': opponent_king.get('attack_count', 0),
+            'defender_count': opponent_king.get('defender_count', 0),
+            'pawn_shield': opponent_king.get('pawn_shield', 0),
+            'open_files': opponent_king.get('open_files', 0)
+        },
+        'safety_comparison': {
+            'player_safer': (player_king.get('pawn_shield', 0) > opponent_king.get('pawn_shield', 0) and
+                           player_king.get('attack_count', 0) < opponent_king.get('attack_count', 0))
+        }
+    }
+
+def extract_pawn_structure_analysis(metadata):
+    """Extract pawn structure analysis from metadata."""
+    pawn_structure = metadata.get('pawn_structure', {})
+    
+    return {
+        'open_files': pawn_structure.get('open_files', 0),
+        'half_open_files': pawn_structure.get('half_open_files', 0),
+        'pawn_islands': {
+            'white': pawn_structure.get('white_pawn_islands', 0),
+            'black': pawn_structure.get('black_pawn_islands', 0)
+        },
+        'passed_pawns': {
+            'white': pawn_structure.get('white_passed_pawns', 0),
+            'black': pawn_structure.get('black_passed_pawns', 0)
+        },
+        'isolated_pawns': {
+            'white': pawn_structure.get('white_isolated_pawns', 0),
+            'black': pawn_structure.get('black_isolated_pawns', 0)
+        },
+        'doubled_pawns': {
+            'white': pawn_structure.get('white_doubled_pawns', 0),
+            'black': pawn_structure.get('black_doubled_pawns', 0)
+        },
+        'pawn_chains': pawn_structure.get('pawn_chains', 0)
+    }
+
+def extract_mobility_analysis(metadata, turn):
+    """Extract mobility analysis from metadata."""
+    mobility = metadata.get('mobility', {})
+    
+    white_total = mobility.get('white_total', 0)
+    black_total = mobility.get('black_total', 0)
+    white_avg = mobility.get('white_avg', 0)
+    black_avg = mobility.get('black_avg', 0)
+    
+    if turn == 'white':
+        player_mobility_advantage = white_total - black_total
+    else:
+        player_mobility_advantage = black_total - white_total
+    
+    return {
+        'white_mobility': {
+            'total': white_total,
+            'average': white_avg
+        },
+        'black_mobility': {
+            'total': black_total,
+            'average': black_avg
+        },
+        'player_advantage': player_mobility_advantage,
+        'total_mobility': white_total + black_total
+    }
+
+def extract_development_analysis(metadata, fullmove_number):
+    """Extract development analysis from metadata."""
+    piece_development = metadata.get('piece_development', {})
+    
+    return {
+        'white_development': piece_development.get('white', 0),
+        'black_development': piece_development.get('black', 0),
+        'development_phase': 'opening' if fullmove_number <= 15 else 'developed',
+        'development_speed': piece_development.get('white', 0) + piece_development.get('black', 0)
+    }
+
+def extract_game_phase_analysis(fullmove_number, metadata):
+    """Extract game phase analysis."""
+    material = metadata.get('material', {})
+    total_material = material.get('white_total', 0) + material.get('black_total', 0)
+    
+    # Determine game phase
+    if fullmove_number <= 15:
+        phase = 'opening'
+    elif fullmove_number <= 30 and total_material > 40:
+        phase = 'middlegame'
+    else:
+        phase = 'endgame'
+    
+    return {
+        'phase': phase,
+        'move_number': fullmove_number,
+        'total_material': total_material,
+        'queens_on_board': (material.get('white_queens', 0) + material.get('black_queens', 0)) > 0
+    }
+
+def validate_move(position_id, selected_move, user_id):
+    """
+    Legacy validate_move function for backward compatibility.
+    """
+    position_data = get_position_by_id(position_id)
+    if not position_data:
+        return {"success": False, "message": "Position not found"}
+    
+    return validate_move_enhanced(position_id, selected_move, user_id, position_data, 0)
 
 def record_user_move(user_id, position_id, move_id, time_taken, result):
     """
-    Record the user's move attempt in the database.
+    Legacy record_user_move function for backward compatibility.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -217,9 +509,7 @@ def record_user_move(user_id, position_id, move_id, time_taken, result):
     return move_record_id
 
 def save_openai_analysis(move_record_id, analysis_text):
-    """
-    Save OpenAI analysis for a user move.
-    """
+    """Save OpenAI analysis for a user move."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -235,9 +525,7 @@ def save_openai_analysis(move_record_id, analysis_text):
     return True
 
 def get_position_category(fullmove_number):
-    """
-    Categorize move as opening, middle game, or endgame based on move number.
-    """
+    """Categorize move as opening, middle game, or endgame based on move number."""
     if fullmove_number <= 15:
         return "opening"
     elif fullmove_number <= 32:
@@ -245,230 +533,102 @@ def get_position_category(fullmove_number):
     else:
         return "endgame"
 
-def get_position_difficulty(position_data):
+def get_comprehensive_user_insights(user_id):
     """
-    Calculate position difficulty based on various factors.
-    
-    Args:
-        position_data: Position dictionary with moves and metadata
-        
-    Returns:
-        Dictionary with difficulty metrics
-    """
-    if not position_data or not position_data.get('moves'):
-        return {'difficulty': 'unknown', 'score': 0}
-    
-    moves = position_data['moves']
-    metadata = position_data.get('metadata', {})
-    
-    # Factors that increase difficulty:
-    # 1. Large score differences between top moves
-    top_3_scores = [m['score'] for m in moves[:3]]
-    score_variance = max(top_3_scores) - min(top_3_scores) if len(top_3_scores) > 1 else 0
-    
-    # 2. Number of legal moves (more choices = harder)
-    try:
-        import chess
-        board = chess.Board(position_data['fen'])
-        legal_moves_count = len(list(board.legal_moves))
-    except:
-        legal_moves_count = 20  # Default estimate
-    
-    # 3. Tactical complexity
-    tactics_count = sum(len(move.get('tactics', [])) for move in moves[:5])
-    
-    # 4. Position classification complexity
-    position_class = position_data.get('position_classification', [])
-    complex_types = ['tactical', 'sacrificial', 'positional', 'endgame']
-    complexity_score = sum(1 for ptype in position_class if ptype in complex_types)
-    
-    # 5. Material imbalance
-    material = metadata.get('material', {})
-    material_imbalance = abs(material.get('imbalance', 0))
-    
-    # Calculate overall difficulty score (0-100)
-    difficulty_score = 0
-    difficulty_score += min(score_variance / 2, 25)  # Max 25 points for score variance
-    difficulty_score += min(legal_moves_count, 25)   # Max 25 points for move count
-    difficulty_score += min(tactics_count * 5, 20)   # Max 20 points for tactics
-    difficulty_score += complexity_score * 10        # Max 40 points for complexity
-    difficulty_score += min(material_imbalance, 10)  # Max 10 points for material imbalance
-    
-    # Categorize difficulty
-    if difficulty_score < 30:
-        difficulty_level = 'easy'
-    elif difficulty_score < 60:
-        difficulty_level = 'medium'
-    elif difficulty_score < 80:
-        difficulty_level = 'hard'
-    else:
-        difficulty_level = 'expert'
-    
-    return {
-        'difficulty': difficulty_level,
-        'score': difficulty_score,
-        'factors': {
-            'score_variance': score_variance,
-            'legal_moves': legal_moves_count,
-            'tactics_count': tactics_count,
-            'complexity_score': complexity_score,
-            'material_imbalance': material_imbalance
-        }
-    }
-
-def get_adaptive_position(user_id):
-    """
-    Get a position based on user's recent performance (adaptive difficulty).
-    
-    Args:
-        user_id: User ID
-        
-    Returns:
-        Position dictionary or None
+    Get comprehensive insights based on enhanced move tracking.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Get user's recent performance (last 10 moves)
+    # Get enhanced analysis data
     cursor.execute('''
-        SELECT result, time_taken
-        FROM user_moves
+        SELECT analysis_data 
+        FROM user_move_analysis 
         WHERE user_id = ?
-        ORDER BY timestamp DESC
-        LIMIT 10
-    ''', (user_id,))
-    recent_moves = cursor.fetchall()
-    
-    if not recent_moves:
-        # No history, return random position
-        conn.close()
-        return get_random_position()
-    
-    # Calculate recent performance metrics
-    recent_accuracy = sum(1 for move in recent_moves if move['result'] == 'pass') / len(recent_moves)
-    avg_time = sum(move['time_taken'] for move in recent_moves) / len(recent_moves)
-    
-    # Determine target difficulty based on performance
-    if recent_accuracy > 0.8 and avg_time < 15:
-        # User is doing well, increase difficulty
-        target_difficulty = 'hard'
-    elif recent_accuracy < 0.4 or avg_time > 60:
-        # User is struggling, decrease difficulty
-        target_difficulty = 'easy'
-    else:
-        # User is doing okay, maintain medium difficulty
-        target_difficulty = 'medium'
-    
-    # Get positions that haven't been attempted by this user
-    cursor.execute('''
-        SELECT p.id
-        FROM positions p
-        LEFT JOIN user_moves um ON p.id = um.position_id AND um.user_id = ?
-        WHERE um.id IS NULL
-        ORDER BY RANDOM()
-        LIMIT 20
+        ORDER BY id DESC
+        LIMIT 100
     ''', (user_id,))
     
-    available_positions = cursor.fetchall()
+    analysis_records = cursor.fetchall()
     conn.close()
     
-    if not available_positions:
-        # User has attempted all positions, return random
-        return get_random_position()
+    if not analysis_records:
+        return None
     
-    # Evaluate difficulty of available positions and pick best match
-    best_position = None
-    best_score_diff = float('inf')
+    # Process analysis data
+    insights = {
+        'material_insights': analyze_material_patterns(analysis_records),
+        'positional_insights': analyze_positional_patterns(analysis_records),
+        'tactical_insights': analyze_tactical_patterns(analysis_records),
+        'timing_insights': analyze_timing_patterns(analysis_records),
+        'phase_insights': analyze_phase_patterns(analysis_records),
+        'weakness_insights': identify_weaknesses(analysis_records),
+        'strength_insights': identify_strengths(analysis_records)
+    }
     
-    target_scores = {'easy': 25, 'medium': 50, 'hard': 75, 'expert': 90}
-    target_score = target_scores[target_difficulty]
+    return insights
+
+def analyze_material_patterns(analysis_records):
+    """Analyze material-related patterns from user moves."""
+    material_data = []
     
-    for pos_row in available_positions[:10]:  # Check only first 10 for performance
-        position = get_position_by_id(pos_row['id'])
-        if position:
-            difficulty = get_position_difficulty(position)
-            score_diff = abs(difficulty['score'] - target_score)
+    for record in analysis_records:
+        try:
+            data = json.loads(record['analysis_data'])
+            material_analysis = data.get('material_analysis', {})
+            result = data.get('result')
             
-            if score_diff < best_score_diff:
-                best_score_diff = score_diff
-                best_position = position
+            material_data.append({
+                'player_advantage': material_analysis.get('player_advantage', 0),
+                'total_material': material_analysis.get('total_material', 0),
+                'result': result
+            })
+        except:
+            continue
     
-    return best_position if best_position else get_random_position()
-
-def get_user_progress_stats(user_id):
-    """
-    Get comprehensive progress statistics for a user.
+    if not material_data:
+        return {}
     
-    Args:
-        user_id: User ID
-        
-    Returns:
-        Dictionary with progress statistics
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Basic stats
-    cursor.execute('''
-        SELECT 
-            COUNT(*) as total_attempts,
-            SUM(CASE WHEN result = 'pass' THEN 1 ELSE 0 END) as correct_moves,
-            AVG(time_taken) as avg_time,
-            MIN(time_taken) as best_time,
-            MAX(time_taken) as worst_time
-        FROM user_moves
-        WHERE user_id = ?
-    ''', (user_id,))
-    
-    basic_stats = dict(cursor.fetchone())
-    basic_stats['accuracy'] = (basic_stats['correct_moves'] / basic_stats['total_attempts']) * 100 if basic_stats['total_attempts'] > 0 else 0
-    
-    # Progress over time (last 30 days)
-    cursor.execute('''
-        SELECT 
-            DATE(timestamp) as date,
-            COUNT(*) as attempts,
-            SUM(CASE WHEN result = 'pass' THEN 1 ELSE 0 END) as correct,
-            AVG(time_taken) as avg_time
-        FROM user_moves
-        WHERE user_id = ? AND timestamp >= datetime('now', '-30 days')
-        GROUP BY DATE(timestamp)
-        ORDER BY date
-    ''', (user_id,))
-    
-    daily_progress = []
-    for row in cursor.fetchall():
-        day_data = dict(row)
-        day_data['accuracy'] = (day_data['correct'] / day_data['attempts']) * 100 if day_data['attempts'] > 0 else 0
-        daily_progress.append(day_data)
-    
-    # Performance by difficulty
-    cursor.execute('''
-        SELECT 
-            CASE 
-                WHEN p.fullmove_number <= 15 THEN 'opening'
-                WHEN p.fullmove_number <= 32 THEN 'middlegame'
-                ELSE 'endgame'
-            END as phase,
-            COUNT(*) as attempts,
-            SUM(CASE WHEN um.result = 'pass' THEN 1 ELSE 0 END) as correct,
-            AVG(um.time_taken) as avg_time
-        FROM user_moves um
-        JOIN positions p ON um.position_id = p.id
-        WHERE um.user_id = ?
-        GROUP BY phase
-    ''', (user_id,))
-    
-    phase_performance = []
-    for row in cursor.fetchall():
-        phase_data = dict(row)
-        phase_data['accuracy'] = (phase_data['correct'] / phase_data['attempts']) * 100 if phase_data['attempts'] > 0 else 0
-        phase_performance.append(phase_data)
-    
-    conn.close()
+    # Analyze patterns
+    advantages = [d['player_advantage'] for d in material_data]
+    results = [d['result'] for d in material_data]
     
     return {
-        'basic_stats': basic_stats,
-        'daily_progress': daily_progress,
-        'phase_performance': phase_performance
+        'avg_material_advantage': sum(advantages) / len(advantages),
+        'accuracy_with_advantage': sum(1 for i, d in enumerate(material_data) 
+                                     if d['player_advantage'] > 0 and d['result'] == 'pass') / 
+                                   max(1, sum(1 for d in material_data if d['player_advantage'] > 0)),
+        'accuracy_with_disadvantage': sum(1 for i, d in enumerate(material_data) 
+                                        if d['player_advantage'] < 0 and d['result'] == 'pass') / 
+                                      max(1, sum(1 for d in material_data if d['player_advantage'] < 0))
     }
+
+def analyze_positional_patterns(analysis_records):
+    """Analyze positional patterns from user moves."""
+    # Implementation for positional pattern analysis
+    return {}
+
+def analyze_tactical_patterns(analysis_records):
+    """Analyze tactical patterns from user moves."""
+    # Implementation for tactical pattern analysis
+    return {}
+
+def analyze_timing_patterns(analysis_records):
+    """Analyze timing patterns from user moves."""
+    # Implementation for timing pattern analysis
+    return {}
+
+def analyze_phase_patterns(analysis_records):
+    """Analyze game phase patterns from user moves."""
+    # Implementation for phase pattern analysis
+    return {}
+
+def identify_weaknesses(analysis_records):
+    """Identify user weaknesses from analysis data."""
+    # Implementation for weakness identification
+    return []
+
+def identify_strengths(analysis_records):
+    """Identify user strengths from analysis data."""
+    # Implementation for strength identification
+    return []
