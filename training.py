@@ -4,21 +4,31 @@ from datetime import datetime
 from database import get_db_connection
 
 def get_random_position():
-    """Get a random position from the database."""
+    """Get a random position from the database with enhanced selection."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute('SELECT id FROM positions ORDER BY RANDOM() LIMIT 1')
-    position = cursor.fetchone()
+    # Enhanced random selection with position variety
+    cursor.execute('''
+        SELECT id, fullmove_number, position_classification 
+        FROM positions 
+        ORDER BY RANDOM() 
+        LIMIT 10
+    ''')
+    candidates = cursor.fetchall()
     
+    if not candidates:
+        conn.close()
+        return None
+    
+    # Select position with some variety preference
+    selected = random.choice(candidates)
     conn.close()
     
-    if position:
-        return get_position_by_id(position['id'])
-    return None
+    return get_position_by_id(selected['id'])
 
 def get_position_by_id(position_id):
-    """Get a specific position by ID."""
+    """Get a specific position by ID with enhanced data."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -85,21 +95,120 @@ def get_sequential_position(user_id):
     result = cursor.fetchone()
     next_position_id = result['next_position'] if result and result['next_position'] else None
     
-    conn.close()
-    
     # If no next position found (user completed all positions), start from beginning
     if not next_position_id:
         cursor.execute('SELECT MIN(id) as first_position FROM positions')
         result = cursor.fetchone()
         next_position_id = result['first_position'] if result else None
     
+    conn.close()
+    
     if next_position_id:
         return get_position_by_id(next_position_id)
     return None
 
+def get_adaptive_position(user_id):
+    """
+    Get an adaptive position based on user's recent performance and weak areas.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get user's recent performance patterns
+    cursor.execute('''
+        SELECT 
+            p.fullmove_number,
+            p.position_classification,
+            um.result,
+            m.classification as move_classification
+        FROM user_moves um
+        JOIN positions p ON um.position_id = p.id
+        JOIN moves m ON um.move_id = m.id
+        WHERE um.user_id = ?
+        ORDER BY um.timestamp DESC
+        LIMIT 20
+    ''', (user_id,))
+    
+    recent_moves = cursor.fetchall()
+    
+    # Analyze weak areas
+    weak_areas = analyze_weak_areas(recent_moves)
+    
+    # Select position targeting weak areas
+    target_position = select_targeted_position(cursor, weak_areas)
+    
+    conn.close()
+    
+    return target_position if target_position else get_random_position()
+
+def analyze_weak_areas(recent_moves):
+    """Analyze user's weak areas from recent performance."""
+    weak_areas = {
+        'game_phase': {},
+        'position_types': {},
+        'move_types': {}
+    }
+    
+    total_moves = len(recent_moves)
+    if total_moves == 0:
+        return weak_areas
+    
+    # Analyze by game phase
+    phase_performance = {}
+    for move in recent_moves:
+        fullmove = move['fullmove_number']
+        if fullmove <= 15:
+            phase = 'opening'
+        elif fullmove <= 30:
+            phase = 'middlegame'
+        else:
+            phase = 'endgame'
+        
+        if phase not in phase_performance:
+            phase_performance[phase] = {'total': 0, 'correct': 0}
+        
+        phase_performance[phase]['total'] += 1
+        if move['result'] == 'pass':
+            phase_performance[phase]['correct'] += 1
+    
+    # Identify weak phases
+    for phase, stats in phase_performance.items():
+        if stats['total'] >= 3:  # Only consider phases with enough data
+            accuracy = stats['correct'] / stats['total']
+            if accuracy < 0.6:  # Less than 60% accuracy
+                weak_areas['game_phase'][phase] = accuracy
+    
+    return weak_areas
+
+def select_targeted_position(cursor, weak_areas):
+    """Select a position targeting user's weak areas."""
+    # If user is weak in specific game phases, target those
+    if weak_areas['game_phase']:
+        weakest_phase = min(weak_areas['game_phase'], key=weak_areas['game_phase'].get)
+        
+        if weakest_phase == 'opening':
+            move_range = (1, 15)
+        elif weakest_phase == 'middlegame':
+            move_range = (16, 30)
+        else:  # endgame
+            move_range = (31, 60)
+        
+        cursor.execute('''
+            SELECT id FROM positions 
+            WHERE fullmove_number BETWEEN ? AND ?
+            ORDER BY RANDOM()
+            LIMIT 1
+        ''', move_range)
+        
+        result = cursor.fetchone()
+        if result:
+            return get_position_by_id(result['id'])
+    
+    return None
+
 def validate_move_enhanced(position_id, selected_move, user_id, position_data, time_taken):
     """
-    Enhanced move validation with comprehensive position tracking.
+    Enhanced move validation with comprehensive position tracking and mobile-optimized feedback.
     Returns validation results and records detailed move data.
     """
     conn = get_db_connection()
@@ -121,7 +230,7 @@ def validate_move_enhanced(position_id, selected_move, user_id, position_data, t
     
     # Get the top move for comparison
     cursor.execute('''
-        SELECT score, move, uci
+        SELECT score, move, uci, classification
         FROM moves
         WHERE position_id = ? AND rank = 1
     ''', (position_id, ))
@@ -136,7 +245,7 @@ def validate_move_enhanced(position_id, selected_move, user_id, position_data, t
     selected_move_data['tactics'] = json.loads(selected_move_data['tactics']) if selected_move_data['tactics'] else []
     selected_move_data['position_impact'] = json.loads(selected_move_data['position_impact']) if selected_move_data['position_impact'] else {}
     
-    # Enhanced scoring algorithm
+    # Enhanced scoring algorithm with mobile-friendly feedback
     move_id = selected_move_data['id']
     rank = selected_move_data['rank']
     move_score = selected_move_data['score']
@@ -145,46 +254,64 @@ def validate_move_enhanced(position_id, selected_move, user_id, position_data, t
     
     # Get all moves within top N to check for score equality
     cursor.execute('''
-        SELECT score, rank, move, centipawn_loss
+        SELECT score, rank, move, centipawn_loss, classification
         FROM moves
         WHERE position_id = ? AND rank <= ?
         ORDER BY rank
     ''', (position_id, top_n_threshold))
     top_n_moves = cursor.fetchall()
     
-    # Enhanced logic: Check if all top moves have similar scores
+    # Enhanced logic with better feedback
+    success_reasons = []
+    failure_reasons = []
+    
     if top_n_moves:
         top_n_scores = [move['score'] for move in top_n_moves]
         score_range = max(top_n_scores) - min(top_n_scores)
         
-        # If all top N moves have very similar scores (within 5 centipawns), 
-        # then any move within top N should be considered correct regardless of exact rank
+        # Check if all top N moves have very similar scores
         similar_scores_threshold = 5
         all_moves_similar = score_range <= similar_scores_threshold
         
-        # find top centipawn losses and check if selected move has same centipawn loss
+        # Find top centipawn losses and check if selected move has acceptable loss
         top_move_centipawn_loss = min(move['centipawn_loss'] for move in top_n_moves if move['centipawn_loss'] is not None)
+        
+        # Multiple success criteria
         if selected_move_data['centipawn_loss'] <= top_move_centipawn_loss:
             is_success = True
-            message = f"Move ranked #{rank} with acceptable centipawn loss: {selected_move_data['centipawn_loss']} centipawns"
-        elif all_moves_similar:
-            # All top moves are essentially equal, so check if within top N
-            is_success = rank <= top_n_threshold
-            message = f"Move ranked #{rank} - all top {top_n_threshold} moves are equivalent"
+            success_reasons.append(f"Excellent! Only {selected_move_data['centipawn_loss']} centipawns lost")
+        elif rank == 1:
+            is_success = True
+            success_reasons.append("Perfect! You found the best move")
+        elif all_moves_similar and rank <= top_n_threshold:
+            is_success = True
+            success_reasons.append(f"Great! All top {top_n_threshold} moves are essentially equal")
+        elif rank <= top_n_threshold and score_difference <= score_difference_threshold:
+            is_success = True
+            success_reasons.append(f"Good choice! Ranked #{rank} with only {score_difference} points difference")
         else:
-            # Standard logic: check rank and score difference
-            is_success = (rank <= top_n_threshold) and (score_difference <= score_difference_threshold)
-            
-            if rank <= top_n_threshold and not is_success:
-                message = f"Move ranked #{rank}, but score difference too high: {score_difference} centipawns"
-            else:
-                message = f"Move ranked #{rank}"
+            is_success = False
+            if rank > top_n_threshold:
+                failure_reasons.append(f"Move ranked #{rank}, outside top {top_n_threshold}")
+            if score_difference > score_difference_threshold:
+                failure_reasons.append(f"Score difference too high: {score_difference} centipawns")
     else:
         # Fallback to original logic
         is_success = (rank <= top_n_threshold) and (score_difference <= score_difference_threshold)
-        message = f"Move ranked #{rank}"
+        if not is_success:
+            failure_reasons.append(f"Move ranked #{rank}")
     
     result = "pass" if is_success else "fail"
+    
+    # Generate mobile-friendly message
+    if is_success:
+        message = " • ".join(success_reasons)
+        if selected_move_data['classification'] in ['great', 'good']:
+            message += f" ({selected_move_data['classification'].title()} move!)"
+    else:
+        message = " • ".join(failure_reasons)
+        if selected_move_data['classification'] in ['mistake', 'blunder']:
+            message += f" ({selected_move_data['classification'].title()})"
     
     # Record enhanced move data with detailed position tracking
     move_record_id = record_enhanced_user_move(
@@ -192,21 +319,82 @@ def validate_move_enhanced(position_id, selected_move, user_id, position_data, t
         position_data, selected_move_data
     )
     
-    conn.close()
-    
-    return {
+    # Enhanced validation result with mobile-optimized data
+    validation_result = {
         "success": is_success,
         "move_id": move_id,
         "rank": rank,
         "score": move_score,
         "top_score": top_score,
+        "top_move": top_move['move'],
         "classification": selected_move_data['classification'],
         "centipawn_loss": selected_move_data['centipawn_loss'],
         "score_difference": score_difference,
         "result": result,
         "message": message,
-        "move_record_id": move_record_id
+        "move_record_id": move_record_id,
+        
+        # Additional mobile-friendly data
+        "performance_indicator": get_performance_indicator(selected_move_data['classification']),
+        "quick_tip": generate_quick_tip(selected_move_data, top_move, position_data),
+        "position_type": get_position_type_description(position_data),
+        "tactics_involved": selected_move_data.get('tactics', [])
     }
+    
+    conn.close()
+    return validation_result
+
+def get_performance_indicator(classification):
+    """Get mobile-friendly performance indicator."""
+    indicators = {
+        'great': {'emoji': '🎯', 'color': '#28a745', 'text': 'Excellent'},
+        'good': {'emoji': '✅', 'color': '#20c997', 'text': 'Good'},
+        'inaccuracy': {'emoji': '⚠️', 'color': '#ffc107', 'text': 'Inaccuracy'},
+        'mistake': {'emoji': '❌', 'color': '#fd7e14', 'text': 'Mistake'},
+        'blunder': {'emoji': '💥', 'color': '#dc3545', 'text': 'Blunder'}
+    }
+    return indicators.get(classification, {'emoji': '❓', 'color': '#6c757d', 'text': 'Unknown'})
+
+def generate_quick_tip(selected_move_data, top_move, position_data):
+    """Generate a quick tip for mobile display."""
+    classification = selected_move_data['classification']
+    tactics = selected_move_data.get('tactics', [])
+    
+    if classification == 'great':
+        return "🎯 Perfect execution! Look for similar patterns."
+    elif classification == 'good':
+        return "✅ Solid choice! Consider the engine's preference next time."
+    elif tactics:
+        return f"💡 This position involves {', '.join(tactics[:2])}. Practice these patterns!"
+    elif classification in ['mistake', 'blunder']:
+        return f"📚 The best move was {top_move['move']}. Analyze why it's stronger."
+    else:
+        move_num = position_data.get('fullmove_number', 0)
+        if move_num <= 15:
+            return "📖 In the opening, focus on development and center control."
+        elif move_num <= 30:
+            return "⚔️ In the middlegame, look for tactical opportunities."
+        else:
+            return "🏰 In the endgame, king activity and pawn promotion are key."
+
+def get_position_type_description(position_data):
+    """Get a mobile-friendly position type description."""
+    move_num = position_data.get('fullmove_number', 0)
+    classifications = position_data.get('position_classification', [])
+    
+    if move_num <= 15:
+        phase = "Opening"
+    elif move_num <= 30:
+        phase = "Middlegame"
+    else:
+        phase = "Endgame"
+    
+    if 'tactical' in classifications:
+        return f"{phase} - Tactical"
+    elif 'positional' in classifications:
+        return f"{phase} - Positional"
+    else:
+        return phase
 
 def record_enhanced_user_move(user_id, position_id, move_id, time_taken, result, position_data, selected_move_data):
     """
@@ -484,10 +672,128 @@ def extract_game_phase_analysis(fullmove_number, metadata):
         'queens_on_board': (material.get('white_queens', 0) + material.get('black_queens', 0)) > 0
     }
 
+def get_training_statistics(user_id):
+    """Get comprehensive training statistics for mobile display."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Basic stats
+    cursor.execute('''
+        SELECT 
+            COUNT(*) as total_attempts,
+            SUM(CASE WHEN result = 'pass' THEN 1 ELSE 0 END) as correct_moves,
+            AVG(time_taken) as avg_time,
+            MIN(time_taken) as fastest_time,
+            MAX(time_taken) as slowest_time,
+            COUNT(DISTINCT position_id) as unique_positions
+        FROM user_moves
+        WHERE user_id = ?
+    ''', (user_id,))
+    
+    basic_stats = dict(cursor.fetchone())
+    basic_stats['accuracy'] = (basic_stats['correct_moves'] / basic_stats['total_attempts']) * 100 if basic_stats['total_attempts'] > 0 else 0
+    
+    # Recent performance (last 10 moves)
+    cursor.execute('''
+        SELECT result, time_taken, timestamp
+        FROM user_moves
+        WHERE user_id = ?
+        ORDER BY timestamp DESC
+        LIMIT 10
+    ''', (user_id,))
+    
+    recent_moves = [dict(row) for row in cursor.fetchall()]
+    recent_accuracy = sum(1 for move in recent_moves if move['result'] == 'pass') / len(recent_moves) * 100 if recent_moves else 0
+    
+    # Performance by classification
+    cursor.execute('''
+        SELECT 
+            m.classification,
+            COUNT(*) as attempts,
+            SUM(CASE WHEN um.result = 'pass' THEN 1 ELSE 0 END) as correct
+        FROM user_moves um
+        JOIN moves m ON um.move_id = m.id
+        WHERE um.user_id = ?
+        GROUP BY m.classification
+        ORDER BY attempts DESC
+    ''', (user_id,))
+    
+    classification_stats = []
+    for row in cursor.fetchall():
+        stats = dict(row)
+        stats['accuracy'] = (stats['correct'] / stats['attempts']) * 100 if stats['attempts'] > 0 else 0
+        classification_stats.append(stats)
+    
+    conn.close()
+    
+    return {
+        'basic_stats': basic_stats,
+        'recent_accuracy': recent_accuracy,
+        'recent_moves': recent_moves,
+        'classification_stats': classification_stats
+    }
+
+def get_position_recommendations(user_id):
+    """Get personalized position recommendations."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Analyze user's weak areas
+    cursor.execute('''
+        SELECT 
+            p.fullmove_number,
+            AVG(CASE WHEN um.result = 'pass' THEN 100.0 ELSE 0.0 END) as accuracy,
+            COUNT(*) as attempts
+        FROM user_moves um
+        JOIN positions p ON um.position_id = p.id
+        WHERE um.user_id = ?
+        GROUP BY 
+            CASE 
+                WHEN p.fullmove_number <= 15 THEN 'opening'
+                WHEN p.fullmove_number <= 30 THEN 'middlegame'
+                ELSE 'endgame'
+            END
+        HAVING attempts >= 5
+    ''', (user_id,))
+    
+    phase_performance = cursor.fetchall()
+    
+    recommendations = []
+    
+    for performance in phase_performance:
+        if performance['accuracy'] < 60:
+            if performance['fullmove_number'] <= 15:
+                recommendations.append({
+                    'type': 'opening',
+                    'message': 'Focus on opening principles and development',
+                    'priority': 'high' if performance['accuracy'] < 40 else 'medium'
+                })
+            elif performance['fullmove_number'] <= 30:
+                recommendations.append({
+                    'type': 'middlegame',
+                    'message': 'Practice tactical combinations and piece coordination',
+                    'priority': 'high' if performance['accuracy'] < 40 else 'medium'
+                })
+            else:
+                recommendations.append({
+                    'type': 'endgame',
+                    'message': 'Study basic endgame patterns and king activity',
+                    'priority': 'high' if performance['accuracy'] < 40 else 'medium'
+                })
+    
+    if not recommendations:
+        recommendations.append({
+            'type': 'general',
+            'message': 'Great progress! Continue practicing varied positions',
+            'priority': 'low'
+        })
+    
+    conn.close()
+    return recommendations
+
+# Legacy functions for backward compatibility
 def validate_move(position_id, selected_move, user_id):
-    """
-    Legacy validate_move function for backward compatibility.
-    """
+    """Legacy validate_move function for backward compatibility."""
     position_data = get_position_by_id(position_id)
     if not position_data:
         return {"success": False, "message": "Position not found"}
@@ -495,9 +801,7 @@ def validate_move(position_id, selected_move, user_id):
     return validate_move_enhanced(position_id, selected_move, user_id, position_data, 0)
 
 def record_user_move(user_id, position_id, move_id, time_taken, result):
-    """
-    Legacy record_user_move function for backward compatibility.
-    """
+    """Legacy record_user_move function for backward compatibility."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -537,103 +841,3 @@ def get_position_category(fullmove_number):
         return "middle game"
     else:
         return "endgame"
-
-def get_comprehensive_user_insights(user_id):
-    """
-    Get comprehensive insights based on enhanced move tracking.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Get enhanced analysis data
-    cursor.execute('''
-        SELECT analysis_data 
-        FROM user_move_analysis 
-        WHERE user_id = ?
-        ORDER BY id DESC
-        LIMIT 100
-    ''', (user_id,))
-    
-    analysis_records = cursor.fetchall()
-    conn.close()
-    
-    if not analysis_records:
-        return None
-    
-    # Process analysis data
-    insights = {
-        'material_insights': analyze_material_patterns(analysis_records),
-        'positional_insights': analyze_positional_patterns(analysis_records),
-        'tactical_insights': analyze_tactical_patterns(analysis_records),
-        'timing_insights': analyze_timing_patterns(analysis_records),
-        'phase_insights': analyze_phase_patterns(analysis_records),
-        'weakness_insights': identify_weaknesses(analysis_records),
-        'strength_insights': identify_strengths(analysis_records)
-    }
-    
-    return insights
-
-def analyze_material_patterns(analysis_records):
-    """Analyze material-related patterns from user moves."""
-    material_data = []
-    
-    for record in analysis_records:
-        try:
-            data = json.loads(record['analysis_data'])
-            material_analysis = data.get('material_analysis', {})
-            result = data.get('result')
-            
-            material_data.append({
-                'player_advantage': material_analysis.get('player_advantage', 0),
-                'total_material': material_analysis.get('total_material', 0),
-                'result': result
-            })
-        except:
-            continue
-    
-    if not material_data:
-        return {}
-    
-    # Analyze patterns
-    advantages = [d['player_advantage'] for d in material_data]
-    results = [d['result'] for d in material_data]
-    
-    return {
-        'avg_material_advantage': sum(advantages) / len(advantages),
-        'accuracy_with_advantage': sum(1 for i, d in enumerate(material_data) 
-                                     if d['player_advantage'] > 0 and d['result'] == 'pass') / 
-                                   max(1, sum(1 for d in material_data if d['player_advantage'] > 0)),
-        'accuracy_with_disadvantage': sum(1 for i, d in enumerate(material_data) 
-                                        if d['player_advantage'] < 0 and d['result'] == 'pass') / 
-                                      max(1, sum(1 for d in material_data if d['player_advantage'] < 0))
-    }
-
-def analyze_positional_patterns(analysis_records):
-    """Analyze positional patterns from user moves."""
-    # Implementation for positional pattern analysis
-    return {}
-
-def analyze_tactical_patterns(analysis_records):
-    """Analyze tactical patterns from user moves."""
-    # Implementation for tactical pattern analysis
-    return {}
-
-def analyze_timing_patterns(analysis_records):
-    """Analyze timing patterns from user moves."""
-    # Implementation for timing pattern analysis
-    return {}
-
-def analyze_phase_patterns(analysis_records):
-    """Analyze game phase patterns from user moves."""
-    # Implementation for phase pattern analysis
-    return {}
-
-def identify_weaknesses(analysis_records):
-    """Identify user weaknesses from analysis data."""
-    # Implementation for weakness identification
-    return []
-
-def identify_strengths(analysis_records):
-    """Identify user strengths from analysis data."""
-    # Implementation for strength identification
-    return []

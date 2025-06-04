@@ -1,379 +1,489 @@
 """
-Chess board rendering and interaction handling.
-Handles the interactive chess board with move suggestions.
+Enhanced chess board rendering and interaction handling with mobile optimization.
+Handles the interactive chess board with move suggestions, spatial analysis, and responsive design.
 """
 import streamlit as st
 import chess
 import chess.svg
 import base64
+import json
+import re
 from io import BytesIO
 from typing import List, Dict, Any, Optional, Tuple, Union, Set, Callable
 
+def display_chess_board(fen: str, theme: str = 'default', 
+                       highlight_best_move: bool = False, 
+                       top_moves: List[Dict] = None, 
+                       flipped: bool = False, 
+                       board_size: int = None,
+                       show_coordinates: bool = True,
+                       interactive: bool = False):
+    """
+    Enhanced main function to display a chess board with comprehensive features.
+    
+    Args:
+        fen: The FEN string representing the position
+        theme: Board theme name
+        highlight_best_move: Whether to highlight the best move with an arrow
+        top_moves: List of top engine moves to highlight
+        flipped: Whether to flip the board (typically for black's perspective)
+        board_size: Size of the board in pixels (auto-calculated if None)
+        show_coordinates: Whether to show board coordinates
+        interactive: Whether to enable interactive features
+    """
+    try:
+        # Validate inputs
+        if not fen:
+            st.error("No FEN string provided")
+            return
+        
+        # Create board from FEN
+        board = chess.Board(fen)
+        
+        # Auto-calculate board size if not provided
+        if board_size is None:
+            board_size = get_responsive_board_size()
+        
+        # Prepare arrows for top moves
+        arrows = []
+        if highlight_best_move and top_moves:
+            arrows = generate_move_arrows(board, top_moves)
+        
+        # Get last move for highlighting
+        last_move = None
+        try:
+            last_move = board.peek() if board.move_stack else None
+        except:
+            last_move = None
+        
+        # Render the enhanced board
+        render_board(
+            board=board,
+            flipped=flipped,
+            last_move=last_move,
+            board_size=board_size,
+            arrows=arrows,
+            theme=theme
+        )
+        
+        # Add mobile-friendly move information below board
+        if top_moves and len(top_moves) > 0:
+            display_mobile_move_info(top_moves[:3])
+            
+    except chess.InvalidFenError as e:
+        st.error(f"Invalid FEN string: {fen}")
+        st.code(f"FEN: {fen}", language="text")
+    except Exception as e:
+        st.error(f"Error displaying chess board: {str(e)}")
+        # Fallback: display basic position info
+        st.code(f"Position FEN: {fen}", language="text")
+
 def render_board(board: chess.Board, flipped: bool = False, 
                  last_move: Optional[chess.Move] = None,
-                 drag_and_drop: bool = True,
-                 board_size: int = 800):
+                 board_size: int = None,
+                 highlight_squares: Set[chess.Square] = None,
+                 arrows: List[Tuple[chess.Square, chess.Square, str]] = None,
+                 theme: str = 'default'):
     """
-    Render an interactive chess board with move suggestions and optional drag-and-drop.
+    Enhanced board rendering with mobile optimization and theme support.
     
     Args:
         board: Chess board object
         flipped: Whether to flip the board orientation
         last_move: The last move played (highlighted on the board)
-        drag_and_drop: Whether to enable drag-and-drop functionality
-        board_size: Size of the board in pixels
+        board_size: Size of the board in pixels (auto-calculated if None)
+        highlight_squares: Set of squares to highlight
+        arrows: List of arrows to draw (from_square, to_square, color)
+        theme: Board theme name
     """
-    # Initialize session state variables if not already set
-    if "selected_square" not in st.session_state:
-        st.session_state.selected_square = None
-    
-    if "legal_moves_cache" not in st.session_state:
-        st.session_state.legal_moves_cache = {}
-    
-    # Cache legal moves for performance (only recalculate when board changes)
-    board_fen = board.fen()
-    if board_fen not in st.session_state.legal_moves_cache:
-        st.session_state.legal_moves_cache[board_fen] = list(board.legal_moves)
-    
-    legal_moves = st.session_state.legal_moves_cache[board_fen]
-    
-    # Track highlighted squares
-    highlighted_squares = set()
-    selected_square = st.session_state.selected_square
-    
-    # Squares to fill with different colors
-    fill_dict = {}
-    
-    # Arrows to display on the board
-    arrows = []
-    
-    # If a square is selected, highlight it and legal destinations
-    if selected_square is not None:
-        square = chess.parse_square(selected_square)
-        fill_dict[square] = "#ffe438"  # Yellow highlight for selected square
+    try:
+        # Auto-calculate board size based on screen size
+        if board_size is None:
+            board_size = get_responsive_board_size()
         
-        # Highlight legal move destinations
-        for move in legal_moves:
-            if move.from_square == square:
-                if board.is_capture(move):
-                    # Red highlight for captures
-                    fill_dict[move.to_square] = "#ff6464"
-                else:
-                    highlighted_squares.add(move.to_square)
+        # Get theme colors
+        theme_config = get_board_theme(theme)
+        
+        # Prepare highlighting
+        fill_dict = {}
+        arrow_list = arrows or []
+        
+        # Highlight squares if provided
+        if highlight_squares:
+            for square in highlight_squares:
+                fill_dict[square] = theme_config['highlight_color']
+        
+        # Highlight last move
+        if last_move:
+            try:
+                fill_dict[last_move.from_square] = theme_config['last_move_from']
+                fill_dict[last_move.to_square] = theme_config['last_move_to']
+            except AttributeError:
+                # If last_move doesn't have the expected attributes, skip highlighting
+                pass
+        
+        # Check for check
+        check_square = None
+        try:
+            if board.is_check():
+                check_square = board.king(board.turn)
+                if check_square is not None:
+                    fill_dict[check_square] = theme_config['check_color']
+        except:
+            # If there's an error checking for check, skip it
+            pass
+        
+        # Generate enhanced SVG
+        svg_board = chess.svg.board(
+            board=board,
+            flipped=flipped,
+            size=board_size,
+            lastmove=last_move,
+            check=check_square,
+            fill=fill_dict,
+            arrows=arrow_list,
+            style=get_svg_style(theme_config)
+        )
+        
+        # Apply mobile optimizations
+        svg_board = optimize_svg_for_mobile(svg_board, board_size)
+        
+        # Display the board
+        display_svg_board(svg_board, board_size)
+        
+    except Exception as e:
+        st.error(f"Error rendering chess board: {e}")
+        # Fallback to simple text representation
+        st.text("♟️ Chess Board")
+        st.code(f"Board FEN: {board.fen()}", language="text")
+
+def get_responsive_board_size() -> int:
+    """
+    Calculate responsive board size based on screen width.
     
-    # Generate SVG with highlighting
-    svg_board = chess.svg.board(
-        board=board,
-        flipped=flipped,
-        size=board_size,
-        lastmove=last_move if last_move else board.peek() if board.move_stack else None,
-        check=board.king(board.turn) if board.is_check() else None,
-        squares=chess.SquareSet(highlighted_squares) if highlighted_squares else None,
-        fill=fill_dict,
-        arrows=arrows
+    Returns:
+        Optimal board size in pixels
+    """
+    # Use JavaScript to detect screen size (fallback to reasonable defaults)
+    mobile_size = 350
+    tablet_size = 500
+    desktop_size = 600
+    
+    # For now, return a good default that works on most screens
+    # In a full implementation, this could use JavaScript to detect screen size
+    return mobile_size
+
+def get_board_theme(theme_name: str) -> Dict[str, str]:
+    """
+    Get theme configuration for board colors.
+    
+    Args:
+        theme_name: Name of the theme
+        
+    Returns:
+        Dictionary with theme colors
+    """
+    themes = {
+        'default': {
+            'light_square': '#F0D9B5',
+            'dark_square': '#B58863',
+            'highlight_color': '#AACC44',
+            'last_move_from': '#BBDDAA',
+            'last_move_to': '#AACC88',
+            'check_color': '#FF6B6B',
+            'arrow_color': '#15781B'
+        },
+        'blue': {
+            'light_square': '#DEE3E6',
+            'dark_square': '#788A94',
+            'highlight_color': '#82C0E3',
+            'last_move_from': '#AACCEE',
+            'last_move_to': '#88BBDD',
+            'check_color': '#FF6B6B',
+            'arrow_color': '#4A90A4'
+        },
+        'green': {
+            'light_square': '#FFFFDD',
+            'dark_square': '#86A666',
+            'highlight_color': '#AACCBB',
+            'last_move_from': '#CCEEAA',
+            'last_move_to': '#AADDAA',
+            'check_color': '#FF6B6B',
+            'arrow_color': '#6B8E4E'
+        },
+        'dark': {
+            'light_square': '#4A4A4A',
+            'dark_square': '#2E2E2E',
+            'highlight_color': '#6B8E6B',
+            'last_move_from': '#5A7A5A',
+            'last_move_to': '#4A6A4A',
+            'check_color': '#CC5555',
+            'arrow_color': '#7A9A7A'
+        }
+    }
+    
+    return themes.get(theme_name, themes['default'])
+
+def get_svg_style(theme_config: Dict[str, str]) -> str:
+    """
+    Generate CSS style for SVG board based on theme.
+    
+    Args:
+        theme_config: Theme configuration dictionary
+        
+    Returns:
+        CSS style string
+    """
+    return f"""
+    .light {{fill: {theme_config['light_square']}}}
+    .dark {{fill: {theme_config['dark_square']}}}
+    """
+
+def optimize_svg_for_mobile(svg_content: str, board_size: int) -> str:
+    """
+    Optimize SVG content for mobile display.
+    
+    Args:
+        svg_content: Original SVG content
+        board_size: Board size in pixels
+        
+    Returns:
+        Optimized SVG content
+    """
+    # Add responsive attributes
+    svg_content = svg_content.replace(
+        f'width="{board_size}" height="{board_size}"',
+        f'width="100%" height="auto" viewBox="0 0 {board_size} {board_size}"'
     )
     
-    # Add JavaScript for drag-and-drop if enabled
-    if drag_and_drop:
-        # Add a unique ID to the SVG for JavaScript interaction
-        svg_board = svg_board.replace("<svg ", '<svg id="chess-board" ')
-        
-        # Calculate the square size for drag and drop
-        square_size = board_size / 8
-        
-        # Add custom JavaScript for drag-and-drop functionality
-        st.markdown(f"""
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {{
-            const board = document.getElementById('chess-board');
-            if (!board) return;
-            
-            let dragging = false;
-            let draggedPiece = null;
-            let startSquare = null;
-            
-            // Find all pieces (SVG 'use' elements)
-            const pieces = board.querySelectorAll('use');
-            
-            pieces.forEach(piece => {{
-                // Make pieces draggable
-                piece.setAttribute('cursor', 'pointer');
-                
-                // Drag start
-                piece.addEventListener('mousedown', function(e) {{
-                    dragging = true;
-                    draggedPiece = this;
-                    
-                    // Determine starting square
-                    const transform = this.getAttribute('transform');
-                    if (transform) {{
-                        // Extract x,y from transform
-                        const match = transform.match(/translate\\(([0-9.]+),([0-9.]+)\\)/);
-                        if (match) {{
-                            const x = parseFloat(match[1]);
-                            const y = parseFloat(match[2]);
-                            
-                            // Convert to board coordinates
-                            const file = Math.floor(x / {square_size});
-                            const rank = 7 - Math.floor(y / {square_size});
-                            
-                            startSquare = String.fromCharCode(97 + file) + (rank + 1);
-                            
-                            // Send to Streamlit
-                            const data = {{
-                                square: startSquare,
-                                type: 'square_selected'
-                            }};
-                            window.parent.postMessage({{
-                                type: 'streamlit:setComponentValue',
-                                value: data
-                            }}, '*');
-                        }}
-                    }}
-                    
-                    // Bring piece to front while dragging
-                    this.parentNode.appendChild(this);
-                    
-                    // Store original position
-                    this.dataset.originalX = e.clientX;
-                    this.dataset.originalY = e.clientY;
-                    this.dataset.originalTransform = this.getAttribute('transform');
-                }});
-            }});
-            
-            // Mouse move event for the entire board
-            board.addEventListener('mousemove', function(e) {{
-                if (!dragging || !draggedPiece) return;
-                
-                // Calculate new position
-                const dx = e.clientX - draggedPiece.dataset.originalX;
-                const dy = e.clientY - draggedPiece.dataset.originalY;
-                
-                // Update piece position
-                const originalTransform = draggedPiece.dataset.originalTransform || '';
-                draggedPiece.setAttribute('transform', 
-                    originalTransform + ' translate(' + dx + ',' + dy + ')');
-            }});
-            
-            // Mouse up event for the entire document
-            document.addEventListener('mouseup', function(e) {{
-                if (!dragging || !draggedPiece || !startSquare) {{
-                    dragging = false;
-                    draggedPiece = null;
-                    startSquare = null;
-                    return;
-                }}
-                
-                // Find coordinates relative to the board
-                const boardRect = board.getBoundingClientRect();
-                const relX = e.clientX - boardRect.left;
-                const relY = e.clientY - boardRect.top;
-                
-                // Convert to board coordinates
-                const boardSize = {board_size}; // SVG board size
-                const squareSize = boardSize / 8;
-                
-                const file = Math.floor(relX / squareSize);
-                const rank = 7 - Math.floor(relY / squareSize);
-                
-                // Validate coordinates
-                if (file >= 0 && file < 8 && rank >= 0 && rank < 8) {{
-                    const endSquare = String.fromCharCode(97 + file) + (rank + 1);
-                    
-                    // Send move to Streamlit
-                    if (startSquare !== endSquare) {{
-                        const data = {{
-                            from: startSquare,
-                            to: endSquare,
-                            type: 'move_made'
-                        }};
-                        window.parent.postMessage({{
-                            type: 'streamlit:setComponentValue',
-                            value: data
-                        }}, '*');
-                    }}
-                }}
-                
-                // Reset piece position
-                if (draggedPiece.dataset.originalTransform) {{
-                    draggedPiece.setAttribute('transform', draggedPiece.dataset.originalTransform);
-                }}
-                
-                // Reset state
-                dragging = false;
-                draggedPiece = null;
-                startSquare = null;
-            }});
-        }});
-        </script>
-        """, unsafe_allow_html=True)
+    # Add mobile-friendly CSS
+    mobile_css = f'''
+    <style>
+        .chess-board {{
+            max-width: 100%;
+            height: auto;
+            touch-action: manipulation;
+            user-select: none;
+        }}
+        .chess-square {{
+            cursor: pointer;
+        }}
+        @media (max-width: 768px) {{
+            .chess-piece {{
+                pointer-events: auto;
+            }}
+        }}
+    </style>
+    '''
     
-    # Convert SVG to base64 and display
-    b64 = base64.b64encode(svg_board.encode('utf-8')).decode('utf-8')
-    html = f'<img src="data:image/svg+xml;base64,{b64}" style="max-width:100%; height:auto;" />'
+    # Insert mobile CSS
+    svg_content = svg_content.replace('<svg', mobile_css + '<svg class="chess-board"')
     
-    # Calculate additional height for the container to accommodate the larger board
-    container_height = int(board_size * 1.05)  # Add 5% extra space for padding
-    st.components.v1.html(html, height=container_height, scrolling=False)
+    return svg_content
 
-def handle_board_interaction(callback: Callable[[str, str], None]):
+def display_svg_board(svg_content: str, board_size: int):
     """
-    Handle chess board interactions and trigger callback when a move is made.
+    Display SVG board with mobile-optimized container.
     
     Args:
-        callback: Function to call with the move details (from_square, to_square)
+        svg_content: SVG content to display
+        board_size: Board size for container calculations
     """
-    # Process board interactions from JavaScript
-    if 'board_interaction' in st.session_state:
-        interaction = st.session_state.board_interaction
+    try:
+        # Create mobile-friendly HTML container
+        container_html = f'''
+        <div style="
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: {board_size}px;
+            margin: 0 auto;
+            padding: 10px;
+            box-sizing: border-box;
+        ">
+            {svg_content}
+        </div>
+        '''
         
-        if interaction.get('type') == 'square_selected':
-            st.session_state.selected_square = interaction.get('square')
-            st.rerun()
+        # Calculate container height (add extra space for mobile)
+        container_height = min(board_size + 50, 650)
         
-        elif interaction.get('type') == 'move_made':
-            from_square = interaction.get('from')
-            to_square = interaction.get('to')
-            
-            if from_square and to_square:
-                # Clear selection
-                st.session_state.selected_square = None
-                
-                # Call the callback function with move details
-                callback(from_square, to_square)
+        # Display with mobile-optimized settings
+        st.components.v1.html(
+            container_html, 
+            height=container_height, 
+            scrolling=False
+        )
+        
+    except Exception as e:
+        st.error(f"Error displaying SVG board: {e}")
+        # Fallback to simple display
+        st.markdown("### ♟️ Chess Position")
+        st.text("Board display error - using fallback")
 
-def highlight_last_move(board: chess.Board) -> Optional[chess.Move]:
+def generate_move_arrows(board: chess.Board, top_moves: List[Dict]) -> List[Tuple[chess.Square, chess.Square, str]]:
     """
-    Get the last move for highlighting on the board.
+    Generate arrows for top moves with color coding.
     
     Args:
         board: Chess board object
+        top_moves: List of top engine moves
         
     Returns:
-        The last move or None
+        List of arrow tuples (from_square, to_square, color)
     """
-    return board.peek() if board.move_stack else None
-
-def highlight_best_moves(board: chess.Board, top_moves: List[Dict[str, Any]]) -> Tuple[Dict, List]:
-    """
-    Generate highlighting for top engine moves.
-    
-    Args:
-        board: Chess board object
-        top_moves: List of top engine moves with scores
-        
-    Returns:
-        Tuple of (fill_dict, arrows) for board rendering
-    """
-    fill_dict = {}
     arrows = []
     
-    # Sort moves by score
-    sorted_moves = sorted(top_moves, key=lambda x: x.get("score", 0), reverse=True)
+    if not top_moves:
+        return arrows
     
-    # Limit to top 3 moves
-    for i, move_data in enumerate(sorted_moves[:3]):
+    # Color scheme for move ranking
+    arrow_colors = [
+        '#28a745',  # Green for best move
+        '#ffc107',  # Yellow for second best
+        '#fd7e14',  # Orange for third best
+        '#6c757d'   # Gray for others
+    ]
+    
+    for i, move_data in enumerate(top_moves[:4]):  # Limit to top 4 moves
         try:
+            if not isinstance(move_data, dict):
+                continue
+                
+            move_san = move_data.get('move', '')
+            if not move_san:
+                continue
+            
             # Parse the move
-            move_san = move_data["move"]
             move = board.parse_san(move_san)
             
-            # Choose colors based on rank
-            colors = ["#66bb6a", "#aeea00", "#ffeb3b"]  # Green, lime, yellow
-            color = colors[i] if i < len(colors) else colors[-1]
+            # Choose color based on ranking
+            color = arrow_colors[i] if i < len(arrow_colors) else arrow_colors[-1]
             
-            # Add arrow
-            arrows.append((move.from_square, move.to_square, color))
-        except (ValueError, KeyError, chess.InvalidMoveError):
+            # Add arrow - ensure we have valid squares
+            if hasattr(move, 'from_square') and hasattr(move, 'to_square'):
+                arrows.append((move.from_square, move.to_square, color))
+            
+        except (ValueError, KeyError, chess.InvalidMoveError, AttributeError) as e:
+            # Skip invalid moves
+            print(f"Skipping invalid move {move_data}: {e}")
+            continue
+        except Exception as e:
+            # Skip any other errors
+            print(f"Error processing move {move_data}: {e}")
             continue
     
-    return fill_dict, arrows
+    return arrows
 
-def render_board_with_arrows(board: chess.Board, flipped: bool = False, 
-                           arrows: List[Tuple[chess.Square, chess.Square, str]] = None,
-                           fill: Dict[chess.Square, str] = None):
+def display_mobile_move_info(top_moves: List[Dict]):
     """
-    Render a chess board with custom arrows and highlighted squares.
+    Display mobile-friendly move information below the board.
     
     Args:
-        board: Chess board object
-        flipped: Whether to flip the board orientation
-        arrows: List of arrows to draw (from_square, to_square, color)
-        fill: Dictionary of squares to fill with colors
+        top_moves: List of top moves to display
     """
-    # Generate SVG with custom arrows and highlighting
-    svg_board = chess.svg.board(
-        board=board,
-        flipped=flipped,
-        size=600,
-        arrows=arrows or [],
-        fill=fill or {}
-    )
+    if not top_moves:
+        return
     
-    # Convert SVG to base64 and display
-    b64 = base64.b64encode(svg_board.encode('utf-8')).decode('utf-8')
-    html = f'<img src="data:image/svg+xml;base64,{b64}" style="max-width:100%; height:auto;" />'
-    st.components.v1.html(html, height=620, scrolling=False)
+    try:
+        st.markdown("### 🎯 Top Moves")
+        
+        for i, move_data in enumerate(top_moves):
+            try:
+                if not isinstance(move_data, dict):
+                    continue
+                    
+                move = move_data.get('move', 'Unknown')
+                score = move_data.get('score', 0)
+                classification = move_data.get('classification', 'unknown')
+                
+                # Color coding for move quality
+                color_map = {
+                    'great': '#28a745',
+                    'good': '#20c997', 
+                    'inaccuracy': '#ffc107',
+                    'mistake': '#fd7e14',
+                    'blunder': '#dc3545'
+                }
+                
+                color = color_map.get(classification, '#6c757d')
+                rank_emoji = ['🥇', '🥈', '🥉'][i] if i < 3 else f'#{i+1}'
+                
+                # Mobile-friendly move display
+                st.markdown(f"""
+                <div style="
+                    display: flex; 
+                    align-items: center; 
+                    padding: 8px 12px; 
+                    margin: 4px 0; 
+                    border-left: 4px solid {color};
+                    background-color: {color}15;
+                    border-radius: 4px;
+                ">
+                    <span style="font-size: 1.2em; margin-right: 12px;">{rank_emoji}</span>
+                    <div style="flex: 1;">
+                        <strong style="color: {color}; font-size: 1.1em;">{move}</strong>
+                        <span style="margin-left: 12px; color: #666;">Score: {score:+}</span>
+                        <small style="display: block; color: #888; text-transform: capitalize;">
+                            {classification.replace('_', ' ')}
+                        </small>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            except Exception as e:
+                print(f"Error displaying move {i}: {e}")
+                continue
+                
+    except Exception as e:
+        print(f"Error in display_mobile_move_info: {e}")
+        st.text("Unable to display move information")
 
-def display_chess_board(fen, theme='default', highlight_best_move=False, top_moves=None, flipped=False, board_size=800):
+def create_thumbnail_board(fen: str, size: int = 150) -> str:
     """
-    Display a chess board in Streamlit using the python-chess library.
+    Create a small thumbnail board for lists and previews.
     
     Args:
-        fen: The FEN string representing the position
-        theme: Board theme (currently not used with python-chess)
-        highlight_best_move: Whether to highlight the best move with an arrow
-        top_moves: List of top engine moves to highlight
-        flipped: Whether to flip the board (typically for black's perspective)
-        board_size: Size of the board in pixels
-    """
-    # Create a board from the FEN string
-    board = chess.Board(fen)
-    
-    # Handle interactions if in session state
-    if "board_interaction" in st.session_state:
-        handle_board_interaction(lambda from_square, to_square: st.info(f"Move: {from_square} to {to_square}"))
-    
-    # Get arrows for best moves if requested
-    arrows = []
-    fill_dict = {}
-    
-    if highlight_best_move and top_moves:
-        fill_dict, arrows = highlight_best_moves(board, top_moves)
-    
-    # Get last move for highlighting
-    last_move = highlight_last_move(board)
-    
-    # Render the board with the flipped parameter and specified size
-    render_board(board, flipped=flipped, last_move=last_move, board_size=board_size)
-
-
-def create_screenshot(board: chess.Board, filename: str = None) -> str:
-    """
-    Create a PNG screenshot of the current board position.
-    
-    Args:
-        board: Chess board object
-        filename: Optional filename for the saved image
+        fen: Position FEN string
+        size: Thumbnail size in pixels
         
     Returns:
-        Base64 encoded PNG image
+        Base64 encoded image data URL
     """
-    # Generate SVG
-    svg_data = chess.svg.board(board=board, size=600)
-    
-    # For now, just return the base64 encoded SVG
-    b64 = base64.b64encode(svg_data.encode('utf-8')).decode('utf-8')
-    
-    return b64
+    try:
+        board = chess.Board(fen)
+        
+        # Generate small SVG
+        svg_content = chess.svg.board(
+            board=board,
+            size=size,
+            coordinates=False  # No coordinates for thumbnails
+        )
+        
+        # Convert to base64 for embedding
+        b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
+        return f"data:image/svg+xml;base64,{b64}"
+        
+    except Exception:
+        # Return placeholder on error
+        return "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiPjxyZWN0IHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNzUiIHk9Ijc1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjE0Ij5FcnJvcjwvdGV4dD48L3N2Zz4="
 
-def fen_to_board(fen):
+def fen_to_board(fen: str) -> Optional[chess.Board]:
     """
-    Convert a FEN string to a chess.Board object.
+    Convert a FEN string to a chess.Board object with error handling.
+    
+    Args:
+        fen: FEN string
+        
+    Returns:
+        Chess board object or None if invalid
     """
     try:
         return chess.Board(fen)
-    except ValueError:
-        # Handle invalid FEN
+    except ValueError as e:
         st.error(f"Invalid FEN string: {fen}")
-        return chess.Board()  # Return default starting position
+        return None
+    except Exception as e:
+        st.error(f"Error parsing FEN: {str(e)}")
+        return None

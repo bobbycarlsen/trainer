@@ -2,6 +2,7 @@ import sqlite3
 import json
 from datetime import datetime
 import os
+import shutil
 
 def get_db_connection():
     """
@@ -42,7 +43,7 @@ def init_db():
         fullmove_number INTEGER NOT NULL,
         timestamp TEXT,
         position_classification TEXT,
-        metadata JSON,
+        metadata TEXT,
         UNIQUE(fen)
     )
     ''')
@@ -59,8 +60,8 @@ def init_db():
         centipawn_loss INTEGER NOT NULL,
         classification TEXT NOT NULL,
         principal_variation TEXT,
-        tactics JSON,
-        position_impact JSON,
+        tactics TEXT,
+        position_impact TEXT,
         rank INTEGER NOT NULL,
         FOREIGN KEY (position_id) REFERENCES positions (id),
         UNIQUE(position_id, move)
@@ -96,30 +97,30 @@ def init_db():
     )
     ''')
     
-    # NEW: Enhanced analysis tracking table
+    # Enhanced analysis tracking table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS user_move_analysis (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         move_record_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
-        analysis_data JSON NOT NULL,
+        analysis_data TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (move_record_id) REFERENCES user_moves (id),
         FOREIGN KEY (user_id) REFERENCES users (id)
     )
     ''')
     
-    # NEW: User insights cache table for performance
+    # User insights cache table for performance
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS user_insights_cache (
         user_id INTEGER PRIMARY KEY,
-        insights_data JSON NOT NULL,
+        insights_data TEXT NOT NULL,
         last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id)
     )
     ''')
     
-    # NEW: Training sessions table for grouping moves
+    # Training sessions table for grouping moves
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS training_sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -129,17 +130,117 @@ def init_db():
         end_time TIMESTAMP,
         total_moves INTEGER DEFAULT 0,
         correct_moves INTEGER DEFAULT 0,
-        session_metadata JSON,
+        session_metadata TEXT,
         FOREIGN KEY (user_id) REFERENCES users (id)
     )
     ''')
     
-    # Create indexes for better performance
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_moves_user_id ON user_moves(user_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_moves_timestamp ON user_moves(timestamp)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_move_analysis_user_id ON user_move_analysis(user_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_positions_fullmove ON positions(fullmove_number)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_moves_position_rank ON moves(position_id, rank)')
+    # Games table - Store complete chess games from PGNs
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS games (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pgn_source TEXT,
+        game_index INTEGER,
+        white_player TEXT,
+        black_player TEXT,
+        white_elo INTEGER,
+        black_elo INTEGER,
+        result TEXT,
+        date TEXT,
+        event TEXT,
+        site TEXT,
+        round TEXT,
+        opening TEXT,
+        eco_code TEXT,
+        time_control TEXT,
+        total_moves INTEGER,
+        pgn_text TEXT,
+        moves_data TEXT,
+        positions_data TEXT,
+        metadata TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
+    # User game analysis table - Track user's game analysis progress
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS user_game_analysis (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        game_id INTEGER NOT NULL,
+        analysis_status TEXT DEFAULT 'not_started',
+        current_move_index INTEGER DEFAULT 0,
+        total_time_spent REAL DEFAULT 0,
+        moves_analyzed INTEGER DEFAULT 0,
+        correct_moves INTEGER DEFAULT 0,
+        notes TEXT,
+        analysis_data TEXT,
+        last_analyzed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id),
+        FOREIGN KEY (game_id) REFERENCES games (id),
+        UNIQUE(user_id, game_id)
+    )
+    ''')
+    
+    # Saved games table - Users can save games for later analysis
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS user_saved_games (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        game_id INTEGER NOT NULL,
+        saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        notes TEXT,
+        tags TEXT,
+        FOREIGN KEY (user_id) REFERENCES users (id),
+        FOREIGN KEY (game_id) REFERENCES games (id),
+        UNIQUE(user_id, game_id)
+    )
+    ''')
+    
+    # User game sessions - Track analysis sessions
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS user_game_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        session_type TEXT DEFAULT 'game_analysis',
+        start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        end_time TIMESTAMP,
+        games_analyzed INTEGER DEFAULT 0,
+        total_moves_analyzed INTEGER DEFAULT 0,
+        session_metadata TEXT,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+    ''')
+    
+    # Create indexes for better performance (separate statements)
+    index_statements = [
+        'CREATE INDEX IF NOT EXISTS idx_user_moves_user_id ON user_moves(user_id)',
+        'CREATE INDEX IF NOT EXISTS idx_user_moves_timestamp ON user_moves(timestamp)',
+        'CREATE INDEX IF NOT EXISTS idx_user_move_analysis_user_id ON user_move_analysis(user_id)',
+        'CREATE INDEX IF NOT EXISTS idx_positions_fullmove ON positions(fullmove_number)',
+        'CREATE INDEX IF NOT EXISTS idx_moves_position_rank ON moves(position_id, rank)',
+        'CREATE INDEX IF NOT EXISTS idx_games_white_player ON games(white_player)',
+        'CREATE INDEX IF NOT EXISTS idx_games_black_player ON games(black_player)',
+        'CREATE INDEX IF NOT EXISTS idx_games_date ON games(date)',
+        'CREATE INDEX IF NOT EXISTS idx_games_result ON games(result)',
+        'CREATE INDEX IF NOT EXISTS idx_games_opening ON games(opening)',
+        'CREATE INDEX IF NOT EXISTS idx_user_game_analysis_user_id ON user_game_analysis(user_id)',
+        'CREATE INDEX IF NOT EXISTS idx_user_game_analysis_status ON user_game_analysis(analysis_status)',
+        'CREATE INDEX IF NOT EXISTS idx_user_saved_games ON user_saved_games(user_id)',
+        'CREATE INDEX IF NOT EXISTS idx_games_players ON games(white_player, black_player)',
+        'CREATE INDEX IF NOT EXISTS idx_user_moves_result ON user_moves(user_id, result)',
+        'CREATE INDEX IF NOT EXISTS idx_user_moves_position ON user_moves(position_id)',
+        'CREATE INDEX IF NOT EXISTS idx_moves_score ON moves(position_id, score DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_positions_turn ON positions(turn)',
+        'CREATE INDEX IF NOT EXISTS idx_analysis_user_created ON user_move_analysis(user_id, created_at DESC)'
+    ]
+    
+    for index_sql in index_statements:
+        try:
+            cursor.execute(index_sql)
+        except sqlite3.Error as e:
+            print(f"Index creation warning: {e}")
     
     conn.commit()
     conn.close()
@@ -254,6 +355,427 @@ def load_positions_from_jsonl(file_path):
     
     print(f"JSONL loading complete: {positions_loaded} positions loaded, {errors} errors encountered.")
     return positions_loaded
+
+def store_pgn_games(games_data, pgn_source="uploaded"):
+    """
+    Store complete games from PGN data into the database.
+    
+    Args:
+        games_data: List of game dictionaries from pgn_loader
+        pgn_source: Source identifier for the PGN file
+        
+    Returns:
+        Dictionary with import results
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    games_stored = 0
+    errors = 0
+    
+    for game_index, game_data in enumerate(games_data):
+        try:
+            headers = game_data.get('headers', {})
+            moves = game_data.get('moves', [])
+            positions = game_data.get('positions', [])
+            
+            # Extract game information
+            white_player = headers.get('White', 'Unknown')
+            black_player = headers.get('Black', 'Unknown')
+            result = headers.get('Result', '*')
+            date = headers.get('Date', 'Unknown')
+            event = headers.get('Event', 'Unknown')
+            site = headers.get('Site', 'Unknown')
+            round_num = headers.get('Round', 'Unknown')
+            opening = headers.get('Opening', 'Unknown')
+            eco_code = headers.get('ECO', 'Unknown')
+            time_control = headers.get('TimeControl', 'Unknown')
+            
+            # Parse ELO ratings
+            try:
+                white_elo = int(headers.get('WhiteElo', 0)) if headers.get('WhiteElo', '').isdigit() else None
+                black_elo = int(headers.get('BlackElo', 0)) if headers.get('BlackElo', '').isdigit() else None
+            except:
+                white_elo = None
+                black_elo = None
+            
+            total_moves = len(moves)
+            
+            # Create metadata
+            metadata = {
+                'termination': headers.get('Termination', 'Unknown'),
+                'annotator': headers.get('Annotator', ''),
+                'ply_count': headers.get('PlyCount', ''),
+                'setup': headers.get('Setup', ''),
+                'variant': headers.get('Variant', ''),
+                'imported_at': datetime.now().isoformat()
+            }
+            
+            # Insert game
+            cursor.execute('''
+                INSERT INTO games (
+                    pgn_source, game_index, white_player, black_player, 
+                    white_elo, black_elo, result, date, event, site, round,
+                    opening, eco_code, time_control, total_moves,
+                    moves_data, positions_data, metadata
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                pgn_source, game_index, white_player, black_player,
+                white_elo, black_elo, result, date, event, site, round_num,
+                opening, eco_code, time_control, total_moves,
+                json.dumps(moves), json.dumps(positions), json.dumps(metadata)
+            ))
+            
+            games_stored += 1
+            
+        except Exception as e:
+            errors += 1
+            print(f"Error storing game {game_index}: {e}")
+            continue
+    
+    conn.commit()
+    conn.close()
+    
+    return {
+        'games_stored': games_stored,
+        'errors': errors,
+        'total_processed': len(games_data)
+    }
+
+def get_games_with_filters(filters=None, limit=50, offset=0):
+    """
+    Get games from database with optional filtering.
+    
+    Args:
+        filters: Dictionary with filter criteria
+        limit: Maximum number of games to return
+        offset: Number of games to skip
+        
+    Returns:
+        Dictionary with games list and metadata
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Base query
+    base_where = "WHERE 1=1"
+    params = []
+    
+    # Apply filters
+    if filters:
+        if filters.get('white_player'):
+            base_where += ' AND white_player LIKE ?'
+            params.append(f"%{filters['white_player']}%")
+        
+        if filters.get('black_player'):
+            base_where += ' AND black_player LIKE ?'
+            params.append(f"%{filters['black_player']}%")
+        
+        if filters.get('player_name'):
+            # Search both white and black players
+            base_where += ' AND (white_player LIKE ? OR black_player LIKE ?)'
+            params.extend([f"%{filters['player_name']}%", f"%{filters['player_name']}%"])
+        
+        if filters.get('result'):
+            base_where += ' AND result = ?'
+            params.append(filters['result'])
+        
+        if filters.get('opening'):
+            base_where += ' AND opening LIKE ?'
+            params.append(f"%{filters['opening']}%")
+        
+        if filters.get('year'):
+            base_where += ' AND date LIKE ?'
+            params.append(f"{filters['year']}%")
+        
+        if filters.get('min_elo'):
+            base_where += ' AND (white_elo >= ? OR black_elo >= ?)'
+            params.extend([filters['min_elo'], filters['min_elo']])
+        
+        if filters.get('max_elo'):
+            base_where += ' AND (white_elo <= ? OR black_elo <= ?)'
+            params.extend([filters['max_elo'], filters['max_elo']])
+        
+        if filters.get('event'):
+            base_where += ' AND event LIKE ?'
+            params.append(f"%{filters['event']}%")
+        
+        if filters.get('eco_code'):
+            base_where += ' AND eco_code LIKE ?'
+            params.append(f"{filters['eco_code']}%")
+        
+        if filters.get('min_moves'):
+            base_where += ' AND total_moves >= ?'
+            params.append(filters['min_moves'])
+        
+        if filters.get('max_moves'):
+            base_where += ' AND total_moves <= ?'
+            params.append(filters['max_moves'])
+    
+    # Get total count for pagination
+    try:
+        count_query = f'SELECT COUNT(*) as total FROM games {base_where}'
+        cursor.execute(count_query, params)
+        count_result = cursor.fetchone()
+        total_count = count_result['total'] if count_result else 0
+    except Exception as e:
+        print(f"Error getting count: {e}")
+        total_count = 0
+    
+    # Main query with pagination
+    try:
+        main_query = f'''
+            SELECT id, white_player, black_player, white_elo, black_elo,
+                   result, date, event, opening, eco_code, total_moves, site
+            FROM games
+            {base_where}
+            ORDER BY date DESC, id DESC 
+            LIMIT ? OFFSET ?
+        '''
+        
+        main_params = params + [limit, offset]
+        cursor.execute(main_query, main_params)
+        games = [dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Error getting games: {e}")
+        games = []
+    
+    conn.close()
+    
+    return {
+        'games': games,
+        'total_count': total_count,
+        'has_more': (offset + limit) < total_count
+    }
+
+def get_game_by_id(game_id):
+    """
+    Get complete game data by ID.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT * FROM games WHERE id = ?
+    ''', (game_id,))
+    
+    game = cursor.fetchone()
+    conn.close()
+    
+    if game:
+        game_dict = dict(game)
+        # Parse JSON fields
+        try:
+            game_dict['moves_data'] = json.loads(game_dict['moves_data']) if game_dict['moves_data'] else []
+            game_dict['positions_data'] = json.loads(game_dict['positions_data']) if game_dict['positions_data'] else []
+            game_dict['metadata'] = json.loads(game_dict['metadata']) if game_dict['metadata'] else {}
+        except json.JSONDecodeError:
+            game_dict['moves_data'] = []
+            game_dict['positions_data'] = []
+            game_dict['metadata'] = {}
+        return game_dict
+    
+    return None
+
+def save_game_for_user(user_id, game_id, notes="", tags=""):
+    """
+    Save a game for later analysis by a user.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            INSERT OR REPLACE INTO user_saved_games (user_id, game_id, notes, tags)
+            VALUES (?, ?, ?, ?)
+        ''', (user_id, game_id, notes, tags))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error saving game: {e}")
+        conn.close()
+        return False
+
+def get_user_saved_games(user_id):
+    """
+    Get all games saved by a user.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            SELECT usg.*, g.white_player, g.black_player, g.result, g.date, g.opening
+            FROM user_saved_games usg
+            JOIN games g ON usg.game_id = g.id
+            WHERE usg.user_id = ?
+            ORDER BY usg.saved_at DESC
+        ''', (user_id,))
+        
+        saved_games = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return saved_games
+    except Exception as e:
+        print(f"Error getting saved games: {e}")
+        conn.close()
+        return []
+
+def update_user_game_analysis_progress(user_id, game_id, move_index, time_spent, analysis_data=None):
+    """
+    Update user's progress on game analysis.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get existing record or create new one
+    cursor.execute('''
+        SELECT * FROM user_game_analysis 
+        WHERE user_id = ? AND game_id = ?
+    ''', (user_id, game_id))
+    
+    existing = cursor.fetchone()
+    
+    if existing:
+        # Update existing record
+        cursor.execute('''
+            UPDATE user_game_analysis 
+            SET current_move_index = ?, 
+                total_time_spent = total_time_spent + ?,
+                analysis_data = ?,
+                last_analyzed = CURRENT_TIMESTAMP
+            WHERE user_id = ? AND game_id = ?
+        ''', (move_index, time_spent, json.dumps(analysis_data) if analysis_data else None, user_id, game_id))
+    else:
+        # Create new record
+        cursor.execute('''
+            INSERT INTO user_game_analysis 
+            (user_id, game_id, current_move_index, total_time_spent, analysis_data)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, game_id, move_index, time_spent, json.dumps(analysis_data) if analysis_data else None))
+    
+    conn.commit()
+    conn.close()
+
+def get_user_game_statistics(user_id):
+    """
+    Get comprehensive user statistics including both position training and game analysis.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Position training stats
+        cursor.execute('''
+            SELECT 
+                COUNT(*) as total_position_attempts,
+                SUM(CASE WHEN result = 'pass' THEN 1 ELSE 0 END) as correct_positions,
+                AVG(time_taken) as avg_position_time,
+                SUM(time_taken) as total_position_time
+            FROM user_moves
+            WHERE user_id = ?
+        ''', (user_id,))
+        
+        result = cursor.fetchone()
+        position_stats = dict(result) if result else {
+            'total_position_attempts': 0,
+            'correct_positions': 0,
+            'avg_position_time': 0,
+            'total_position_time': 0
+        }
+        
+        position_stats['position_accuracy'] = (position_stats['correct_positions'] / position_stats['total_position_attempts']) * 100 if position_stats['total_position_attempts'] > 0 else 0
+        
+        # Game analysis stats
+        cursor.execute('''
+            SELECT 
+                COUNT(*) as games_analyzed,
+                SUM(total_time_spent) as total_game_time,
+                SUM(moves_analyzed) as total_moves_analyzed,
+                AVG(total_time_spent) as avg_game_time
+            FROM user_game_analysis
+            WHERE user_id = ?
+        ''', (user_id,))
+        
+        result = cursor.fetchone()
+        game_stats = dict(result) if result else {
+            'games_analyzed': 0,
+            'total_game_time': 0,
+            'total_moves_analyzed': 0,
+            'avg_game_time': 0
+        }
+        
+        # Saved games count
+        cursor.execute('''
+            SELECT COUNT(*) as saved_games_count
+            FROM user_saved_games
+            WHERE user_id = ?
+        ''', (user_id,))
+        
+        result = cursor.fetchone()
+        saved_stats = dict(result) if result else {'saved_games_count': 0}
+        
+        # Recent activity
+        cursor.execute('''
+            SELECT DATE(timestamp) as date, COUNT(*) as positions_count
+            FROM user_moves
+            WHERE user_id = ? AND timestamp >= date('now', '-30 days')
+            GROUP BY DATE(timestamp)
+            ORDER BY date DESC
+        ''', (user_id,))
+        
+        recent_position_activity = [dict(row) for row in cursor.fetchall()]
+        
+        cursor.execute('''
+            SELECT DATE(last_analyzed) as date, COUNT(*) as games_count
+            FROM user_game_analysis
+            WHERE user_id = ? AND last_analyzed >= date('now', '-30 days')
+            GROUP BY DATE(last_analyzed)
+            ORDER BY date DESC
+        ''', (user_id,))
+        
+        recent_game_activity = [dict(row) for row in cursor.fetchall()]
+        
+        conn.close()
+        
+        return {
+            'position_stats': position_stats,
+            'game_stats': game_stats,
+            'saved_stats': saved_stats,
+            'recent_position_activity': recent_position_activity,
+            'recent_game_activity': recent_game_activity
+        }
+        
+    except Exception as e:
+        print(f"Error getting user game statistics: {e}")
+        conn.close()
+        return {
+            'position_stats': {'total_position_attempts': 0, 'correct_positions': 0, 'avg_position_time': 0, 'total_position_time': 0, 'position_accuracy': 0},
+            'game_stats': {'games_analyzed': 0, 'total_game_time': 0, 'total_moves_analyzed': 0, 'avg_game_time': 0},
+            'saved_stats': {'saved_games_count': 0},
+            'recent_position_activity': [],
+            'recent_game_activity': []
+        }
+
+def export_database_with_schema():
+    """
+    Export the complete database with all data and schema.
+    
+    Returns:
+        Path to exported file or None if error
+    """
+    try:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        export_path = f'data/chess_trainer_complete_{timestamp}.db'
+        
+        # Simply copy the database file
+        shutil.copy2('data/chess_trainer.db', export_path)
+        return export_path
+    except Exception as e:
+        print(f"Export error: {e}")
+        return None
 
 def get_enhanced_user_statistics(user_id):
     """
@@ -387,6 +909,9 @@ def clear_user_statistics(user_id):
         cursor.execute('DELETE FROM user_moves WHERE user_id = ?', (user_id,))
         cursor.execute('DELETE FROM user_insights_cache WHERE user_id = ?', (user_id,))
         cursor.execute('DELETE FROM training_sessions WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM user_game_analysis WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM user_saved_games WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM user_game_sessions WHERE user_id = ?', (user_id,))
         
         conn.commit()
         
@@ -423,18 +948,6 @@ def optimize_database():
         # Analyze tables for better query planning
         cursor.execute('ANALYZE')
         
-        # Create additional performance indexes if not exists
-        performance_indexes = [
-            'CREATE INDEX IF NOT EXISTS idx_user_moves_result ON user_moves(user_id, result)',
-            'CREATE INDEX IF NOT EXISTS idx_user_moves_position ON user_moves(position_id)',
-            'CREATE INDEX IF NOT EXISTS idx_moves_score ON moves(position_id, score DESC)',
-            'CREATE INDEX IF NOT EXISTS idx_positions_turn ON positions(turn)',
-            'CREATE INDEX IF NOT EXISTS idx_analysis_user_created ON user_move_analysis(user_id, created_at DESC)'
-        ]
-        
-        for index_sql in performance_indexes:
-            cursor.execute(index_sql)
-        
         conn.commit()
         conn.close()
         
@@ -455,12 +968,43 @@ def backup_database(backup_path=None):
         backup_path = f'data/chess_trainer_backup_{timestamp}.db'
     
     try:
-        import shutil
         shutil.copy2('data/chess_trainer.db', backup_path)
         return backup_path
     except Exception as e:
         print(f"Backup error: {e}")
         return None
+
+def get_database_stats():
+    """Get basic database statistics."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    stats = {}
+    
+    try:
+        cursor.execute('SELECT COUNT(*) as count FROM users')
+        stats['users'] = cursor.fetchone()['count']
+        
+        cursor.execute('SELECT COUNT(*) as count FROM positions')
+        stats['positions'] = cursor.fetchone()['count']
+        
+        cursor.execute('SELECT COUNT(*) as count FROM moves')
+        stats['moves'] = cursor.fetchone()['count']
+        
+        cursor.execute('SELECT COUNT(*) as count FROM user_moves')
+        stats['user_moves'] = cursor.fetchone()['count']
+        
+        cursor.execute('SELECT COUNT(*) as count FROM games')
+        stats['games'] = cursor.fetchone()['count']
+        
+        cursor.execute('SELECT COUNT(*) as count FROM user_saved_games')
+        stats['saved_games'] = cursor.fetchone()['count']
+        
+    except sqlite3.Error as e:
+        print(f"Error getting database stats: {e}")
+    
+    conn.close()
+    return stats
 
 if __name__ == "__main__":
     # Initialize the database with enhanced tables

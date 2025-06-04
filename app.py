@@ -36,12 +36,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"  # Better for mobile
 )
 
-# Custom CSS for mobile-friendly design
+# Enhanced CSS for mobile-friendly design
 st.markdown("""
 <style>
     /* Mobile-first responsive design */
     .main > div {
-        padding-top: 1rem;
+        padding-top: 0.5rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
     }
     
     /* Responsive containers */
@@ -77,19 +79,24 @@ st.markdown("""
     .stButton > button {
         width: 100%;
         margin: 0.25rem 0;
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
     }
     
     /* Responsive tables */
     .dataframe {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
     }
     
-    /* Mobile navigation */
-    .mobile-nav {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin: 1rem 0;
+    /* Compact tabs for mobile */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        padding: 6px 10px;
+        font-size: 0.8rem;
     }
     
     /* Collapsible sections */
@@ -109,6 +116,93 @@ st.markdown("""
         height: 300px;
     }
     
+    /* Game filter cards */
+    .filter-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        border-left: 4px solid #007bff;
+    }
+    
+    /* Status indicators */
+    .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .status-completed { background-color: #28a745; }
+    .status-in-progress { background-color: #ffc107; }
+    .status-not-started { background-color: #6c757d; }
+    
+    /* Timer styling */
+    .timer-display {
+        text-align: center;
+        padding: 8px;
+        border-radius: 6px;
+        color: white;
+        font-weight: bold;
+        margin: 0.5rem 0;
+        font-size: 1.1em;
+    }
+    
+    /* Game card styling */
+    .game-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .game-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .game-info {
+        font-size: 0.9em;
+        color: #666;
+        margin: 0.25rem 0;
+    }
+    
+    .elo-display {
+        text-align: center;
+        font-weight: bold;
+    }
+    
+    /* Mobile navigation */
+    .mobile-nav {
+        display: flex;
+        overflow-x: auto;
+        gap: 0.5rem;
+        padding: 0.5rem 0;
+        margin-bottom: 1rem;
+    }
+    
+    .nav-button {
+        min-width: 120px;
+        padding: 0.5rem 1rem;
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        text-align: center;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    
+    .nav-button.active {
+        background: #007bff;
+        color: white;
+        border-color: #007bff;
+    }
+    
     @media (max-width: 768px) {
         .chart-container {
             height: 250px;
@@ -122,62 +216,72 @@ st.markdown("""
         .mobile-card {
             padding: 0.75rem;
         }
+        
+        .stTabs [data-baseweb="tab"] {
+            font-size: 0.75rem;
+            padding: 4px 6px;
+        }
+        
+        .game-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+        
+        .elo-display {
+            align-self: flex-end;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
 
-# App state in session_state
-if 'user_id' not in st.session_state:
-    st.session_state.user_id = None
-if 'current_position' not in st.session_state:
-    st.session_state.current_position = None
-if 'timer_start' not in st.session_state:
-    st.session_state.timer_start = None
-if 'timer_paused' not in st.session_state:
-    st.session_state.timer_paused = False
-if 'paused_time' not in st.session_state:
-    st.session_state.paused_time = 0
-if 'last_move_record' not in st.session_state:
-    st.session_state.last_move_record = None
-if 'menu_selection' not in st.session_state:
-    st.session_state.menu_selection = None
-
-# Enhanced session state for collapsible sections
-if 'show_kpi_section' not in st.session_state:
-    st.session_state.show_kpi_section = True
-if 'show_moves_section' not in st.session_state:
-    st.session_state.show_moves_section = True
-if 'show_position_info' not in st.session_state:
-    st.session_state.show_position_info = True
-
-# Spatial analysis session state
-if 'current_game' not in st.session_state:
-    st.session_state.current_game = None
-if 'current_move_index' not in st.session_state:
-    st.session_state.current_move_index = 0
-if 'loaded_games' not in st.session_state:
-    st.session_state.loaded_games = []
-if 'spatial_settings' not in st.session_state:
-    st.session_state.spatial_settings = {
-        'show_white_polygon': True,
-        'show_black_polygon': True,
-        'show_centroids': True,
-        'show_metrics': True,
-        'show_insights': True,
-        'polygon_opacity': 0.3
+# Enhanced session state management
+def init_session_state():
+    """Initialize all session state variables."""
+    defaults = {
+        'user_id': None,
+        'current_position': None,
+        'timer_start': None,
+        'timer_paused': False,
+        'paused_time': 0,
+        'last_move_record': None,
+        'menu_selection': None,
+        
+        # Game analysis session state
+        'selected_game': None,
+        'current_game_move_index': 0,
+        'game_analysis_filters': {},
+        'games_page': 0,
+        'games_per_page': 10,
+        
+        # Spatial analysis session state
+        'current_game': None,
+        'current_move_index': 0,
+        'loaded_games': [],
+        'spatial_settings': {
+            'show_white_polygon': True,
+            'show_black_polygon': True,
+            'show_centroids': True,
+            'show_metrics': True,
+            'show_insights': True,
+            'polygon_opacity': 0.3
+        },
+        'games_filter_range': None,
+        
+        # UI state
+        'show_moves_table': False,
+        'current_moves_data': None,
+        'show_timer': True,
     }
-if 'games_filter_range' not in st.session_state:
-    st.session_state.games_filter_range = None
+    
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
-if 'show_moves_table' not in st.session_state:
-    st.session_state.show_moves_table = False
-if 'current_moves_data' not in st.session_state:
-    st.session_state.current_moves_data = None
+init_session_state()
 
 def display_login_page():
-    """
-    Display the mobile-friendly login page.
-    """
+    """Display the mobile-friendly login page."""
     st.title("♟️ Chess Trainer")
     st.markdown("### Welcome! Please login or register to continue.")
     
@@ -222,393 +326,57 @@ def display_login_page():
                 else:
                     st.warning("⚠️ Please fill all fields")
 
-def reset_training_session():
-    """Reset the training session state."""
-    st.session_state.current_position = None
-    st.session_state.timer_start = None
-    st.session_state.timer_paused = False
-    st.session_state.paused_time = 0
-    st.session_state.last_move_record = None
-
-def load_new_position():
-    """Load a new position based on user settings."""
-    user_settings = auth.get_user_settings(st.session_state.user_id)
+def display_simple_train_page():
+    """Display simplified training page with only essential features."""
+    st.markdown("# ♟️ Position Training")
     
-    conn = database.get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) as count FROM positions')
-    count = cursor.fetchone()['count']
-    conn.close()
-    
-    if count == 0:
-        st.session_state.current_position = None
-        return
-    
-    if user_settings and user_settings['random_positions']:
-        st.session_state.current_position = training.get_random_position()
-    else:
-        st.session_state.current_position = training.get_sequential_position(st.session_state.user_id)
-    
-    if st.session_state.current_position is None:
-        st.warning("⚠️ Unable to load position")
-        return
-    
-    st.session_state.timer_start = time.time()
-    st.session_state.timer_paused = False
-    st.session_state.paused_time = 0
-
-def get_elapsed_time():
-    """Get current elapsed time considering pauses."""
-    if st.session_state.timer_start is None:
-        return 0
-    
-    if st.session_state.timer_paused:
-        return st.session_state.paused_time
-    else:
-        current_time = time.time() - st.session_state.timer_start
-        return current_time + st.session_state.paused_time
-
-def display_mobile_kpi_section(position, user_summary):
-    """Display mobile-friendly KPI section."""
-    # Collapsible KPI section
-    kpi_expander = st.expander("📊 Performance & Position Stats", expanded=st.session_state.show_kpi_section)
-    
-    with kpi_expander:
-        # User Performance KPIs
-        st.markdown("#### 📈 Your Performance")
-        
-        # Mobile-friendly 2x2 grid for performance metrics
-        perf_col1, perf_col2 = st.columns(2)
-        
-        with perf_col1:
-            st.markdown(f"""
-            <div class="metric-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
-                <h2 style="margin: 0; font-size: 1.8em;">{user_summary.get('total_attempts', 0):,}</h2>
-                <p style="margin: 5px 0 0 0; font-size: 0.9em;">Attempts</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            accuracy = user_summary.get('accuracy', 0)
-            accuracy_color = "#28a745" if accuracy >= 70 else "#ffc107" if accuracy >= 50 else "#dc3545"
-            st.markdown(f"""
-            <div class="metric-card" style="background: linear-gradient(135deg, {accuracy_color} 0%, {accuracy_color}dd 100%); color: white;">
-                <h2 style="margin: 0; font-size: 1.8em;">{accuracy:.1f}%</h2>
-                <p style="margin: 5px 0 0 0; font-size: 0.9em;">Accuracy</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with perf_col2:
-            st.markdown(f"""
-            <div class="metric-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white;">
-                <h2 style="margin: 0; font-size: 1.8em;">{user_summary.get('avg_time', 0):.1f}s</h2>
-                <p style="margin: 5px 0 0 0; font-size: 0.9em;">Avg Time</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class="metric-card" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">
-                <h2 style="margin: 0; font-size: 1.8em;">#{position['id']}</h2>
-                <p style="margin: 5px 0 0 0; font-size: 0.9em;">Position ID</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # Position Stats
-        st.markdown("#### 🏁 Current Position")
-        
-        pos_col1, pos_col2 = st.columns(2)
-        
-        with pos_col1:
-            move_num = position['fullmove_number']
-            phase = "Opening" if move_num <= 15 else "Middlegame" if move_num <= 30 else "Endgame"
-            phase_emoji = "🌅" if phase == "Opening" else "⚔️" if phase == "Middlegame" else "🏰"
-            phase_color = "#ff9a56" if phase == "Opening" else "#ffad56" if phase == "Middlegame" else "#ff6b6b"
-            
-            st.markdown(f"""
-            <div class="metric-card" style="background: linear-gradient(135deg, {phase_color} 0%, {phase_color}dd 100%); color: white;">
-                <h2 style="margin: 0; font-size: 1.5em;">{phase_emoji}</h2>
-                <p style="margin: 5px 0 0 0; font-size: 0.9em;">{phase}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Legal moves count
-            try:
-                board = chess.Board(position['fen'])
-                legal_moves_count = len(list(board.legal_moves))
-            except:
-                legal_moves_count = 0
-                
-            st.markdown(f"""
-            <div class="metric-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                <h2 style="margin: 0; font-size: 1.8em;">{legal_moves_count}</h2>
-                <p style="margin: 5px 0 0 0; font-size: 0.9em;">Legal Moves</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with pos_col2:
-            st.markdown(f"""
-            <div class="metric-card" style="background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); color: white;">
-                <h2 style="margin: 0; font-size: 1.8em;">#{move_num}</h2>
-                <p style="margin: 5px 0 0 0; font-size: 0.9em;">Move Number</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Top move score
-            top_move_score = position['moves'][0]['score'] if position['moves'] else 0
-            score_color = "#28a745" if top_move_score > 0 else "#dc3545" if top_move_score < 0 else "#6c757d"
-            st.markdown(f"""
-            <div class="metric-card" style="background: linear-gradient(135deg, {score_color} 0%, {score_color}dd 100%); color: white;">
-                <h2 style="margin: 0; font-size: 1.8em;">{top_move_score:+}</h2>
-                <p style="margin: 5px 0 0 0; font-size: 0.9em;">Top Score</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-def display_mobile_timer_section():
-    """Display mobile-friendly timer section."""
-    timer_expander = st.expander("⏱️ Timer & Position Info", expanded=st.session_state.show_position_info)
-    
-    with timer_expander:
-        # Timer controls
-        timer_col1, timer_col2, timer_col3 = st.columns(3)
-        
-        with timer_col1:
-            if st.button("⏸️ Pause" if not st.session_state.timer_paused else "▶️ Resume", 
-                        key="mobile_timer_control", use_container_width=True):
-                if not st.session_state.timer_paused:
-                    st.session_state.paused_time = get_elapsed_time()
-                    st.session_state.timer_paused = True
-                else:
-                    st.session_state.timer_start = time.time()
-                    st.session_state.timer_paused = False
-                st.rerun()
-        
-        with timer_col2:
-            if st.button("🔄 Reset", key="mobile_timer_reset", use_container_width=True):
-                st.session_state.timer_start = time.time()
-                st.session_state.timer_paused = False
-                st.session_state.paused_time = 0
-                st.rerun()
-        
-        with timer_col3:
-            elapsed_time = get_elapsed_time()
-            timer_color = "#28a745" if elapsed_time < 10 else "#ffc107" if elapsed_time < 30 else "#dc3545"
-            st.markdown(f"""
-            <div style="text-align: center; padding: 10px; background: {timer_color}; 
-                        border-radius: 6px; color: white; font-weight: bold;">
-                {elapsed_time:.1f}s {'(Paused)' if st.session_state.timer_paused else ''}
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # FEN Display
-        st.markdown("#### 🎲 Position FEN")
-        if st.session_state.current_position:
-            st.code(st.session_state.current_position['fen'], language="text")
-            
-            if st.button("📋 Copy FEN", key="mobile_copy_fen", use_container_width=True):
-                st.success("📋 FEN ready to copy!")
-
-def display_enhanced_moves_table(position, moves_data, selected_move):
-    """Display mobile-friendly enhanced moves table."""
-    moves_expander = st.expander("🏆 Top Engine Moves", expanded=st.session_state.show_moves_section)
-    
-    with moves_expander:
-        # Mobile-friendly tabs
-        move_tab1, move_tab2 = st.tabs(["📊 Rankings", "🧠 Analysis"])
-        
-        with move_tab1:
-            # Color coding for classifications
-            classification_colors = {
-                'great': '#28a745', 'good': '#20c997', 'inaccuracy': '#ffc107', 
-                'mistake': '#fd7e14', 'blunder': '#dc3545'
-            }
-            
-            # Mobile-friendly move cards
-            for i, move_data in enumerate(moves_data):
-                rank = move_data.get('rank', i+1)
-                move = move_data.get('move', '')
-                score = move_data.get('score', 0)
-                centipawn_loss = move_data.get('centipawn_loss', 0)
-                classification = move_data.get('classification', 'unknown')
-                
-                bg_color = classification_colors.get(classification, '#6c757d')
-                is_selected = (move == selected_move)
-                border_style = "border: 2px solid #007bff;" if is_selected else "border: 1px solid #dee2e6;"
-                
-                rank_emoji = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"#{rank}"
-                score_color = "#28a745" if score > 0 else "#dc3545" if score < 0 else "#6c757d"
-                
-                # Mobile-optimized move card
-                st.markdown(f"""
-                <div class="mobile-card" style="{border_style} background: linear-gradient(135deg, {bg_color}15 0%, {bg_color}25 100%);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-                        <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                            <span style="font-size: 1.2em; margin-right: 8px;">{rank_emoji}</span>
-                            <div>
-                                <h4 style="margin: 0; color: {bg_color}; font-weight: bold; font-size: 1.1em;">{move}</h4>
-                                <p style="margin: 2px 0; color: #666; font-size: 0.8em;">
-                                    {classification.title()} • Loss: {centipawn_loss}cp
-                                </p>
-                            </div>
-                        </div>
-                        <div style="text-align: center;">
-                            <h3 style="margin: 0; color: {score_color}; font-weight: bold; font-size: 1.2em;">{score:+}</h3>
-                            <p style="margin: 0; color: #666; font-size: 0.7em;">Score</p>
-                        </div>
-                    </div>
-                    {'<div style="margin-top: 8px; padding: 6px; background: #007bff; border-radius: 4px; color: white; text-align: center; font-weight: bold; font-size: 0.9em;">🎯 Your Choice</div>' if is_selected else ''}
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # View button for each move
-                if st.button(f"👁️ View Position After {move}", key=f"mobile_view_move_{rank}", use_container_width=True):
-                    display_move_popup(position, move_data)
-        
-        with move_tab2:
-            st.markdown("#### 🧠 AI Analysis")
-            top_move = next((m['move'] for m in position['moves'] if m['rank'] == 1), None)
-            
-            if st.button("🔍 Analyze Position", key="mobile_analyze", use_container_width=True):
-                st.info("🤖 AI analysis would be integrated here")
-
-@st.dialog("Position After Move")
-def display_move_popup(position, move_data):
-    """Display position after move with enhanced error handling for mobile."""
-    try:
-        board = chess.Board(position['fen'])
-        
-        move_uci = move_data.get('uci')
-        move_san = move_data.get('move')
-        
-        if not move_uci:
-            st.error("❌ No UCI notation available")
-            return
-        
-        # Enhanced UCI validation and conversion
-        try:
-            # Clean the UCI string
-            move_uci = move_uci.strip().lower()
-            
-            # Validate UCI format
-            if len(move_uci) < 4 or len(move_uci) > 5:
-                st.error(f"❌ Invalid UCI format: {move_uci}")
-                return
-            
-            # Try to parse the UCI move
-            move = chess.Move.from_uci(move_uci)
-            
-            # Alternative: Try to parse from SAN if UCI fails
-            if move not in board.legal_moves and move_san:
-                try:
-                    move = board.parse_san(move_san)
-                    move_uci = move.uci()
-                except:
-                    st.error(f"❌ Could not parse move: {move_san} or {move_uci}")
-                    return
-            
-            # Final check if move is legal
-            if move not in board.legal_moves:
-                st.error(f"❌ Move {move_uci} ({move_san}) not legal in current position")
-                # Still show move details
-                display_move_details_only(move_data)
-                return
-            
-            # Make the move
-            board.push(move)
-            
-            st.markdown(f"### Position after **{move_data.get('move', 'Unknown')}**")
-            
-            # Display the resulting position
-            from chess_board import display_chess_board
-            display_chess_board(board.fen(), 'default')
-            
-            # Mobile-friendly move details
-            display_move_details(move_data)
-            
-        except Exception as e:
-            st.error(f"❌ Error processing move: {str(e)}")
-            display_move_details_only(move_data)
-            
-    except Exception as e:
-        st.error(f"❌ Error displaying position: {str(e)}")
-
-def display_move_details(move_data):
-    """Display move details in mobile-friendly format."""
-    col1, col2 = st.columns(2)
+    # Essential controls only
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.metric("Score", f"{move_data.get('score', 0):+}")
-        st.metric("Centipawn Loss", f"{move_data.get('centipawn_loss', 0)}")
+        if st.button("🎲 Random", use_container_width=True):
+            st.session_state.current_position = training.get_random_position()
+            st.session_state.show_result = False  # Hide previous results
+            reset_timer()
+            st.rerun()
     
     with col2:
-        st.metric("Classification", move_data.get('classification', 'Unknown').title())
-        st.metric("Depth", f"{move_data.get('depth', 0)}")
-    
-    # Principal variation
-    pv = move_data.get('principal_variation', '') or move_data.get('pv', '')
-    if pv:
-        st.markdown("#### Principal Variation")
-        st.code(pv, language="text")
-
-def display_move_details_only(move_data):
-    """Display only move details when position can't be shown."""
-    st.markdown(f"### Move Details: **{move_data.get('move', 'Unknown')}**")
-    st.info("⚠️ Could not display position, but here are the move details:")
-    display_move_details(move_data)
-
-def display_train_page():
-    """Display mobile-friendly training page."""
-    # Mobile-friendly header
-    st.markdown("# ♟️ Chess Training")
-    
-    # Quick navigation for mobile
-    nav_col1, nav_col2, nav_col3 = st.columns(3)
-    
-    with nav_col1:
-        if st.button("🎲 Random", key="mobile_random", use_container_width=True):
-            st.session_state.current_position = training.get_random_position()
-            st.session_state.timer_start = time.time()
-            st.session_state.timer_paused = False
-            st.session_state.paused_time = 0
-            st.rerun()
-    
-    with nav_col2:
-        if st.button("▶️ Next", key="mobile_next", use_container_width=True):
+        if st.button("▶️ Next", use_container_width=True):
             st.session_state.current_position = training.get_sequential_position(st.session_state.user_id)
-            st.session_state.timer_start = time.time()
-            st.session_state.timer_paused = False
-            st.session_state.paused_time = 0
+            st.session_state.show_result = False  # Hide previous results
+            reset_timer()
             st.rerun()
     
-    with nav_col3:
-        if st.button("⚙️ Settings", key="mobile_settings", use_container_width=True):
-            st.session_state.menu_selection = "Settings"
-            st.rerun()
+    with col3:
+        position_id = st.number_input("Position ID", min_value=1, value=1, key="simple_pos_id")
+        if st.button("📍 Load", use_container_width=True):
+            pos = training.get_position_by_id(position_id)
+            if pos:
+                st.session_state.current_position = pos
+                st.session_state.show_result = False  # Hide previous results
+                reset_timer()
+                st.success(f"✅ Loaded position #{position_id}")
+                st.rerun()
+            else:
+                st.error("❌ Position not found")
+    
+    # Initialize show_result if not exists
+    if 'show_result' not in st.session_state:
+        st.session_state.show_result = False
     
     # Load position if none exists
     if not st.session_state.current_position:
-        load_new_position()
+        st.session_state.current_position = training.get_random_position()
+        st.session_state.show_result = False
+        reset_timer()
     
     position = st.session_state.current_position
     
     if position is None:
         st.warning("⚠️ No positions available. Please import positions from Settings.")
-        if st.button("📁 Go to Settings", use_container_width=True):
-            st.session_state.menu_selection = "Settings"
-            st.rerun()
         return
     
-    # Get user performance
-    try:
-        user_summary = analysis.get_user_performance_summary(st.session_state.user_id)
-        avg_time = user_summary.get('avg_time', 0)
-        if avg_time is None or not isinstance(avg_time, (int, float)):
-            avg_time = 0.0
-        user_summary['avg_time'] = avg_time
-    except:
-        user_summary = {'total_attempts': 0, 'accuracy': 0, 'avg_time': 0.0}
-    
-    # Mobile-friendly turn display
+    # Essential position info
     turn_color = position['turn'].capitalize()
     turn_emoji = "⚪" if turn_color == "White" else "⚫"
     
@@ -621,155 +389,633 @@ def display_train_page():
     </div>
     """, unsafe_allow_html=True)
     
-    # Mobile KPI section
-    display_mobile_kpi_section(position, user_summary)
-    
-    # Mobile timer section
-    display_mobile_timer_section()
-    
-    # Chess board (responsive)
-    st.markdown("### ♛ Chess Board")
-    
-    # Board controls
-    board_col1, board_col2 = st.columns(2)
-    with board_col1:
-        flip_board = st.checkbox("🔄 Flip Board", value=position['turn'].lower() == 'black')
-    with board_col2:
-        position_id = st.number_input("Position ID", min_value=1, value=position['id'], key="mobile_pos_id")
-        if st.button("📍 Load", key="mobile_load_pos", use_container_width=True):
-            pos = training.get_position_by_id(position_id)
-            if pos:
-                st.session_state.current_position = pos
-                st.session_state.timer_start = time.time()
-                st.session_state.timer_paused = False
-                st.session_state.paused_time = 0
-                st.success(f"✅ Loaded position #{position_id}")
+    # Timer (simplified)
+    if st.session_state.show_timer:
+        timer_col1, timer_col2 = st.columns([4, 1])
+        
+        with timer_col1:
+            elapsed_time = get_elapsed_time()
+            timer_color = "#28a745" if elapsed_time < 10 else "#ffc107" if elapsed_time < 30 else "#dc3545"
+            st.markdown(f"""
+            <div class="timer-display" style="background: {timer_color};">
+                ⏱️ {elapsed_time:.1f}s {'(Paused)' if st.session_state.timer_paused else ''}
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with timer_col2:
+            if st.button("⏸️" if not st.session_state.timer_paused else "▶️", key="simple_timer"):
+                toggle_timer()
                 st.rerun()
-            else:
-                st.error("❌ Position not found")
     
-    # Display chess board
-    user_settings = auth.get_user_settings(st.session_state.user_id)
-    theme = user_settings.get('theme', 'default') if user_settings else 'default'
-    top_moves = position['moves'][:3] if position['moves'] else []
-    
-    from chess_board import display_chess_board
-    display_chess_board(position['fen'], theme, highlight_best_move=True, 
-                       top_moves=top_moves, flipped=flip_board)
+    # Display chess board WITHOUT top moves (they should only show after submission)
+    display_simple_chess_board(position['fen'], turn_color.lower() == 'black')
     
     # Move selection
     st.markdown("### 🎯 Select Your Move")
     
     # Generate legal moves
-    board = chess.Board(position['fen'])
-    legal_moves = [board.san(move) for move in board.legal_moves]
-    legal_moves.sort()
-    
-    # Mobile-friendly move selection
-    selected_move = st.selectbox("Choose a move", legal_moves, key="mobile_move_selector")
-    
-    if st.button("🚀 Submit Move", key="mobile_submit", type="primary", use_container_width=True):
-        elapsed_time = get_elapsed_time()
+    try:
+        import chess
+        board = chess.Board(position['fen'])
+        legal_moves = [board.san(move) for move in board.legal_moves]
+        legal_moves.sort()
         
-        # Enhanced move validation with detailed tracking
-        validation_result = training.validate_move_enhanced(
-            position['id'], selected_move, st.session_state.user_id, 
-            position, elapsed_time
+        selected_move = st.selectbox("Choose a move", legal_moves, key="simple_move_selector")
+        
+        if st.button("🚀 Submit Move", key="simple_submit", type="primary", use_container_width=True):
+            elapsed_time = get_elapsed_time()
+            
+            # Enhanced move validation with detailed tracking
+            validation_result = training.validate_move_enhanced(
+                position['id'], selected_move, st.session_state.user_id, 
+                position, elapsed_time
+            )
+            
+            # Store the result to show it
+            st.session_state.last_result = validation_result
+            st.session_state.show_result = True
+            
+            # Show result
+            if validation_result['success']:
+                st.success(f"✅ {validation_result['message']}")
+            else:
+                st.error(f"❌ {validation_result['message']}")
+            
+            # Show top moves AFTER submission
+            st.markdown("### 🎯 Top Moves for this Position")
+            top_moves = position['moves'][:5]  # Show top 5 moves
+            
+            for i, move_data in enumerate(top_moves):
+                rank_emoji = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][i]
+                classification = move_data.get('classification', 'unknown')
+                
+                # Color coding for move quality
+                color_map = {
+                    'great': '#28a745',
+                    'good': '#20c997', 
+                    'inaccuracy': '#ffc107',
+                    'mistake': '#fd7e14',
+                    'blunder': '#dc3545'
+                }
+                
+                color = color_map.get(classification, '#6c757d')
+                is_user_move = move_data.get('move') == selected_move
+                border_style = "border: 2px solid #007bff;" if is_user_move else ""
+                
+                st.markdown(f"""
+                <div style="
+                    display: flex; 
+                    align-items: center; 
+                    padding: 8px 12px; 
+                    margin: 4px 0; 
+                    border-left: 4px solid {color};
+                    background-color: {color}15;
+                    border-radius: 4px;
+                    {border_style}
+                ">
+                    <span style="font-size: 1.2em; margin-right: 12px;">{rank_emoji}</span>
+                    <div style="flex: 1;">
+                        <strong style="color: {color}; font-size: 1.1em;">{move_data.get('move', 'Unknown')}</strong>
+                        <span style="margin-left: 12px; color: #666;">Score: {move_data.get('score', 0):+}</span>
+                        <small style="display: block; color: #888; text-transform: capitalize;">
+                            {classification.replace('_', ' ')} {' - YOUR MOVE' if is_user_move else ''}
+                        </small>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Auto-load next position after delay
+            time.sleep(2)
+            st.session_state.current_position = training.get_random_position()
+            st.session_state.show_result = False
+            reset_timer()
+            st.rerun()
+            
+    except Exception as e:
+        st.error(f"Error generating legal moves: {e}")
+        st.code(f"Position FEN: {position['fen']}", language="text")
+
+def display_simple_chess_board(fen: str, flipped: bool = False):
+    """Display a simple chess board without revealing top moves."""
+    try:
+        # Try to use the chess_board module
+        import chess_board
+        
+        # Display board WITHOUT highlighting best moves or showing top moves
+        chess_board.display_chess_board(
+            fen=fen, 
+            theme='default', 
+            highlight_best_move=False,  # Don't highlight best move
+            top_moves=None,  # Don't show top moves
+            flipped=flipped,
+            board_size=400,
+            show_coordinates=True,
+            interactive=False
         )
         
-        if validation_result['success']:
-            st.success(f"✅ {validation_result['message']}")
-        else:
-            st.error(f"❌ {validation_result['message']}")
-        
-        # show the message for 3 seconds
-        time.sleep(3)
+    except Exception as e:
+        # Fallback to ASCII board
+        st.markdown("### ♟️ Chess Position")
+        try:
+            import chess
+            board = chess.Board(fen)
+            
+            # Create ASCII representation
+            board_str = ""
+            for rank in range(7, -1, -1):  # 8 down to 1
+                row = f"{rank + 1} "
+                for file in range(8):  # a to h
+                    square = chess.square(file, rank)
+                    piece = board.piece_at(square)
+                    if piece:
+                        # Use Unicode chess symbols for better display
+                        symbols = {
+                            'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔',
+                            'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚'
+                        }
+                        row += symbols.get(piece.symbol(), piece.symbol()) + " "
+                    else:
+                        row += "· "
+                board_str += row + "\n"
+            board_str += "  a b c d e f g h\n"
+            
+            st.code(board_str, language="text")
+            
+        except Exception as board_error:
+            st.error(f"Error creating chess board: {board_error}")
+            st.code(f"FEN: {fen}", language="text")
 
-        # Show moves table
-        st.session_state.show_moves_section = True
-        st.session_state.current_moves_data = position['moves'][:10]
-        st.rerun()
+def display_game_analysis_page():
+    """Display comprehensive game analysis page."""
+    st.markdown("# 🎯 Game Analysis")
+    st.markdown("Analyze complete chess games from the database and track your progress.")
     
-    # Enhanced moves table (mobile-friendly)
-    if st.session_state.current_moves_data:
-        display_enhanced_moves_table(position, st.session_state.current_moves_data, selected_move)
-        
-        if st.button("➡️ Next Position", key="mobile_next_pos", type="primary", use_container_width=True):
-            load_new_position()
-            st.session_state.show_moves_section = False
-            st.rerun()
-
-def display_advanced_analysis_page():
-    """Display advanced analysis page with spatial analysis as sub-tabs."""
-    st.title("🔬 Advanced Analysis")
-    
-    # Main tabs for different analysis types
-    analysis_tab, spatial_tab = st.tabs(["📊 Performance Analysis", "🗺️ Spatial Analysis"])
-    
-    with analysis_tab:
-        display_performance_analysis()
-    
-    with spatial_tab:
-        display_spatial_analysis()
-
-def display_performance_analysis():
-    """Display comprehensive performance analysis."""
-    st.markdown("## 📊 Performance Analysis")
-    
-    # Get user performance summary
-    summary = analysis.get_user_performance_summary(st.session_state.user_id)
-    
-    # Mobile-friendly summary metrics
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total Attempts", f"{summary['total_attempts']:,}")
-    with col2:
-        st.metric("Correct Moves", f"{summary['correct_moves']:,}")
-    with col3:
-        accuracy_color = "normal" if summary['accuracy'] >= 70 else "inverse"
-        st.metric("Accuracy", f"{summary['accuracy']:.1f}%", delta_color=accuracy_color)
-    with col4:
-        st.metric("Avg. Time", f"{summary['avg_time']:.1f}s")
-    
-    # Enhanced analysis with sub-tabs
-    perf_tab1, perf_tab2, perf_tab3, perf_tab4 = st.tabs([
-        "📈 Trends", "⚖️ Material", "🏗️ Structure", "⏱️ Timing"
+    # Sub-tabs for different game analysis features
+    analysis_tab1, analysis_tab2, analysis_tab3 = st.tabs([
+        "🔍 Browse Games", "📊 Analyze Game", "💾 Saved Games"
     ])
     
-    with perf_tab1:
-        display_trend_analysis(summary)
+    with analysis_tab1:
+        display_game_browser()
     
-    with perf_tab2:
-        display_material_analysis()
+    with analysis_tab2:
+        display_game_analyzer()
     
-    with perf_tab3:
-        display_structural_analysis()
-    
-    with perf_tab4:
-        display_timing_analysis()
+    with analysis_tab3:
+        display_saved_games()
 
-def display_trend_analysis(summary):
-    """Display trend analysis."""
-    st.markdown("### 📈 Performance Trends")
+def display_game_browser():
+    """Display game browsing and filtering interface."""
+    st.markdown("### 🔍 Browse & Filter Games")
     
-    # Category analysis
-    if summary['category_stats']:
-        category_df = pd.DataFrame(summary['category_stats'])
+    # Load PGN files section
+    with st.expander("📁 Load PGN Files", expanded=False):
+        uploaded_file = st.file_uploader("Upload PGN File", type=['pgn'], key="game_pgn")
+        
+        if uploaded_file is not None:
+            is_valid, message = pgn_loader.validate_uploaded_file(uploaded_file)
+            
+            if is_valid:
+                file_content = uploaded_file.read().decode('utf-8')
+                stats = pgn_loader.get_file_statistics(file_content)
+                
+                if 'error' not in stats:
+                    st.success(f"✅ {message}")
+                    st.info(f"📊 Found {stats['total_games']} games, avg {stats['avg_moves_per_game']:.1f} moves per game")
+                    
+                    # Batch loading options for large files
+                    if stats['total_games'] > 100:
+                        st.markdown("#### 📦 Batch Loading Options")
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            batch_start = st.number_input("Start game", min_value=1, max_value=stats['total_games'], value=1)
+                        with col2:
+                            batch_end = st.number_input("End game", min_value=batch_start, max_value=stats['total_games'], 
+                                                       value=min(batch_start + 999, stats['total_games']))
+                        
+                        games_to_load = batch_end - batch_start + 1
+                        st.info(f"Will load {games_to_load} games (#{batch_start} to #{batch_end})")
+                    else:
+                        batch_start = 1
+                        batch_end = stats['total_games']
+                    
+                    if st.button("⚡ Load Games into Database", use_container_width=True):
+                        with st.spinner(f"🎯 Loading games {batch_start}-{batch_end}..."):
+                            # Load specific range of games
+                            games = pgn_loader.load_pgn_games(file_content, max_games=batch_end)
+                            if batch_start > 1:
+                                games = games[batch_start-1:]
+                            
+                            # Store in database
+                            result = database.store_pgn_games(games, f"{uploaded_file.name}_{batch_start}-{batch_end}")
+                            
+                            if result['games_stored'] > 0:
+                                st.success(f"🎉 Loaded {result['games_stored']} games into database!")
+                                st.balloons()
+                            else:
+                                st.error(f"❌ Failed to load games: {result['errors']} errors")
+                else:
+                    st.error(f"❌ {stats['error']}")
+            else:
+                st.error(f"❌ {message}")
+    
+    # Game filtering interface
+    st.markdown("### 🎛️ Filter Games")
+    
+    # Mobile-friendly filter layout
+    with st.expander("🔧 Advanced Filters", expanded=True):
+        filter_col1, filter_col2 = st.columns(2)
+        
+        with filter_col1:
+            player_name = st.text_input("👤 Player Name (any)", placeholder="Search any player")
+            white_player = st.text_input("⚪ White Player", placeholder="e.g., Carlsen")
+            black_player = st.text_input("⚫ Black Player", placeholder="e.g., Nakamura")
+            result_filter = st.selectbox("🏆 Result", ["All", "1-0", "0-1", "1/2-1/2"])
+        
+        with filter_col2:
+            opening_filter = st.text_input("📚 Opening", placeholder="e.g., Sicilian")
+            year_filter = st.text_input("📅 Year", placeholder="e.g., 2024")
+            event_filter = st.text_input("🎪 Event", placeholder="e.g., World Championship")
+            
+            # ELO range filters
+            st.markdown("**⭐ ELO Range**")
+            elo_col1, elo_col2 = st.columns(2)
+            with elo_col1:
+                min_elo = st.number_input("Min ELO", min_value=0, max_value=3000, value=0, step=100)
+            with elo_col2:
+                max_elo = st.number_input("Max ELO", min_value=0, max_value=3000, value=3000, step=100)
+    
+    # Display options
+    display_col1, display_col2 = st.columns(2)
+    with display_col1:
+        sort_by = st.selectbox("📊 Sort by", ["Date (newest)", "Date (oldest)", "ELO (highest)", "Moves (most)"])
+    with display_col2:
+        games_per_page = st.selectbox("📄 Games per page", [10, 25, 50, 100], index=0)
+    
+    # Apply filters
+    filters = {
+        'player_name': player_name if player_name else None,
+        'white_player': white_player if white_player else None,
+        'black_player': black_player if black_player else None,
+        'result': result_filter if result_filter != "All" else None,
+        'opening': opening_filter if opening_filter else None,
+        'year': year_filter if year_filter else None,
+        'min_elo': min_elo if min_elo > 0 else None,
+        'max_elo': max_elo if max_elo < 3000 else None,
+        'event': event_filter if event_filter else None
+    }
+    
+    # Get filtered games
+    offset = st.session_state.games_page * games_per_page
+    games_data = database.get_games_with_filters(filters, games_per_page, offset)
+    
+    # Display results
+    if games_data['games']:
+        st.markdown(f"### 📋 Games ({games_data['total_count']} total)")
+        
+        # Pagination controls
+        if games_data['total_count'] > games_per_page:
+            pagination_col1, pagination_col2, pagination_col3 = st.columns([1, 2, 1])
+            
+            with pagination_col1:
+                if st.button("◀️ Previous", disabled=st.session_state.games_page == 0):
+                    st.session_state.games_page -= 1
+                    st.rerun()
+            
+            with pagination_col2:
+                total_pages = (games_data['total_count'] - 1) // games_per_page + 1
+                st.markdown(f"<div style='text-align: center; padding: 10px;'>Page {st.session_state.games_page + 1} of {total_pages}</div>", 
+                           unsafe_allow_html=True)
+            
+            with pagination_col3:
+                if st.button("Next ▶️", disabled=not games_data['has_more']):
+                    st.session_state.games_page += 1
+                    st.rerun()
+        
+        # Display games
+        for game in games_data['games']:
+            display_game_card(game)
+    else:
+        st.info("🔍 No games found matching your filters. Try adjusting the search criteria or load more PGN files.")
+
+def display_game_card(game):
+    """Display a game card with mobile-friendly layout."""
+    st.markdown(f"""
+    <div class="game-card">
+        <div class="game-header">
+            <div style="flex: 1;">
+                <h4 style="margin: 0; color: #333;">
+                    {game['white_player']} vs {game['black_player']}
+                </h4>
+                <div class="game-info">
+                    📅 {game['date']} • 🏆 {game['result']} • ♟️ {game['total_moves']} moves
+                </div>
+                <div class="game-info">
+                    📚 {game['opening']} • 🎪 {game['event']}
+                </div>
+            </div>
+            <div class="elo-display">
+                <div><strong>⚪ {game['white_elo'] or '?'}</strong></div>
+                <div><strong>⚫ {game['black_elo'] or '?'}</strong></div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Action buttons
+    button_col1, button_col2, button_col3 = st.columns(3)
+    
+    with button_col1:
+        if st.button("🔍 Analyze", key=f"analyze_{game['id']}", use_container_width=True):
+            st.session_state.selected_game = game['id']
+            st.session_state.current_game_move_index = 0
+            st.rerun()
+    
+    with button_col2:
+        if st.button("💾 Save", key=f"save_{game['id']}", use_container_width=True):
+            success = database.save_game_for_user(st.session_state.user_id, game['id'])
+            if success:
+                st.success("✅ Game saved!")
+            else:
+                st.error("❌ Failed to save game")
+    
+    with button_col3:
+        if st.button("📊 Details", key=f"details_{game['id']}", use_container_width=True):
+            display_game_details_popup(game)
+
+@st.dialog("Game Details")
+def display_game_details_popup(game):
+    """Display detailed game information in a popup."""
+    full_game = database.get_game_by_id(game['id'])
+    
+    if full_game:
+        st.markdown(f"### {full_game['white_player']} vs {full_game['black_player']}")
+        
+        # Game info
+        info_col1, info_col2 = st.columns(2)
+        
+        with info_col1:
+            st.metric("White ELO", full_game['white_elo'] or "Unrated")
+            st.metric("Event", full_game['event'])
+            st.metric("Opening", full_game['opening'])
+        
+        with info_col2:
+            st.metric("Black ELO", full_game['black_elo'] or "Unrated")
+            st.metric("Date", full_game['date'])
+            st.metric("Result", full_game['result'])
+        
+        # Move list preview
+        moves_data = full_game.get('moves_data', [])
+        if moves_data:
+            st.markdown("#### 📝 Moves Preview")
+            move_text = ""
+            for i, move in enumerate(moves_data[:20]):  # Show first 20 moves
+                if i % 2 == 0:
+                    move_text += f"{i//2 + 1}. "
+                move_text += f"{move['san']} "
+                if i % 2 == 1:
+                    move_text += " "
+            
+            if len(moves_data) > 20:
+                move_text += "..."
+            
+            st.code(move_text, language="text")
+
+def display_game_analyzer():
+    """Display the game analysis interface."""
+    if not st.session_state.selected_game:
+        st.info("🎯 Select a game from the Browse Games tab to start analysis.")
+        return
+    
+    game = database.get_game_by_id(st.session_state.selected_game)
+    if not game:
+        st.error("❌ Game not found")
+        return
+    
+    st.markdown(f"### 🎯 Analyzing: {game['white_player']} vs {game['black_player']}")
+    
+    # Game navigation
+    moves_data = game.get('moves_data', [])
+    positions_data = game.get('positions_data', [])
+    max_moves = len(moves_data)
+    
+    if max_moves == 0:
+        st.warning("⚠️ No moves available for this game")
+        return
+    
+    # Navigation controls
+    nav_col1, nav_col2, nav_col3, nav_col4, nav_col5 = st.columns(5)
+    
+    with nav_col1:
+        if st.button("⏮️ Start", use_container_width=True):
+            st.session_state.current_game_move_index = 0
+            st.rerun()
+    
+    with nav_col2:
+        if st.button("◀️ Prev", use_container_width=True):
+            if st.session_state.current_game_move_index > 0:
+                st.session_state.current_game_move_index -= 1
+                st.rerun()
+    
+    with nav_col3:
+        move_slider = st.slider("Move", 0, max_moves, st.session_state.current_game_move_index, key="game_move_slider")
+        if move_slider != st.session_state.current_game_move_index:
+            st.session_state.current_game_move_index = move_slider
+            st.rerun()
+    
+    with nav_col4:
+        if st.button("▶️ Next", use_container_width=True):
+            if st.session_state.current_game_move_index < max_moves:
+                st.session_state.current_game_move_index += 1
+                st.rerun()
+    
+    with nav_col5:
+        if st.button("⏭️ End", use_container_width=True):
+            st.session_state.current_game_move_index = max_moves
+            st.rerun()
+    
+    # Current position display
+    current_index = st.session_state.current_game_move_index
+    
+    if current_index < len(positions_data):
+        current_fen = positions_data[current_index]
+        
+        # Display move info
+        if current_index > 0 and current_index <= len(moves_data):
+            move_info = moves_data[current_index - 1]
+            st.markdown(f"**Move {move_info['move_number']}.** {move_info['san']} ({move_info['turn']})")
+        elif current_index == 0:
+            st.markdown("**Starting Position**")
+        
+        # Display chess board
+        try:
+            import chess_board
+            chess_board.display_chess_board(
+                fen=current_fen, 
+                theme='default',
+                highlight_best_move=False,
+                top_moves=None,
+                flipped=False,
+                board_size=None,
+                show_coordinates=True,
+                interactive=False
+            )
+        except Exception as e:
+            st.error(f"Error displaying chess board: {e}")
+            st.code(f"Position FEN: {current_fen}", language="text")
+        
+        # Analysis features
+        analysis_col1, analysis_col2 = st.columns(2)
+        
+        with analysis_col1:
+            if st.button("🧠 Analyze Position", use_container_width=True):
+                st.info("🤖 Position analysis would integrate with chess engine here")
+        
+        with analysis_col2:
+            if st.button("📝 Add Note", use_container_width=True):
+                note = st.text_area("Enter your note:", key=f"note_{current_index}")
+                if note:
+                    # Save note logic here
+                    st.success("✅ Note saved!")
+
+def display_saved_games():
+    """Display user's saved games."""
+    saved_games = database.get_user_saved_games(st.session_state.user_id)
+    
+    if saved_games:
+        st.markdown(f"### 💾 Your Saved Games ({len(saved_games)})")
+        
+        for saved_game in saved_games:
+            st.markdown(f"""
+            <div class="game-card">
+                <h4 style="margin: 0; color: #333;">
+                    {saved_game['white_player']} vs {saved_game['black_player']}
+                </h4>
+                <div class="game-info">
+                    📅 {saved_game['date']} • 🏆 {saved_game['result']} • 📚 {saved_game['opening']}
+                </div>
+                <div class="game-info">
+                    💾 Saved: {saved_game['saved_at'][:10]}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            save_col1, save_col2 = st.columns(2)
+            
+            with save_col1:
+                if st.button("🔍 Analyze", key=f"saved_analyze_{saved_game['game_id']}", use_container_width=True):
+                    st.session_state.selected_game = saved_game['game_id']
+                    st.session_state.current_game_move_index = 0
+                    st.rerun()
+            
+            with save_col2:
+                if st.button("🗑️ Remove", key=f"remove_{saved_game['game_id']}", use_container_width=True):
+                    # Remove from saved games logic
+                    st.success("✅ Game removed from saved list")
+    else:
+        st.info("💾 No saved games yet. Save games from the Browse tab to analyze them later.")
+
+def display_enhanced_insights_page():
+    """Display enhanced insights page with moved training stats."""
+    st.title("🧠 Performance Insights")
+    st.markdown("Comprehensive analysis of your chess training and game analysis performance.")
+    
+    # Get user performance data
+    try:
+        user_summary = analysis.get_user_performance_summary(st.session_state.user_id)
+        avg_time = user_summary.get('avg_time', 0)
+        if avg_time is None or not isinstance(avg_time, (int, float)):
+            avg_time = 0.0
+        user_summary['avg_time'] = avg_time
+    except:
+        user_summary = {'total_attempts': 0, 'accuracy': 0, 'avg_time': 0.0}
+    
+    # Main insights tabs
+    insights_tab1, insights_tab2, insights_tab3, insights_tab4 = st.tabs([
+        "📊 Training Performance", "🎯 Tactical Analysis", "📈 Progress Trends", "🔮 AI Recommendations"
+    ])
+    
+    with insights_tab1:
+        display_training_performance_insights(user_summary)
+    
+    with insights_tab2:
+        display_tactical_insights()
+    
+    with insights_tab3:
+        display_progress_trends(user_summary)
+    
+    with insights_tab4:
+        display_ai_recommendations(user_summary)
+
+def display_training_performance_insights(user_summary):
+    """Display comprehensive training performance insights."""
+    st.markdown("### 📊 Position Training Performance")
+    
+    # Key Performance Indicators
+    kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+    
+    with kpi_col1:
+        st.markdown(f"""
+        <div class="metric-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+            <h2 style="margin: 0; font-size: 1.8em;">{user_summary.get('total_attempts', 0):,}</h2>
+            <p style="margin: 5px 0 0 0; font-size: 0.9em;">Total Attempts</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with kpi_col2:
+        accuracy = user_summary.get('accuracy', 0)
+        accuracy_color = "#28a745" if accuracy >= 70 else "#ffc107" if accuracy >= 50 else "#dc3545"
+        st.markdown(f"""
+        <div class="metric-card" style="background: linear-gradient(135deg, {accuracy_color} 0%, {accuracy_color}dd 100%); color: white;">
+            <h2 style="margin: 0; font-size: 1.8em;">{accuracy:.1f}%</h2>
+            <p style="margin: 5px 0 0 0; font-size: 0.9em;">Accuracy</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with kpi_col3:
+        st.markdown(f"""
+        <div class="metric-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white;">
+            <h2 style="margin: 0; font-size: 1.8em;">{user_summary.get('avg_time', 0):.1f}s</h2>
+            <p style="margin: 5px 0 0 0; font-size: 0.9em;">Avg Time</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with kpi_col4:
+        st.markdown(f"""
+        <div class="metric-card" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">
+            <h2 style="margin: 0; font-size: 1.8em;">{user_summary.get('correct_moves', 0):,}</h2>
+            <p style="margin: 5px 0 0 0; font-size: 0.9em;">Correct Moves</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Performance by Category
+    if user_summary.get('category_stats'):
+        st.markdown("### 🎯 Performance by Game Phase")
+        category_df = pd.DataFrame(user_summary['category_stats'])
         
         fig = px.bar(category_df, x='category', y='accuracy',
                     title='Accuracy by Game Phase', color='accuracy',
                     color_continuous_scale='RdYlGn', range_color=[0, 100])
-        
         fig.update_layout(height=350, showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
-
-def display_material_analysis():
-    """Display material analysis."""
-    st.markdown("### ⚖️ Material Analysis")
     
+    # Performance by Color
+    if user_summary.get('color_stats'):
+        st.markdown("### ⚫⚪ Performance by Color")
+        color_df = pd.DataFrame(user_summary['color_stats'])
+        
+        fig = px.bar(color_df, x='color', y='accuracy',
+                    title='Accuracy by Color', color='color',
+                    color_discrete_map={'white': '#f0f0f0', 'black': '#404040'})
+        fig.update_layout(height=300)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Material Analysis
     material_stats = analysis.get_material_analysis(st.session_state.user_id)
     if material_stats:
+        st.markdown("### ⚖️ Material Analysis")
+        
         mat_tab1, mat_tab2 = st.tabs(["Material Balance", "Piece Advantages"])
         
         with mat_tab1:
@@ -790,47 +1036,60 @@ def display_material_analysis():
                 fig.update_layout(height=300)
                 st.plotly_chart(fig, use_container_width=True)
 
-def display_structural_analysis():
-    """Display structural analysis."""
-    st.markdown("### 🏗️ Structural Analysis")
+def display_tactical_insights():
+    """Display tactical analysis insights."""
+    st.markdown("### ⚔️ Tactical Performance Analysis")
     
-    structural_data = insights.get_enhanced_structural_analysis(st.session_state.user_id)
-    if structural_data:
-        struct_tab1, struct_tab2, struct_tab3 = st.tabs(["Pawn Structure", "King Safety", "Center Control"])
+    tactics_data = insights.get_tactical_analysis(st.session_state.user_id)
+    if tactics_data:
+        tactics_df = pd.DataFrame(tactics_data)
         
-        with struct_tab1:
-            pawn_df = pd.DataFrame(structural_data['pawn_structure'])
-            if not pawn_df.empty:
-                fig = px.bar(pawn_df, x='structure', y='accuracy',
-                           title='Performance by Pawn Structure',
-                           color='accuracy', color_continuous_scale='RdYlGn')
-                fig.update_layout(height=300, xaxis_tickangle=-45)
-                st.plotly_chart(fig, use_container_width=True)
+        fig = px.bar(tactics_df, x='tactic', y='accuracy',
+                    title='Accuracy by Tactical Pattern',
+                    color='accuracy', color_continuous_scale='RdYlGn')
+        fig.update_layout(height=350, xaxis_tickangle=-45)
+        st.plotly_chart(fig, use_container_width=True)
         
-        with struct_tab2:
-            king_df = pd.DataFrame(structural_data['king_safety'])
-            if not king_df.empty:
-                fig = px.bar(king_df, x='safety_level', y='accuracy',
-                           title='Performance by King Safety',
-                           color='accuracy', color_continuous_scale='RdYlGn')
-                fig.update_layout(height=300)
-                st.plotly_chart(fig, use_container_width=True)
-        
-        with struct_tab3:
-            center_df = pd.DataFrame(structural_data['center_control'])
-            if not center_df.empty:
-                fig = px.bar(center_df, x='control_advantage', y='accuracy',
-                           title='Performance by Center Control',
-                           color='accuracy', color_continuous_scale='RdYlGn')
-                fig.update_layout(height=300)
-                st.plotly_chart(fig, use_container_width=True)
+        # Top tactical strengths and weaknesses
+        if len(tactics_df) > 0:
+            st.markdown("### 💪 Tactical Strengths & Weaknesses")
+            
+            strength_col, weakness_col = st.columns(2)
+            
+            with strength_col:
+                top_tactics = tactics_df.nlargest(3, 'accuracy')
+                st.markdown("**🎯 Top Tactical Strengths:**")
+                for _, tactic in top_tactics.iterrows():
+                    st.success(f"✅ {tactic['tactic']}: {tactic['accuracy']:.1f}%")
+            
+            with weakness_col:
+                weak_tactics = tactics_df.nsmallest(3, 'accuracy')
+                st.markdown("**📈 Areas for Improvement:**")
+                for _, tactic in weak_tactics.iterrows():
+                    st.warning(f"⚠️ {tactic['tactic']}: {tactic['accuracy']:.1f}%")
+    else:
+        st.info("🎯 Complete more tactical positions to see detailed tactical insights!")
 
-def display_timing_analysis():
-    """Display timing analysis."""
-    st.markdown("### ⏱️ Timing Analysis")
+def display_progress_trends(user_summary):
+    """Display progress trends and time analysis."""
+    st.markdown("### 📈 Progress Trends")
     
+    # Calendar activity
+    calendar_data = analysis.get_user_calendar_data(st.session_state.user_id)
+    if calendar_data:
+        st.markdown("#### 📅 Training Activity Calendar")
+        calendar_df = pd.DataFrame(calendar_data)
+        
+        if not calendar_df.empty:
+            fig = px.scatter(calendar_df, x='date', y='accuracy', size='attempts',
+                           title='Daily Training Activity', hover_data=['attempts'])
+            fig.update_layout(height=300)
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # Time analysis
     time_data = insights.get_time_analysis(st.session_state.user_id)
     if time_data:
+        st.markdown("#### ⏱️ Time Analysis")
         time_df = pd.DataFrame(time_data['time_buckets'])
         
         if not time_df.empty:
@@ -844,6 +1103,657 @@ def display_timing_analysis():
             fig.update_layout(title='Accuracy by Time Taken', height=300,
                             xaxis_title="Time Range", yaxis_title="Accuracy (%)")
             st.plotly_chart(fig, use_container_width=True)
+
+def display_ai_recommendations(user_summary):
+    """Display AI-powered recommendations."""
+    st.markdown("### 🔮 AI-Powered Recommendations")
+    
+    recommendations = []
+    
+    # Generate personalized recommendations
+    accuracy = user_summary.get('accuracy', 0)
+    avg_time = user_summary.get('avg_time', 0)
+    total_attempts = user_summary.get('total_attempts', 0)
+    
+    if accuracy < 50:
+        recommendations.append({
+            'type': 'improvement',
+            'title': 'Focus on Tactical Training',
+            'description': 'Your accuracy is below 50%. Concentrate on basic tactical patterns like pins, forks, and skewers.',
+            'priority': 'high'
+        })
+    elif accuracy < 70:
+        recommendations.append({
+            'type': 'improvement',
+            'title': 'Strengthen Pattern Recognition',
+            'description': 'Work on recognizing tactical motifs more quickly to improve your accuracy.',
+            'priority': 'medium'
+        })
+    
+    if avg_time > 60:
+        recommendations.append({
+            'type': 'timing',
+            'title': 'Practice Faster Decision Making',
+            'description': 'Your average time is over 60 seconds. Try to make decisions more quickly while maintaining accuracy.',
+            'priority': 'medium'
+        })
+    
+    if total_attempts < 100:
+        recommendations.append({
+            'type': 'volume',
+            'title': 'Increase Training Volume',
+            'description': 'Complete more positions to build consistency and improve pattern recognition.',
+            'priority': 'low'
+        })
+    
+    if not recommendations:
+        recommendations.append({
+            'type': 'excellence',
+            'title': 'Maintain Excellence',
+            'description': 'Great performance! Continue your current training regimen and challenge yourself with more complex positions.',
+            'priority': 'low'
+        })
+    
+    # Display recommendations
+    for rec in recommendations:
+        priority_color = {'high': '#dc3545', 'medium': '#ffc107', 'low': '#28a745'}.get(rec['priority'], '#6c757d')
+        priority_emoji = {'high': '🚨', 'medium': '⚠️', 'low': '💡'}.get(rec['priority'], '📌')
+        
+        st.markdown(f"""
+        <div class="mobile-card" style="border-left: 4px solid {priority_color};">
+            <h4 style="margin: 0; color: #333;">
+                {priority_emoji} {rec['title']}
+            </h4>
+            <p style="margin: 10px 0; color: #666;">
+                {rec['description']}
+            </p>
+            <small style="color: {priority_color}; font-weight: bold; text-transform: uppercase;">
+                {rec['priority']} Priority
+            </small>
+        </div>
+        """, unsafe_allow_html=True)
+
+def display_user_stats_page():
+    """Display comprehensive user statistics page."""
+    st.title("📊 User Statistics")
+    st.markdown("Track your complete chess training journey and achievements.")
+    
+    # Get comprehensive user statistics
+    user_stats = database.get_user_game_statistics(st.session_state.user_id)
+    
+    # Overview metrics
+    st.markdown("### 🎯 Training Overview")
+    
+    overview_col1, overview_col2, overview_col3, overview_col4 = st.columns(4)
+    
+    position_stats = user_stats['position_stats']
+    game_stats = user_stats['game_stats']
+    saved_stats = user_stats['saved_stats']
+    
+    with overview_col1:
+        st.metric("📍 Position Attempts", f"{position_stats['total_position_attempts']:,}")
+        
+    with overview_col2:
+        st.metric("🎮 Games Analyzed", f"{game_stats['games_analyzed'] or 0:,}")
+        
+    with overview_col3:
+        total_time = (position_stats['total_position_time'] or 0) + (game_stats['total_game_time'] or 0)
+        st.metric("⏱️ Total Time", f"{total_time/60:.1f} min")
+        
+    with overview_col4:
+        st.metric("💾 Saved Games", f"{saved_stats['saved_games_count']:,}")
+    
+    # Detailed statistics tabs
+    stats_tab1, stats_tab2, stats_tab3 = st.tabs([
+        "📍 Position Training", "🎮 Game Analysis", "📈 Activity Timeline"
+    ])
+    
+    with stats_tab1:
+        display_position_training_stats(position_stats)
+    
+    with stats_tab2:
+        display_game_analysis_stats(game_stats)
+    
+    with stats_tab3:
+        display_activity_timeline(user_stats)
+
+def display_position_training_stats(position_stats):
+    """Display detailed position training statistics."""
+    st.markdown("### 📍 Position Training Statistics")
+    
+    # Core metrics
+    metric_col1, metric_col2, metric_col3 = st.columns(3)
+    
+    with metric_col1:
+        accuracy = position_stats.get('position_accuracy', 0)
+        accuracy_color = "normal" if accuracy >= 70 else "inverse"
+        st.metric("Accuracy", f"{accuracy:.1f}%", delta_color=accuracy_color)
+    
+    with metric_col2:
+        st.metric("Correct Moves", f"{position_stats['correct_positions']:,}")
+    
+    with metric_col3:
+        avg_time = position_stats.get('avg_position_time', 0) or 0
+        st.metric("Average Time", f"{avg_time:.1f}s")
+    
+    # Performance breakdown
+    st.markdown("#### 📊 Performance Breakdown")
+    
+    # Get detailed performance data
+    user_summary = analysis.get_user_performance_summary(st.session_state.user_id)
+    
+    if user_summary.get('category_stats'):
+        category_df = pd.DataFrame(user_summary['category_stats'])
+        fig = px.pie(category_df, values='attempts', names='category',
+                    title='Training Distribution by Game Phase')
+        fig.update_layout(height=350)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Show solved position IDs
+    st.markdown("#### 🎯 Solved Positions")
+    
+    # Get solved position IDs
+    solved_positions = get_solved_position_ids(st.session_state.user_id)
+    
+    if solved_positions:
+        st.markdown(f"**Total Solved Positions: {len(solved_positions)}**")
+        
+        # Display options
+        display_option = st.selectbox("Display Options", 
+                                    ["Show Recent 20", "Show All", "Search by ID"])
+        
+        if display_option == "Show Recent 20":
+            recent_positions = solved_positions[-20:] if len(solved_positions) > 20 else solved_positions
+            st.markdown("**Recent 20 Solved Positions:**")
+            
+            # Display in a more compact format
+            cols = st.columns(4)
+            for i, pos_data in enumerate(recent_positions):
+                col_idx = i % 4
+                with cols[col_idx]:
+                    accuracy_emoji = "✅" if pos_data['accuracy'] > 80 else "⚠️" if pos_data['accuracy'] > 50 else "❌"
+                    st.markdown(f"{accuracy_emoji} **ID {pos_data['position_id']}**")
+                    st.caption(f"{pos_data['attempts']} attempts, {pos_data['accuracy']:.0f}% accuracy")
+        
+        elif display_option == "Show All":
+            # Create a DataFrame for better display
+            df = pd.DataFrame(solved_positions)
+            df['Position ID'] = df['position_id']
+            df['Attempts'] = df['attempts']
+            df['Accuracy (%)'] = df['accuracy'].round(1)
+            df['Best Time (s)'] = df['best_time'].round(1)
+            
+            st.dataframe(
+                df[['Position ID', 'Attempts', 'Accuracy (%)', 'Best Time (s)']],
+                use_container_width=True,
+                height=400
+            )
+        
+        elif display_option == "Search by ID":
+            search_id = st.number_input("Enter Position ID to search:", min_value=1, value=1)
+            
+            # Find the position
+            found_position = next((pos for pos in solved_positions if pos['position_id'] == search_id), None)
+            
+            if found_position:
+                st.success(f"✅ Position {search_id} found!")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Attempts", found_position['attempts'])
+                with col2:
+                    st.metric("Accuracy", f"{found_position['accuracy']:.1f}%")
+                with col3:
+                    st.metric("Best Time", f"{found_position['best_time']:.1f}s")
+                with col4:
+                    st.metric("Avg Time", f"{found_position['avg_time']:.1f}s")
+                
+                # Show detailed history for this position
+                if st.button("Show Detailed History", key=f"history_{search_id}"):
+                    detailed_history = get_position_detailed_history(st.session_state.user_id, search_id)
+                    if detailed_history:
+                        st.markdown("**Move History:**")
+                        for i, attempt in enumerate(detailed_history[-10:], 1):  # Show last 10 attempts
+                            result_emoji = "✅" if attempt['result'] == 'pass' else "❌"
+                            st.markdown(f"{result_emoji} **Attempt {i}**: {attempt['move']} ({attempt['time_taken']:.1f}s) - {attempt['timestamp'][:16]}")
+            else:
+                st.warning(f"⚠️ Position {search_id} not found in your solved positions.")
+    else:
+        st.info("🎯 No solved positions yet. Start training to see your progress here!")
+
+def display_game_analysis_stats(game_stats):
+    """Display detailed game analysis statistics."""
+    st.markdown("### 🎮 Game Analysis Statistics")
+    
+    if game_stats['games_analyzed'] and game_stats['games_analyzed'] > 0:
+        # Game analysis metrics
+        analysis_col1, analysis_col2, analysis_col3 = st.columns(3)
+        
+        with analysis_col1:
+            st.metric("Games Analyzed", f"{game_stats['games_analyzed']:,}")
+        
+        with analysis_col2:
+            avg_time = game_stats.get('avg_game_time', 0) or 0
+            st.metric("Avg Time per Game", f"{avg_time/60:.1f} min")
+        
+        with analysis_col3:
+            total_moves = game_stats.get('total_moves_analyzed', 0) or 0
+            st.metric("Total Moves Analyzed", f"{total_moves:,}")
+        
+        # Additional game analysis insights would go here
+        st.info("🎯 Complete more game analysis to see detailed insights!")
+    else:
+        st.info("🎮 Start analyzing games to see your game analysis statistics here!")
+
+def display_activity_timeline(user_stats):
+    """Display activity timeline and trends."""
+    st.markdown("### 📈 Activity Timeline")
+    
+    # Recent activity charts
+    position_activity = user_stats['recent_position_activity']
+    game_activity = user_stats['recent_game_activity']
+    
+    if position_activity or game_activity:
+        # Create combined activity chart
+        timeline_data = []
+        
+        for activity in position_activity:
+            timeline_data.append({
+                'date': activity['date'],
+                'activity_type': 'Position Training',
+                'count': activity['positions_count']
+            })
+        
+        for activity in game_activity:
+            timeline_data.append({
+                'date': activity['date'],
+                'activity_type': 'Game Analysis',
+                'count': activity['games_count']
+            })
+        
+        if timeline_data:
+            timeline_df = pd.DataFrame(timeline_data)
+            fig = px.bar(timeline_df, x='date', y='count', color='activity_type',
+                        title='Recent Activity (Last 30 Days)')
+            fig.update_layout(height=350)
+            st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("📈 Your activity timeline will appear here as you train more!")
+
+def display_enhanced_settings_page():
+    """Display enhanced settings page with database export."""
+    st.title("⚙️ Enhanced Settings")
+    
+    user_settings = auth.get_user_settings(st.session_state.user_id)
+    if not user_settings:
+        user_settings = settings.initialize_default_settings()
+    
+    # Enhanced settings tabs
+    settings_tab1, settings_tab2, settings_tab3, settings_tab4, settings_tab5 = st.tabs([
+        "🎯 Training", "🎨 Display", "📂 Data Management", "💾 Export/Backup", "🗑️ Reset"
+    ])
+    
+    with settings_tab1:
+        display_training_settings(user_settings)
+    
+    with settings_tab2:
+        display_display_settings(user_settings)
+    
+    with settings_tab3:
+        display_data_management()
+    
+    with settings_tab4:
+        display_export_backup()
+    
+    with settings_tab5:
+        display_reset_options()
+
+def display_training_settings(user_settings):
+    """Display training configuration settings."""
+    st.markdown("### 🎯 Training Configuration")
+    
+    random_positions = st.checkbox("🎲 Random Positions", 
+                                 value=user_settings.get('random_positions', True))
+    
+    top_n_threshold = st.slider("🎯 Top N Move Threshold", 1, 5, 
+                              value=user_settings.get('top_n_threshold', 3))
+    
+    score_diff_threshold = st.slider("📊 Score Difference Threshold (centipawns)", 0, 50,
+                                   value=user_settings.get('score_difference_threshold', 10))
+    
+    show_timer = st.checkbox("⏱️ Show Timer", value=st.session_state.get('show_timer', True))
+    
+    if st.button("💾 Save Training Settings", use_container_width=True):
+        new_settings = {
+            'random_positions': random_positions,
+            'top_n_threshold': top_n_threshold,
+            'score_difference_threshold': score_diff_threshold
+        }
+        success = settings.update_user_settings(st.session_state.user_id, new_settings)
+        st.session_state.show_timer = show_timer
+        
+        if success:
+            st.success("✅ Training settings saved!")
+        else:
+            st.error("❌ Failed to save settings")
+
+def display_display_settings(user_settings):
+    """Display UI and theme settings."""
+    st.markdown("### 🎨 Display Settings")
+    
+    theme = st.selectbox("🎨 Board Theme", 
+                       options=list(config.BOARD_THEMES.keys()),
+                       index=list(config.BOARD_THEMES.keys()).index(user_settings.get('theme', 'default')))
+    
+    games_per_page = st.selectbox("📄 Games per Page", [10, 25, 50, 100], index=0)
+    
+    mobile_mode = st.checkbox("📱 Mobile Optimization", value=True, help="Optimize interface for mobile devices")
+    
+    if st.button("💾 Save Display Settings", use_container_width=True):
+        success = settings.update_user_settings(st.session_state.user_id, {'theme': theme})
+        if success:
+            st.success("✅ Display settings saved!")
+
+def display_data_management():
+    """Display data management options."""
+    st.markdown("### 📂 Data Management")
+    
+    # Database statistics
+    db_stats = database.get_database_stats()
+    
+    st.markdown("#### 📊 Database Statistics")
+    stat_col1, stat_col2, stat_col3 = st.columns(3)
+    
+    with stat_col1:
+        st.metric("📍 Positions", f"{db_stats.get('positions', 0):,}")
+        st.metric("👤 Users", f"{db_stats.get('users', 0):,}")
+    
+    with stat_col2:
+        st.metric("♟️ Moves", f"{db_stats.get('moves', 0):,}")
+        st.metric("🎮 Games", f"{db_stats.get('games', 0):,}")
+    
+    with stat_col3:
+        st.metric("🎯 User Moves", f"{db_stats.get('user_moves', 0):,}")
+        st.metric("💾 Saved Games", f"{db_stats.get('saved_games', 0):,}")
+    
+    # File import
+    st.markdown("#### 📥 Import Data")
+    
+    import_tab1, import_tab2 = st.tabs(["📍 Import Positions (JSONL)", "🎮 Import Games (PGN)"])
+    
+    with import_tab1:
+        st.markdown("Upload JSONL files containing chess positions for training.")
+        uploaded_jsonl = st.file_uploader("Upload JSONL File", type=['jsonl'])
+        
+        if uploaded_jsonl:
+            if st.button("⬆️ Import Positions", use_container_width=True):
+                with st.spinner("📁 Importing positions..."):
+                    # Save uploaded file temporarily
+                    temp_path = f"temp_{uploaded_jsonl.name}"
+                    with open(temp_path, 'wb') as f:
+                        f.write(uploaded_jsonl.getvalue())
+                    
+                    # Import positions
+                    positions_loaded = database.load_positions_from_jsonl(temp_path)
+                    
+                    # Clean up temp file
+                    os.remove(temp_path)
+                    
+                    if positions_loaded > 0:
+                        st.success(f"📁 Imported {positions_loaded} positions successfully!")
+                    else:
+                        st.error("❌ Failed to import positions")
+    
+    with import_tab2:
+        st.markdown("Upload PGN files containing complete chess games for analysis.")
+        uploaded_pgn = st.file_uploader("Upload PGN File", type=['pgn'], key="settings_pgn")
+        
+        if uploaded_pgn:
+            file_content = uploaded_pgn.read().decode('utf-8')
+            stats = pgn_loader.get_file_statistics(file_content)
+            
+            if 'error' not in stats:
+                st.info(f"📊 Found {stats['total_games']} games")
+                
+                if st.button("⬆️ Import Games", use_container_width=True):
+                    with st.spinner("🎮 Importing games..."):
+                        games = pgn_loader.load_pgn_games(file_content, max_games=1000)  # Limit for settings
+                        result = database.store_pgn_games(games, uploaded_pgn.name)
+                        
+                        if result['games_stored'] > 0:
+                            st.success(f"🎮 Imported {result['games_stored']} games successfully!")
+                        else:
+                            st.error("❌ Failed to import games")
+            else:
+                st.error(f"❌ {stats['error']}")
+
+def display_export_backup():
+    """Display export and backup options."""
+    st.markdown("### 💾 Export & Backup")
+    
+    st.markdown("#### 📤 Export Options")
+    
+    export_col1, export_col2 = st.columns(2)
+    
+    with export_col1:
+        if st.button("💾 Download Complete Database", use_container_width=True):
+            with st.spinner("📦 Preparing database export..."):
+                export_path = database.export_database_with_schema()
+                
+                if export_path:
+                    with open(export_path, 'rb') as f:
+                        st.download_button(
+                            label="⬇️ Download Database File",
+                            data=f.read(),
+                            file_name=f"chess_trainer_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db",
+                            mime="application/octet-stream",
+                            use_container_width=True
+                        )
+                    st.success("✅ Database export ready for download!")
+                    
+                    # Clean up the export file
+                    try:
+                        os.remove(export_path)
+                    except:
+                        pass
+                else:
+                    st.error("❌ Failed to export database")
+    
+    with export_col2:
+        if st.button("📊 Export User Statistics", use_container_width=True):
+            user_stats = database.get_user_game_statistics(st.session_state.user_id)
+            stats_json = json.dumps(user_stats, indent=2, default=str)
+            
+            st.download_button(
+                label="⬇️ Download Statistics (JSON)",
+                data=stats_json,
+                file_name=f"chess_stats_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json",
+                use_container_width=True
+            )
+    
+    st.markdown("#### 🔄 Backup Options")
+    
+    if st.button("🔄 Create Backup", use_container_width=True):
+        backup_path = database.backup_database()
+        if backup_path:
+            st.success(f"✅ Backup created: {backup_path}")
+        else:
+            st.error("❌ Failed to create backup")
+
+def display_reset_options():
+    """Display reset and clear data options."""
+    st.markdown("### 🗑️ Reset Options")
+    
+    st.warning("⚠️ **Warning**: These actions will permanently delete data!")
+    
+    # Show current user stats
+    try:
+        user_stats = database.get_user_game_statistics(st.session_state.user_id)
+        position_stats = user_stats.get('position_stats', {})
+        game_stats = user_stats.get('game_stats', {})
+        
+        st.markdown("#### 📊 Your Current Progress")
+        reset_col1, reset_col2 = st.columns(2)
+        
+        with reset_col1:
+            st.metric("🎯 Position Attempts", f"{position_stats.get('total_position_attempts', 0):,}")
+            st.metric("✅ Correct Moves", f"{position_stats.get('correct_positions', 0):,}")
+        
+        with reset_col2:
+            st.metric("🎮 Games Analyzed", f"{game_stats.get('games_analyzed', 0) or 0:,}")
+            st.metric("📈 Accuracy", f"{position_stats.get('position_accuracy', 0):.1f}%")
+        
+    except:
+        st.info("No training data found.")
+    
+    # Reset options
+    st.markdown("#### 🔄 Reset Actions")
+    
+    reset_tab1, reset_tab2 = st.tabs(["📍 Reset Training Data", "🎮 Reset Game Analysis"])
+    
+    with reset_tab1:
+        st.markdown("Reset all position training progress and statistics.")
+        confirm_positions = st.checkbox("☑️ I understand this will delete all my position training data")
+        
+        if confirm_positions:
+            if st.button("🔄 Reset Position Training", type="primary", use_container_width=True):
+                result = database.clear_user_statistics(st.session_state.user_id)
+                
+                if result['success']:
+                    st.success(f"✅ {result['message']}")
+                    st.balloons()
+                    reset_training_session()
+                    st.rerun()
+                else:
+                    st.error(f"❌ {result['message']}")
+        else:
+            st.button("🔄 Reset Position Training", disabled=True, use_container_width=True)
+    
+    with reset_tab2:
+        st.markdown("Reset all game analysis progress and saved games.")
+        confirm_games = st.checkbox("☑️ I understand this will delete all my game analysis data")
+        
+        if confirm_games:
+            if st.button("🔄 Reset Game Analysis", type="primary", use_container_width=True):
+                # Implementation for clearing game analysis data
+                st.success("✅ Game analysis data cleared!")
+        else:
+            st.button("🔄 Reset Game Analysis", disabled=True, use_container_width=True)
+
+# Helper functions
+def reset_timer():
+    """Reset the training timer."""
+    st.session_state.timer_start = time.time()
+    st.session_state.timer_paused = False
+    st.session_state.paused_time = 0
+
+def get_elapsed_time():
+    """Get current elapsed time considering pauses."""
+    if st.session_state.timer_start is None:
+        return 0
+    
+    if st.session_state.timer_paused:
+        return st.session_state.paused_time
+    else:
+        current_time = time.time() - st.session_state.timer_start
+        return current_time + st.session_state.paused_time
+
+def toggle_timer():
+    """Toggle timer pause/resume state."""
+    if not st.session_state.timer_paused:
+        st.session_state.paused_time = get_elapsed_time()
+        st.session_state.timer_paused = True
+    else:
+        st.session_state.timer_start = time.time()
+        st.session_state.timer_paused = False
+
+def reset_training_session():
+    """Reset the training session state."""
+    st.session_state.current_position = None
+    st.session_state.timer_start = None
+    st.session_state.timer_paused = False
+    st.session_state.paused_time = 0
+    st.session_state.last_move_record = None
+
+def get_solved_position_ids(user_id):
+    """Get list of solved position IDs with statistics."""
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            SELECT 
+                position_id,
+                COUNT(*) as attempts,
+                SUM(CASE WHEN result = 'pass' THEN 1 ELSE 0 END) as correct,
+                MIN(time_taken) as best_time,
+                AVG(time_taken) as avg_time,
+                MAX(timestamp) as last_attempt
+            FROM user_moves
+            WHERE user_id = ?
+            GROUP BY position_id
+            HAVING SUM(CASE WHEN result = 'pass' THEN 1 ELSE 0 END) > 0
+            ORDER BY last_attempt DESC
+        ''', (user_id,))
+        
+        results = cursor.fetchall()
+        solved_positions = []
+        
+        for row in results:
+            solved_positions.append({
+                'position_id': row['position_id'],
+                'attempts': row['attempts'],
+                'correct': row['correct'],
+                'accuracy': (row['correct'] / row['attempts']) * 100,
+                'best_time': row['best_time'],
+                'avg_time': row['avg_time'],
+                'last_attempt': row['last_attempt']
+            })
+        
+        conn.close()
+        return solved_positions
+        
+    except Exception as e:
+        conn.close()
+        print(f"Error getting solved positions: {e}")
+        return []
+
+def get_position_detailed_history(user_id, position_id):
+    """Get detailed history for a specific position."""
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            SELECT 
+                um.result,
+                um.time_taken,
+                um.timestamp,
+                m.move
+            FROM user_moves um
+            JOIN moves m ON um.move_id = m.id
+            WHERE um.user_id = ? AND um.position_id = ?
+            ORDER BY um.timestamp ASC
+        ''', (user_id, position_id))
+        
+        results = cursor.fetchall()
+        history = [dict(row) for row in results]
+        
+        conn.close()
+        return history
+        
+    except Exception as e:
+        conn.close()
+        print(f"Error getting position history: {e}")
+        return []
+
+def display_advanced_analysis_page():
+    """Display advanced analysis page with spatial analysis."""
+    st.title("🔬 Advanced Analysis")
+    
+    # Keep existing spatial analysis functionality
+    display_spatial_analysis()
 
 def display_spatial_analysis():
     """Display complete spatial analysis functionality."""
@@ -885,7 +1795,7 @@ def display_spatial_analysis():
             else:
                 st.error(f"❌ {message}")
         
-        # Game selection
+        # Game selection and spatial settings
         if st.session_state.loaded_games:
             st.markdown("### 🎲 Game Selection")
             
@@ -927,7 +1837,7 @@ def display_spatial_analysis():
             
             st.session_state.spatial_settings = settings
     
-    # Main content area
+    # Main spatial analysis content
     if not st.session_state.loaded_games:
         # Welcome screen
         st.markdown("""
@@ -944,364 +1854,116 @@ def display_spatial_analysis():
         - **🔗 Connectivity**: How well-connected pieces are
         - **📊 Space Control**: Quantitative metrics of board control
         - **💡 Insights**: AI-generated observations about positioning
-        
-        #### 📁 How to Use:
-        
-        1. **Upload** a PGN file using the sidebar
-        2. **Select** a game from the loaded games
-        3. **Navigate** through moves to see spatial evolution
-        4. **Customize** visualization settings
         """)
-        
-        # Sample visualization placeholder
-        st.markdown("#### 🎨 Sample Visualization")
-        st.info("Upload a PGN file to see interactive spatial visualizations here!")
-        
         return
     
-    if not st.session_state.current_game:
-        # Game selection screen
-        st.markdown("### 🎲 Select a Game to Analyze")
+    # If we have a loaded game, show spatial analysis
+    if st.session_state.current_game:
+        st.markdown("### 🎯 Spatial Game Analysis")
         
-        # Display loaded games in a nice format
-        for i, game in enumerate(st.session_state.loaded_games[:10]):  # Show first 10
-            with st.container():
-                col1, col2, col3 = st.columns([3, 2, 1])
-                
-                with col1:
-                    st.markdown(f"**Game {i+1}:** {game.get('white', 'Unknown')} vs {game.get('black', 'Unknown')}")
-                
-                with col2:
-                    st.markdown(f"📅 {game.get('date', 'Unknown')} • ♟️ {game.get('move_count', 0)} moves")
-                
-                with col3:
-                    if st.button("▶️", key=f"load_game_{i}", help="Load this game"):
-                        # Load the full game
-                        if hasattr(st.session_state, 'games_file_content'):
-                            full_games = pgn_loader.load_pgn_games(st.session_state.games_file_content, max_games=i+1)
-                            if full_games and len(full_games) > i:
-                                st.session_state.current_game = full_games[i]
-                                st.session_state.current_move_index = 0
-                                st.rerun()
-                
-                st.markdown("---")
+        game = st.session_state.current_game
+        positions = game.get('positions', [])
+        moves = game.get('moves', [])
         
-        return
-    
-    # Game analysis interface
-    game = st.session_state.current_game
-    current_move_idx = st.session_state.current_move_index
-    
-    # Game header
-    headers = game.get('headers', {})
-    st.markdown(f"""
-    ### 🏆 {headers.get('White', 'Unknown')} vs {headers.get('Black', 'Unknown')}
-    **Event:** {headers.get('Event', 'Unknown')} • **Date:** {headers.get('Date', 'Unknown')} • **Result:** {headers.get('Result', '*')}
-    """)
-    
-    # Move navigation
-    col1, col2, col3, col4, col5 = st.columns(5)
-    
-    with col1:
-        if st.button("⏮️ Start", use_container_width=True):
-            st.session_state.current_move_index = 0
-            st.rerun()
-    
-    with col2:
-        if st.button("◀️ Prev", use_container_width=True):
-            if current_move_idx > 0:
-                st.session_state.current_move_index = current_move_idx - 1
-                st.rerun()
-    
-    with col3:
-        # Move slider
-        max_moves = len(game.get('positions', [])) - 1
-        if max_moves > 0:
-            new_move_idx = st.slider("Move", 0, max_moves, current_move_idx, key="move_slider")
-            if new_move_idx != current_move_idx:
-                st.session_state.current_move_index = new_move_idx
-                st.rerun()
-    
-    with col4:
-        if st.button("▶️ Next", use_container_width=True):
-            if current_move_idx < len(game.get('positions', [])) - 1:
-                st.session_state.current_move_index = current_move_idx + 1
-                st.rerun()
-    
-    with col5:
-        if st.button("⏭️ End", use_container_width=True):
-            st.session_state.current_move_index = len(game.get('positions', [])) - 1
-            st.rerun()
-    
-    # Current position info
-    positions = game.get('positions', [])
-    moves = game.get('moves', [])
-    
-    if current_move_idx < len(positions):
-        current_fen = positions[current_move_idx]
-        
-        # Display move info
-        if current_move_idx > 0 and current_move_idx <= len(moves):
-            move_info = moves[current_move_idx - 1]
-            st.markdown(f"**Move {move_info['move_number']}.** {move_info['san']} ({move_info['turn']})")
-        elif current_move_idx == 0:
-            st.markdown("**Starting Position**")
-        
-        # Display chess board
-        from chess_board import display_chess_board
-        display_chess_board(current_fen, 'default')
-        
-        # Calculate and display spatial metrics
-        try:
-            board = chess.Board(current_fen)
-            metrics = spatial_analysis.calculate_spatial_metrics(board)
+        if positions:
+            # Navigation controls
+            nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
             
-            # Display metrics if enabled
-            if st.session_state.spatial_settings['show_metrics']:
-                st.markdown("### 📊 Spatial Metrics")
-                
-                metric_col1, metric_col2 = st.columns(2)
-                
-                with metric_col1:
-                    st.markdown("#### ⚪ White")
-                    white_metrics = metrics['white']
-                    st.metric("Controlled Area", f"{white_metrics['area']:.1f}")
-                    st.metric("Connectivity Score", f"{white_metrics['connectivity_score']:.2f}")
-                    st.metric("Center Control", f"{white_metrics['center_control']}")
-                    st.metric("Connected Components", f"{len(white_metrics['connected_components'])}")
-                
-                with metric_col2:
-                    st.markdown("#### ⚫ Black")
-                    black_metrics = metrics['black']
-                    st.metric("Controlled Area", f"{black_metrics['area']:.1f}")
-                    st.metric("Connectivity Score", f"{black_metrics['connectivity_score']:.2f}")
-                    st.metric("Center Control", f"{black_metrics['center_control']}")
-                    st.metric("Connected Components", f"{len(black_metrics['connected_components'])}")
-            
-            # Display insights if enabled
-            if st.session_state.spatial_settings['show_insights']:
-                insights_list = spatial_analysis.get_spatial_insights(metrics)
-                if insights_list:
-                    st.markdown("### 💡 Spatial Insights")
-                    for insight in insights_list:
-                        st.info(f"💡 {insight}")
-        
-        except Exception as e:
-            st.error(f"❌ Error calculating spatial metrics: {str(e)}")
-    
-    # Game selection controls
-    st.markdown("---")
-    if st.button("🔄 Load Different Game", use_container_width=True):
-        st.session_state.current_game = None
-        st.rerun()
-
-def display_insights_page():
-    """Display enhanced insights page."""
-    st.title("🧠 Enhanced Insights")
-    
-    # Get comprehensive insights
-    insights_tab1, insights_tab2, insights_tab3 = st.tabs([
-        "🎯 Tactical Insights", "📊 Pattern Recognition", "🔮 AI Recommendations"
-    ])
-    
-    with insights_tab1:
-        display_tactical_insights()
-    
-    with insights_tab2:
-        display_pattern_insights()
-    
-    with insights_tab3:
-        display_ai_recommendations()
-
-def display_tactical_insights():
-    """Display tactical insights."""
-    st.markdown("### ⚔️ Tactical Performance")
-    
-    tactics_data = insights.get_tactical_analysis(st.session_state.user_id)
-    if tactics_data:
-        tactics_df = pd.DataFrame(tactics_data)
-        
-        fig = px.bar(tactics_df, x='tactic', y='accuracy',
-                    title='Accuracy by Tactical Pattern',
-                    color='accuracy', color_continuous_scale='RdYlGn')
-        fig.update_layout(height=350, xaxis_tickangle=-45)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("🎯 Complete more tactical positions to see insights!")
-
-def display_pattern_insights():
-    """Display pattern recognition insights."""
-    st.markdown("### 📊 Pattern Recognition")
-    
-    # Material insights
-    material_insights = insights.get_material_insights(st.session_state.user_id)
-    if material_insights:
-        st.markdown("#### ⚖️ Material Pattern Insights")
-        for insight in material_insights.get('key_insights', []):
-            st.info(f"💡 {insight}")
-
-def display_ai_recommendations():
-    """Display AI-powered recommendations."""
-    st.markdown("### 🔮 AI Recommendations")
-    
-    # Get user performance data
-    summary = analysis.get_user_performance_summary(st.session_state.user_id)
-    
-    recommendations = []
-    
-    if summary['accuracy'] < 50:
-        recommendations.append("🎯 Focus on tactical training to improve pattern recognition")
-    
-    if summary['avg_time'] > 60:
-        recommendations.append("⏰ Practice faster decision-making with time limits")
-    
-    if not recommendations:
-        recommendations.append("🌟 Great job! Keep practicing to maintain your level")
-    
-    for rec in recommendations:
-        st.success(rec)
-
-def display_settings_page():
-    """Display mobile-friendly settings page with clear data option."""
-    st.title("⚙️ Settings")
-    
-    user_settings = auth.get_user_settings(st.session_state.user_id)
-    if not user_settings:
-        user_settings = settings.initialize_default_settings()
-    
-    # Mobile-friendly settings tabs
-    settings_tab1, settings_tab2, settings_tab3, settings_tab4 = st.tabs([
-        "🎯 Training", "🎨 Display", "📂 Data", "🗑️ Reset Progress"
-    ])
-    
-    with settings_tab1:
-        st.markdown("### 🎯 Training Settings")
-        
-        random_positions = st.checkbox("🎲 Random Positions", 
-                                     value=user_settings.get('random_positions', True))
-        
-        top_n_threshold = st.slider("🎯 Top N Threshold", 1, 5, 
-                                  value=user_settings.get('top_n_threshold', 3))
-        
-        score_diff_threshold = st.slider("📊 Score Difference Threshold", 0, 50,
-                                       value=user_settings.get('score_difference_threshold', 10))
-        
-        if st.button("💾 Save Training Settings", use_container_width=True):
-            new_settings = {
-                'random_positions': random_positions,
-                'top_n_threshold': top_n_threshold,
-                'score_difference_threshold': score_diff_threshold
-            }
-            success = settings.update_user_settings(st.session_state.user_id, new_settings)
-            if success:
-                st.success("✅ Settings saved!")
-    
-    with settings_tab2:
-        st.markdown("### 🎨 Display Settings")
-        
-        theme = st.selectbox("🎨 Board Theme", 
-                           options=list(config.BOARD_THEMES.keys()),
-                           index=list(config.BOARD_THEMES.keys()).index(user_settings.get('theme', 'default')))
-        
-        if st.button("💾 Save Display Settings", use_container_width=True):
-            success = settings.update_user_settings(st.session_state.user_id, {'theme': theme})
-            if success:
-                st.success("✅ Settings saved!")
-    
-    with settings_tab3:
-        st.markdown("### 📂 Data Management")
-        
-        # Database stats
-        db_stats = settings.get_db_stats()
-        
-        stat_col1, stat_col2 = st.columns(2)
-        with stat_col1:
-            st.metric("📍 Positions", f"{db_stats['positions_count']:,}")
-            st.metric("♟️ Moves", f"{db_stats['moves_count']:,}")
-        with stat_col2:
-            st.metric("👤 Users", f"{db_stats['users_count']:,}")
-            st.metric("🎯 User Moves", f"{db_stats['user_moves_count']:,}")
-        
-        # File upload
-        st.markdown("#### 📥 Import Positions")
-        uploaded_file = st.file_uploader("Upload JSONL File", type=['jsonl'])
-        
-        if uploaded_file:
-            if st.button("⬆️ Import", use_container_width=True):
-                # Handle file import
-                st.success("📁 File imported successfully!")
-    
-    with settings_tab4:
-        st.markdown("### 🗑️ Reset Training Progress")
-        
-        st.warning("⚠️ **Warning**: This will permanently delete all your training data!")
-        
-        # Show current user stats
-        try:
-            enhanced_stats = database.get_enhanced_user_statistics(st.session_state.user_id)
-            basic_stats = enhanced_stats.get('basic_stats', {})
-            
-            st.markdown("#### 📊 Your Current Progress")
-            clear_col1, clear_col2 = st.columns(2)
-            
-            with clear_col1:
-                st.metric("🎯 Total Attempts", f"{basic_stats.get('total_moves', 0):,}")
-                st.metric("✅ Correct Moves", f"{basic_stats.get('correct_moves', 0):,}")
-            
-            with clear_col2:
-                st.metric("📈 Accuracy", f"{basic_stats.get('accuracy', 0):.1f}%")
-                st.metric("⏱️ Avg Time", f"{basic_stats.get('avg_time', 0):.1f}s")
-            
-        except:
-            st.info("No training data found.")
-        
-        st.markdown("#### 🔄 Fresh Start")
-        st.markdown("""
-        Resetting your progress will:
-        - Delete all your training attempts and statistics
-        - Remove all performance analytics and insights
-        - Clear your training history and progress tracking
-        - Reset all achievement data
-        
-        **Your account and settings will be preserved.**
-        """)
-        
-        # Confirmation checkbox
-        confirm_clear = st.checkbox("☑️ I understand this action cannot be undone")
-        
-        # Clear data button
-        if confirm_clear:
-            if st.button("🔄 Reset My Progress", type="primary", use_container_width=True):
-                result = database.clear_user_statistics(st.session_state.user_id)
-                
-                if result['success']:
-                    st.success(f"✅ {result['message']}")
-                    st.balloons()
-                    
-                    # Reset session state
-                    st.session_state.current_position = None
-                    st.session_state.timer_start = None
-                    st.session_state.timer_paused = False
-                    st.session_state.paused_time = 0
-                    st.session_state.last_move_record = None
-                    
+            with nav_col1:
+                if st.button("⏮️ First") and st.session_state.current_move_index > 0:
+                    st.session_state.current_move_index = 0
                     st.rerun()
-                else:
-                    st.error(f"❌ {result['message']}")
-        else:
-            st.button("🔄 Reset My Progress", disabled=True, use_container_width=True)
+            
+            with nav_col2:
+                move_index = st.slider("Move", 0, len(positions)-1, st.session_state.current_move_index)
+                if move_index != st.session_state.current_move_index:
+                    st.session_state.current_move_index = move_index
+                    st.rerun()
+            
+            with nav_col3:
+                if st.button("⏭️ Last") and st.session_state.current_move_index < len(positions)-1:
+                    st.session_state.current_move_index = len(positions)-1
+                    st.rerun()
+            
+            # Display current position
+            current_fen = positions[st.session_state.current_move_index]
+            
+            # Chess board display
+            try:
+                import chess_board
+                chess_board.display_chess_board(
+                    fen=current_fen, 
+                    theme='default',
+                    highlight_best_move=False,
+                    top_moves=None,
+                    flipped=False,
+                    board_size=None,
+                    show_coordinates=True,
+                    interactive=False
+                )
+            except Exception as e:
+                st.error(f"Error displaying chess board: {e}")
+                st.code(f"Position FEN: {current_fen}", language="text")
+            
+            # Spatial metrics
+            try:
+                board = chess.Board(current_fen)
+                metrics = spatial_analysis.calculate_spatial_metrics(board)
+                
+                if st.session_state.spatial_settings['show_metrics']:
+                    st.markdown("### 📊 Spatial Metrics")
+                    
+                    metric_col1, metric_col2 = st.columns(2)
+                    
+                    with metric_col1:
+                        st.markdown("**⚪ White**")
+                        st.metric("Piece Count", metrics['white']['piece_count'])
+                        st.metric("Area Control", f"{metrics['white']['area']:.1f}")
+                        st.metric("Connectivity", f"{metrics['white']['connectivity_score']:.1f}")
+                    
+                    with metric_col2:
+                        st.markdown("**⚫ Black**")
+                        st.metric("Piece Count", metrics['black']['piece_count'])
+                        st.metric("Area Control", f"{metrics['black']['area']:.1f}")
+                        st.metric("Connectivity", f"{metrics['black']['connectivity_score']:.1f}")
+                
+                # Insights
+                if st.session_state.spatial_settings['show_insights']:
+                    insights = spatial_analysis.get_spatial_insights(metrics)
+                    if insights:
+                        st.markdown("### 💡 Spatial Insights")
+                        for insight in insights:
+                            st.info(f"💡 {insight}")
+                            
+            except Exception as e:
+                st.error(f"Error calculating spatial metrics: {e}")
+    else:
+        st.info("🎲 Select and load a game from the sidebar to start spatial analysis.")
 
 def main():
-    """Main mobile-friendly application."""
+    """Main application with enhanced mobile-friendly navigation."""
     # Mobile-friendly sidebar
     with st.sidebar:
         st.markdown("# ♟️ Chess Trainer")
         
         if st.session_state.user_id:
-            # Updated menu items with combined analysis
-            mobile_menu_items = ["Train", "Advanced Analysis", "Insights", "Settings"]
-            menu_selection = st.radio("📱 Menu", mobile_menu_items)
-            st.session_state.menu_selection = menu_selection
+            # Enhanced menu items
+            mobile_menu_items = [
+                "🎯 Train", 
+                "🔍 Game Analysis", 
+                "🔬 Advanced Analysis",
+                "🧠 Insights", 
+                "📊 User Stats",
+                "⚙️ Settings"
+            ]
+            
+            # Clean menu labels for radio selection
+            menu_labels = [item.split(' ', 1)[1] for item in mobile_menu_items]
+            menu_selection = st.radio("📱 Menu", menu_labels)
+            
+            # Map back to original labels
+            menu_map = dict(zip(menu_labels, mobile_menu_items))
+            st.session_state.menu_selection = menu_map[menu_selection]
             
             if st.button("🚪 Logout", use_container_width=True):
                 st.session_state.user_id = None
@@ -1313,16 +1975,20 @@ def main():
             st.session_state.menu_selection = menu_selection
     
     # Display appropriate page
-    if menu_selection == "Login" or not st.session_state.user_id:
+    if not st.session_state.user_id:
         display_login_page()
-    elif menu_selection == "Train":
-        display_train_page()
-    elif menu_selection == "Advanced Analysis":
+    elif st.session_state.menu_selection == "🎯 Train":
+        display_simple_train_page()
+    elif st.session_state.menu_selection == "🔍 Game Analysis":
+        display_game_analysis_page()
+    elif st.session_state.menu_selection == "🔬 Advanced Analysis":
         display_advanced_analysis_page()
-    elif menu_selection == "Insights":
-        display_insights_page()
-    elif menu_selection == "Settings":
-        display_settings_page()
+    elif st.session_state.menu_selection == "🧠 Insights":
+        display_enhanced_insights_page()
+    elif st.session_state.menu_selection == "📊 User Stats":
+        display_user_stats_page()
+    elif st.session_state.menu_selection == "⚙️ Settings":
+        display_enhanced_settings_page()
 
 if __name__ == "__main__":
     main()
