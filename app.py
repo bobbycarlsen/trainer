@@ -369,7 +369,8 @@ def get_impact_summary(position_impact):
     
     impacts = []
     for key, value in position_impact.items():
-        if value != 0:
+        # Only process numeric values
+        if isinstance(value, (int, float)) and value != 0:
             icon = "📈" if value > 0 else "📉" if value < 0 else "➖"
             impacts.append(f"{icon} {key.replace('_', ' ').title()}: {value:+}")
     
@@ -554,6 +555,7 @@ def display_simple_train_page():
             
             # Create and display the moves table
             top_moves = position['moves'][:10]
+            print(top_moves)
             
             if top_moves:
                 moves_df = create_moves_table(top_moves, selected_move, turn_color, move_number)
