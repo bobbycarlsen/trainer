@@ -480,19 +480,30 @@ def display_simple_train_page():
     if position is None:
         st.warning("⚠️ No positions available. Please import positions from Settings.")
         return
-    
+
     # Essential position info
     turn_color = position['turn'].capitalize()
-    turn_emoji = "⚪" if turn_color == "White" else "⚫"
-    
+
+    # Set style and emoji based on turn color
+    if turn_color == "White":
+        bg_style = "linear-gradient(90deg, #f0f0f0 0%, #d9d9d9 100%)"
+        text_color = "#333"  # dark text for light background
+        turn_emoji = "♔"
+    else:
+        bg_style = "linear-gradient(90deg, #4a4a4a 0%, #2e2e2e 100%)"
+        text_color = "#f0f0f0"  # light text for dark background
+        turn_emoji = "♚"
+
+    # Show turn info banner
     st.markdown(f"""
-    <div style="text-align: center; padding: 1rem; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
-                border-radius: 8px; margin: 1rem 0; color: white;">
+    <div style="text-align: center; padding: 1rem; background: {bg_style};
+                border-radius: 8px; margin: 1rem 0; color: {text_color};">
         <h2 style="margin: 0; font-size: 1.5em;">
             {turn_emoji} <strong>{turn_color} to Move</strong> {turn_emoji}
         </h2>
     </div>
     """, unsafe_allow_html=True)
+
     
     # Timer (simplified)
     if st.session_state.show_timer:
