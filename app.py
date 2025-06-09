@@ -326,6 +326,110 @@ def display_login_page():
                 else:
                     st.warning("⚠️ Please fill all fields")
 
+
+
+def format_principal_variation(pv_string, turn_color, starting_move_number=1, for_table=False):
+    """Format principal variation with proper move numbers and color coding"""
+    if not pv_string:
+        return ""
+    
+    moves = pv_string.split()
+    formatted_moves = []
+    current_move_num = starting_move_number
+    is_white_turn = (turn_color.lower() == 'white')
+    
+    for i, move in enumerate(moves):
+        if for_table:
+            # Plain text formatting for table display
+            if is_white_turn:
+                move_display = f"{current_move_num}.{move}"
+                is_white_turn = False
+            else:
+                move_display = f"{move}"
+                is_white_turn = True
+                current_move_num += 1
+        else:
+            # HTML formatting for rich display
+            if is_white_turn:
+                move_display = f"<span style='color: #3E591E; font-weight: bold;'>{current_move_num}.{move}</span>"
+                is_white_turn = False
+            else:
+                move_display = f"<span style='color: #D2691E; font-weight: bold;'>{move}</span>"
+                is_white_turn = True
+                current_move_num += 1
+            
+        formatted_moves.append(move_display)
+    
+    return " ".join(formatted_moves)
+
+def get_impact_summary(position_impact):
+    """Create a concise summary of position impact"""
+    if not position_impact:
+        return "No impact data"
+    
+    impacts = []
+    for key, value in position_impact.items():
+        if value != 0:
+            icon = "📈" if value > 0 else "📉" if value < 0 else "➖"
+            impacts.append(f"{icon} {key.replace('_', ' ').title()}: {value:+}")
+    
+    return " | ".join(impacts) if impacts else "⚖️ Neutral"
+
+def create_moves_table(moves_data, selected_move, turn_color, starting_move_number=1):
+    """Create a comprehensive moves analysis table"""
+    
+    # Prepare data for the table
+    table_data = []
+    
+    for i, move_data in enumerate(moves_data[:10]):  # Top 10 moves
+        rank_icons = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+        rank_icon = rank_icons[i] if i < len(rank_icons) else f"{i+1}️⃣"
+        
+        # Classification styling
+        classification = move_data.get('classification', 'unknown')
+        class_colors = {
+            'great': '🟢 Great',
+            'good': '🟡 Good', 
+            'inaccuracy': '🟠 Inaccuracy',
+            'mistake': '🔴 Mistake',
+            'blunder': '⚫ Blunder'
+        }
+        
+        classification_display = class_colors.get(classification, f"⚪ {classification.title()}")
+        
+        # Format principal variation for table (plain text)
+        pv_formatted = format_principal_variation(
+            move_data.get('principal_variation', ''), 
+            turn_color, 
+            starting_move_number,
+            for_table=True
+        )
+        
+        # Truncate PV for table display
+        pv_display = pv_formatted[:80] + "..." if len(pv_formatted) > 80 else pv_formatted
+        
+        # Position impact summary
+        impact_summary = get_impact_summary(move_data.get('position_impact', {}))
+        
+        # Mark user's move with simple indicator
+        move_display = move_data.get('move', 'Unknown')
+        is_user_move = (move_display == selected_move)
+        
+        table_data.append({
+            'Rank': rank_icon,
+            'Move': move_display,
+            'Score': f"{move_data.get('score', 0):+}",
+            'Classification': classification_display,
+            'Depth': move_data.get('depth', 0),
+            'CP Loss': move_data.get('centipawn_loss', 0),
+            'Position Impact': impact_summary,
+            'Tactics': ", ".join(move_data.get('tactics', [])) or "None",
+            'Principal Variation': pv_display
+        })
+    
+    return pd.DataFrame(table_data)
+
+
 def display_simple_train_page():
     """Display simplified training page with only essential features."""
     st.markdown("# ♟️ Position Training")
@@ -395,7 +499,7 @@ def display_simple_train_page():
         
         with timer_col1:
             elapsed_time = get_elapsed_time()
-            timer_color = "#28a745" if elapsed_time < 10 else "#ffc107" if elapsed_time < 30 else "#dc3545"
+            timer_color = "#28a745" if elapsed_time < 100 else "#ffc107" if elapsed_time < 300 else "#dc3545"
             st.markdown(f"""
             <div class="timer-display" style="background: {timer_color};">
                 ⏱️ {elapsed_time:.1f}s {'(Paused)' if st.session_state.timer_paused else ''}
@@ -435,57 +539,138 @@ def display_simple_train_page():
             st.session_state.last_result = validation_result
             st.session_state.show_result = True
             
-            # Show result
+            # Show result with enhanced styling
             if validation_result['success']:
                 st.success(f"✅ {validation_result['message']}")
             else:
                 st.error(f"❌ {validation_result['message']}")
             
-            # Show top moves AFTER submission
-            st.markdown("### 🎯 Top Moves for this Position")
-            top_moves = position['moves'][:5]  # Show top 5 moves
+            # Enhanced moves analysis section
+            st.markdown("### 🎯 Comprehensive Move Analysis")
             
-            for i, move_data in enumerate(top_moves):
-                rank_emoji = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][i]
-                classification = move_data.get('classification', 'unknown')
+            # Get turn color and move number context
+            turn_color = position.get('turn_color', 'white')  # Assume this exists in position data
+            move_number = position.get('move_number', 1)     # Assume this exists in position data
+            
+            # Create and display the moves table
+            top_moves = position['moves'][:10]
+            
+            if top_moves:
+                moves_df = create_moves_table(top_moves, selected_move, turn_color, move_number)
                 
-                # Color coding for move quality
-                color_map = {
-                    'great': '#28a745',
-                    'good': '#20c997', 
-                    'inaccuracy': '#ffc107',
-                    'mistake': '#fd7e14',
-                    'blunder': '#dc3545'
+                # Custom CSS for better table styling
+                st.markdown("""
+                <style>
+                .moves-table {
+                    border-radius: 10px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
                 }
-                
-                color = color_map.get(classification, '#6c757d')
-                is_user_move = move_data.get('move') == selected_move
-                border_style = "border: 2px solid #007bff;" if is_user_move else ""
-                
-                st.markdown(f"""
-                <div style="
-                    display: flex; 
-                    align-items: center; 
-                    padding: 8px 12px; 
-                    margin: 4px 0; 
-                    border-left: 4px solid {color};
-                    background-color: {color}15;
-                    border-radius: 4px;
-                    {border_style}
-                ">
-                    <span style="font-size: 1.2em; margin-right: 12px;">{rank_emoji}</span>
-                    <div style="flex: 1;">
-                        <strong style="color: {color}; font-size: 1.1em;">{move_data.get('move', 'Unknown')}</strong>
-                        <span style="margin-left: 12px; color: #666;">Score: {move_data.get('score', 0):+}</span>
-                        <small style="display: block; color: #888; text-transform: capitalize;">
-                            {classification.replace('_', ' ')} {' - YOUR MOVE' if is_user_move else ''}
-                        </small>
-                    </div>
-                </div>
+                .moves-table table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                .moves-table th {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 12px 8px;
+                    text-align: left;
+                    font-weight: 600;
+                    font-size: 0.9em;
+                }
+                .moves-table td {
+                    padding: 10px 8px;
+                    border-bottom: 1px solid #e0e0e0;
+                    vertical-align: top;
+                }
+                .moves-table tr:hover {
+                    background-color: #f8f9fa;
+                }
+                .moves-table tr:nth-child(even) {
+                    background-color: #fafafa;
+                }
+                </style>
                 """, unsafe_allow_html=True)
+                
+                # Display table with custom styling and user move highlighting
+                st.markdown('<div class="moves-table">', unsafe_allow_html=True)
+                
+                # Create styled dataframe with user move highlighting
+                def highlight_user_move(row):
+                    if row['Move'] == selected_move:
+                        return ['background-color: #e3f2fd; border-left: 4px solid #2196f3; font-weight: bold'] * len(row)
+                    return [''] * len(row)
+                
+                styled_df = moves_df.style.apply(highlight_user_move, axis=1)
+                
+                st.dataframe(
+                    styled_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Rank": st.column_config.TextColumn("Rank", width="small"),
+                        "Move": st.column_config.TextColumn("Move", width="medium"),
+                        "Score": st.column_config.TextColumn("Score", width="small"),
+                        "Classification": st.column_config.TextColumn("Quality", width="medium"),
+                        "Depth": st.column_config.NumberColumn("Depth", width="small"),
+                        "CP Loss": st.column_config.NumberColumn("CP Loss", width="small"),
+                        "Position Impact": st.column_config.TextColumn("Impact", width="large"),
+                        "Tactics": st.column_config.TextColumn("Tactics", width="medium"),
+                        "Principal Variation": st.column_config.TextColumn("Principal Variation", width="large")
+                    }
+                )
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Additional insights section
+                st.markdown("### 📊 Position Insights")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    best_move = top_moves[0]
+                    st.metric(
+                        "Best Move", 
+                        best_move.get('move', 'N/A'),
+                        f"Score: {best_move.get('score', 0):+}"
+                    )
+                
+                with col2:
+                    user_move_data = next((m for m in top_moves if m.get('move') == selected_move), None)
+                    if user_move_data:
+                        rank = next((i+1 for i, m in enumerate(top_moves) if m.get('move') == selected_move), 'N/A')
+                        st.metric(
+                            "Your Move Rank",
+                            f"#{rank}",
+                            f"CP Loss: {user_move_data.get('centipawn_loss', 0)}"
+                        )
+                    else:
+                        st.metric("Your Move Rank", "Not in Top 10", "")
+                
+                with col3:
+                    avg_score = sum(m.get('score', 0) for m in top_moves) / len(top_moves)
+                    st.metric(
+                        "Avg Top 10 Score",
+                        f"{avg_score:+.1f}",
+                        ""
+                    )
+                
+                # Detailed principal variation for best move - FULL VARIATION
+                if best_move.get('principal_variation'):
+                    st.markdown("### 🧠 Best Move Analysis")
+                    st.markdown("**Complete Principal Variation (All Available Moves):**")
+                    full_pv = format_principal_variation(
+                        best_move.get('principal_variation', ''), 
+                        turn_color, 
+                        move_number,
+                        for_table=False  # Use rich HTML formatting for display
+                    )
+                    st.markdown(f'<div style="background-color: #f0f2f6; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea; line-height: 1.6;">{full_pv}</div>', unsafe_allow_html=True)
+            
+            else:
+                st.warning("No move analysis data available for this position.")
             
             # Auto-load next position after delay
-            time.sleep(300)
+            time.sleep(300)  # Restored to original 300 seconds as requested
             st.session_state.current_position = training.get_random_position()
             st.session_state.show_result = False
             reset_timer()
@@ -494,6 +679,14 @@ def display_simple_train_page():
     except Exception as e:
         st.error(f"Error generating legal moves: {e}")
         st.code(f"Position FEN: {position['fen']}", language="text")
+        
+        # Debug information
+        with st.expander("🔧 Debug Information"):
+            st.json({
+                "error": str(e),
+                "position_keys": list(position.keys()) if 'position' in locals() else "Position not defined",
+                "session_state_keys": list(st.session_state.keys())
+            })
 
 def display_simple_chess_board(fen: str, flipped: bool = False):
     """Display a simple chess board without revealing top moves."""
