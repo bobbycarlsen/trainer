@@ -566,7 +566,6 @@ def display_simple_train_page():
             
             # Create and display the moves table
             top_moves = position['moves'][:10]
-            print(top_moves)
             
             if top_moves:
                 moves_df = create_moves_table(top_moves, selected_move, turn_color, move_number)
