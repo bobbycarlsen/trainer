@@ -25,6 +25,9 @@ import config
 import pgn_loader
 import spatial_analysis
 
+# Add this import at the top of app.py with the other imports:
+import book_generator
+
 # Initialize the database if it doesn't exist
 database.init_db()
 
@@ -236,6 +239,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Enhanced session state management
+# Add these to the defaults dictionary in init_session_state() function:
 def init_session_state():
     """Initialize all session state variables."""
     # sample position to load by default
@@ -249,6 +253,12 @@ def init_session_state():
         'last_move_record': None,
         'menu_selection': None,
         
+        # Book generation state - ADD THESE LINES
+        'book_generation_available': False,
+        'generated_book_files': None,
+        'current_selected_move': None,
+        'move_submitted': False,
+
         # Game analysis session state
         'selected_game': None,
         'current_game_move_index': 0,
@@ -433,26 +443,26 @@ def create_moves_table(moves_data, selected_move, turn_color, starting_move_numb
     return pd.DataFrame(table_data)
 
 
+# REPLACE the entire display_simple_train_page() function with this:
 def display_simple_train_page():
-    """Display simplified training page with only essential features."""
+    """Display simplified training page with only essential features and book generation."""
     st.markdown("# ♟️ Position Training")
     
     # Essential controls only
     col1, col2, col3 = st.columns(3)
-    # if 'id' in st.session_state.current_position.keys()
     pid = int(st.session_state.current_position.get('id', 11))
 
     with col1:
         if st.button("🎲 Random", use_container_width=True):
             st.session_state.current_position = training.get_random_position()
-            st.session_state.show_result = False  # Hide previous results
+            reset_position_state()
             reset_timer()
             st.rerun()
     
     with col2:
         if st.button("▶️ Next", use_container_width=True):
             st.session_state.current_position = training.get_position_by_id(pid + 1)
-            st.session_state.show_result = False  # Hide previous results
+            reset_position_state()
             reset_timer()
             st.rerun()
     
@@ -462,21 +472,17 @@ def display_simple_train_page():
             pos = training.get_position_by_id(position_id)
             if pos:
                 st.session_state.current_position = pos
-                st.session_state.show_result = False  # Hide previous results
+                reset_position_state()
                 reset_timer()
                 st.success(f"✅ Loaded position #{position_id}")
                 st.rerun()
             else:
                 st.error("❌ Position not found")
     
-    # Initialize show_result if not exists
-    if 'show_result' not in st.session_state:
-        st.session_state.show_result = False
-    
     # Load position if none exists
     if not st.session_state.current_position:
         st.session_state.current_position = training.get_random_position()
-        st.session_state.show_result = False
+        reset_position_state()
         reset_timer()
     
     position = st.session_state.current_position
@@ -507,7 +513,6 @@ def display_simple_train_page():
         </h2>
     </div>
     """, unsafe_allow_html=True)
-
     
     # Timer (simplified)
     if st.session_state.show_timer:
@@ -527,182 +532,191 @@ def display_simple_train_page():
                 toggle_timer()
                 st.rerun()
     
-    # Display chess board WITHOUT top moves (they should only show after submission)
+    # Display chess board
     display_simple_chess_board(position['fen'], turn_color.lower() == 'black')
     
-    # Move selection
-    st.markdown("### 🎯 Select Your Move")
-    
-    # Generate legal moves
-    try:
-        import chess
-        board = chess.Board(position['fen'])
-        legal_moves = [board.san(move) for move in board.legal_moves]
-        legal_moves.sort()
+    # Move selection - ONLY show if move hasn't been submitted yet
+    if not st.session_state.get('move_submitted', False):
+        st.markdown("### 🎯 Select Your Move")
         
-        selected_move = st.selectbox("Choose a move", legal_moves, key="simple_move_selector")
-        
-        if st.button("🚀 Submit Move", key="simple_submit", type="primary", use_container_width=True):
-            elapsed_time = get_elapsed_time()
+        # Generate legal moves
+        try:
+            import chess
+            board = chess.Board(position['fen'])
+            legal_moves = [board.san(move) for move in board.legal_moves]
+            legal_moves.sort()
             
-            # Enhanced move validation with detailed tracking
-            validation_result = training.validate_move_enhanced(
-                position['id'], selected_move, st.session_state.user_id, 
-                position, elapsed_time
-            )
+            selected_move = st.selectbox("Choose a move", legal_moves, key="simple_move_selector")
             
-            # Store the result to show it
-            st.session_state.last_result = validation_result
-            st.session_state.show_result = True
-            
-            # Show result with enhanced styling
-            if validation_result['success']:
-                st.success(f"✅ {validation_result['message']}")
-            else:
-                st.error(f"❌ {validation_result['message']}")
-            
-            # Enhanced moves analysis section
-            st.markdown("### 🎯 Comprehensive Move Analysis")
-            
-            # Get turn color and move number context
-            turn_color = position.get('turn_color', 'white')  # Assume this exists in position data
-            move_number = position.get('move_number', 1)     # Assume this exists in position data
-            
-            # Create and display the moves table
-            top_moves = position['moves'][:10]
-            
-            if top_moves:
-                moves_df = create_moves_table(top_moves, selected_move, turn_color, move_number)
+            if st.button("🚀 Submit Move", key="simple_submit", type="primary", use_container_width=True):
+                elapsed_time = get_elapsed_time()
                 
-                # Custom CSS for better table styling
-                st.markdown("""
-                <style>
-                .moves-table {
-                    border-radius: 10px;
-                    overflow: hidden;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                }
-                .moves-table table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                .moves-table th {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 12px 8px;
-                    text-align: left;
-                    font-weight: 600;
-                    font-size: 0.9em;
-                }
-                .moves-table td {
-                    padding: 10px 8px;
-                    border-bottom: 1px solid #e0e0e0;
-                    vertical-align: top;
-                }
-                .moves-table tr:hover {
-                    background-color: #f8f9fa;
-                }
-                .moves-table tr:nth-child(even) {
-                    background-color: #fafafa;
-                }
-                </style>
-                """, unsafe_allow_html=True)
-                
-                # Display table with custom styling and user move highlighting
-                st.markdown('<div class="moves-table">', unsafe_allow_html=True)
-                
-                # Create styled dataframe with user move highlighting
-                def highlight_user_move(row):
-                    if row['Move'] == selected_move:
-                        return ['background-color: #e3f2fd; border-left: 4px solid #2196f3; font-weight: bold'] * len(row)
-                    return [''] * len(row)
-                
-                styled_df = moves_df.style.apply(highlight_user_move, axis=1)
-                
-                st.dataframe(
-                    styled_df,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Rank": st.column_config.TextColumn("Rank", width="small"),
-                        "Move": st.column_config.TextColumn("Move", width="medium"),
-                        "Score": st.column_config.TextColumn("Score", width="small"),
-                        "Classification": st.column_config.TextColumn("Quality", width="medium"),
-                        "Depth": st.column_config.NumberColumn("Depth", width="small"),
-                        "CP Loss": st.column_config.NumberColumn("CP Loss", width="small"),
-                        "Position Impact": st.column_config.TextColumn("Impact", width="large"),
-                        "Tactics": st.column_config.TextColumn("Tactics", width="medium"),
-                        "Principal Variation": st.column_config.TextColumn("Principal Variation", width="large")
-                    }
+                # Enhanced move validation with detailed tracking
+                validation_result = training.validate_move_enhanced(
+                    position['id'], selected_move, st.session_state.user_id, 
+                    position, elapsed_time
                 )
-                st.markdown('</div>', unsafe_allow_html=True)
                 
-                # Additional insights section
-                st.markdown("### 📊 Position Insights")
+                # Store the results in session state
+                st.session_state.last_result = validation_result
+                st.session_state.move_submitted = True
+                st.session_state.book_generation_available = True
+                st.session_state.current_selected_move = selected_move
                 
-                col1, col2, col3 = st.columns(3)
+                st.rerun()  # Refresh to show analysis
                 
-                with col1:
-                    best_move = top_moves[0]
-                    st.metric(
-                        "Best Move", 
-                        best_move.get('move', 'N/A'),
-                        f"Score: {best_move.get('score', 0):+}"
-                    )
-                
-                with col2:
-                    user_move_data = next((m for m in top_moves if m.get('move') == selected_move), None)
-                    if user_move_data:
-                        rank = next((i+1 for i, m in enumerate(top_moves) if m.get('move') == selected_move), 'N/A')
-                        st.metric(
-                            "Your Move Rank",
-                            f"#{rank}",
-                            f"CP Loss: {user_move_data.get('centipawn_loss', 0)}"
-                        )
-                    else:
-                        st.metric("Your Move Rank", "Not in Top 10", "")
-                
-                with col3:
-                    avg_score = sum(m.get('score', 0) for m in top_moves) / len(top_moves)
-                    st.metric(
-                        "Avg Top 10 Score",
-                        f"{avg_score:+.1f}",
-                        ""
-                    )
-                
-                # Detailed principal variation for best move - FULL VARIATION
-                if best_move.get('principal_variation'):
-                    st.markdown("### 🧠 Best Move Analysis")
-                    st.markdown("**Complete Principal Variation (All Available Moves):**")
-                    full_pv = format_principal_variation(
-                        best_move.get('principal_variation', ''), 
-                        turn_color, 
-                        move_number,
-                        for_table=False  # Use rich HTML formatting for display
-                    )
-                    st.markdown(f'<div style="background-color: #f0f2f6; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea; line-height: 1.6;">{full_pv}</div>', unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Error generating legal moves: {e}")
+    
+    # Show results and analysis if move has been submitted
+    if st.session_state.get('move_submitted', False):
+        selected_move = st.session_state.get('current_selected_move', '')
+        validation_result = st.session_state.get('last_result', {})
+        
+        # Show move result
+        if validation_result.get('success'):
+            st.success(f"✅ {validation_result.get('message', 'Good move!')}")
+        else:
+            st.error(f"❌ {validation_result.get('message', 'Try again!')}")
+        
+        # Enhanced moves analysis section
+        st.markdown("### 🎯 Comprehensive Move Analysis")
+        
+        turn_color = position.get('turn', 'white')
+        move_number = position.get('fullmove_number', 1)
+        top_moves = position['moves'][:10]
+        
+        if top_moves:
+            moves_df = create_moves_table(top_moves, selected_move, turn_color, move_number)
+            st.dataframe(moves_df, use_container_width=True, hide_index=True)
             
-            else:
-                st.warning("No move analysis data available for this position.")
+            # Position insights
+            st.markdown("### 📊 Position Insights")
+            col1, col2, col3 = st.columns(3)
             
-            # Auto-load next position after delay
-            time.sleep(300)  # Restored to original 300 seconds as requested
+            with col1:
+                best_move = top_moves[0]
+                st.metric("Best Move", best_move.get('move', 'N/A'), f"Score: {best_move.get('score', 0):+}")
+            
+            with col2:
+                user_move_data = next((m for m in top_moves if m.get('move') == selected_move), None)
+                if user_move_data:
+                    rank = next((i+1 for i, m in enumerate(top_moves) if m.get('move') == selected_move), 'N/A')
+                    st.metric("Your Move Rank", f"#{rank}", f"CP Loss: {user_move_data.get('centipawn_loss', 0)}")
+                else:
+                    st.metric("Your Move Rank", "Not in Top 10", "")
+            
+            with col3:
+                avg_score = sum(m.get('score', 0) for m in top_moves) / len(top_moves)
+                st.metric("Avg Top 10 Score", f"{avg_score:+.1f}", "")
+        
+        # Book Generation Section
+        st.markdown("### 📚 Generate Educational Materials")
+        
+        # Track current position for generated files
+        current_position_id = position.get('id')
+        generated_files = st.session_state.get('generated_book_files')
+        has_files_for_position = (generated_files and generated_files.get('position_id') == current_position_id)
+        
+        book_col1, book_col2 = st.columns(2)
+        
+        with book_col1:
+            generate_button_text = "📖 Generate Book Pages" if not has_files_for_position else "🔄 Regenerate Pages"
+            
+            if st.button(generate_button_text, key="generate_book", use_container_width=True):
+                with st.spinner("Generating educational materials..."):
+                    try:
+                        # Test import first
+                        import book_generator
+                        
+                        # Generate the book files
+                        question_html, solution_html, filename_base = book_generator.generate_book_files(position)
+                        
+                        # Store in session state
+                        st.session_state.generated_book_files = {
+                            'question_html': question_html,
+                            'solution_html': solution_html,
+                            'filename_base': filename_base,
+                            'position_id': current_position_id
+                        }
+                        
+                        st.success("✅ Educational materials generated successfully!")
+                        st.rerun()
+                        
+                    except ImportError as e:
+                        st.error(f"❌ Book generator module not found: {e}")
+                        st.write("Make sure book_generator.py is in your project directory")
+                    except Exception as e:
+                        st.error(f"❌ Error generating materials: {e}")
+                        with st.expander("🔧 Debug Information"):
+                            st.exception(e)
+        
+        with book_col2:
+            if has_files_for_position:
+                files = st.session_state.generated_book_files
+                
+                # Download buttons
+                question_filename = f"{files['filename_base']}_question.html"
+                solution_filename = f"{files['filename_base']}_solution.html"
+                
+                st.download_button(
+                    label="⬇️ Download Question",
+                    data=files['question_html'],
+                    file_name=question_filename,
+                    mime="text/html",
+                    use_container_width=True
+                )
+                
+                st.download_button(
+                    label="⬇️ Download Solution", 
+                    data=files['solution_html'],
+                    file_name=solution_filename,
+                    mime="text/html",
+                    use_container_width=True
+                )
+        
+        # Show preview if files exist
+        if has_files_for_position:
+            with st.expander("📖 Preview Generated Materials"):
+                tab1, tab2 = st.tabs(["Question Preview", "Solution Preview"])
+                
+                with tab1:
+                    st.components.v1.html(
+                        st.session_state.generated_book_files['question_html'],
+                        height=600,
+                        scrolling=True
+                    )
+                
+                with tab2:
+                    st.components.v1.html(
+                        st.session_state.generated_book_files['solution_html'],
+                        height=600,
+                        scrolling=True
+                    )
+        
+        # Option to try again with new move
+        st.markdown("---")
+        if st.button("🔄 Try Another Move", use_container_width=True):
             st.session_state.current_position = training.get_random_position()
-            st.session_state.show_result = False
+            reset_position_state()
             reset_timer()
             st.rerun()
-            
-    except Exception as e:
-        st.error(f"Error generating legal moves: {e}")
-        st.code(f"Position FEN: {position['fen']}", language="text")
-        
-        # Debug information
-        with st.expander("🔧 Debug Information"):
-            st.json({
-                "error": str(e),
-                "position_keys": list(position.keys()) if 'position' in locals() else "Position not defined",
-                "session_state_keys": list(st.session_state.keys())
-            })
+
+# ADD these helper functions:
+def reset_position_state():
+    """Reset state when loading new position or trying again."""
+    st.session_state.move_submitted = False
+    st.session_state.book_generation_available = False
+    st.session_state.current_selected_move = None
+    if 'generated_book_files' in st.session_state:
+        del st.session_state.generated_book_files
+    if 'last_result' in st.session_state:
+        del st.session_state.last_result
+
+def reset_book_generation():
+    """Legacy function - now calls reset_position_state."""
+    reset_position_state()
+
 
 def display_simple_chess_board(fen: str, flipped: bool = False):
     """Display a simple chess board without revealing top moves."""
@@ -2148,6 +2162,54 @@ def display_spatial_analysis():
                 st.error(f"Error calculating spatial metrics: {e}")
     else:
         st.info("🎲 Select and load a game from the sidebar to start spatial analysis.")
+
+# Add this to your app.py temporarily for debugging
+# Call this function somewhere in your training page to test
+
+
+# Add this test function to debug the book generator
+def test_book_generator():
+    """Test function to debug book generation"""
+    st.markdown("### 🔧 Debug Book Generator")
+    
+    if st.button("Test Book Generator"):
+        try:
+            # Test with current position
+            position = st.session_state.current_position
+            
+            st.write("Position data:", position.get('id', 'No ID'))
+            st.write("Position keys:", list(position.keys()) if position else "No position")
+            
+            # Test imports
+            import book_generator
+            st.write("✅ book_generator module imported successfully")
+            
+            # Test function exists
+            if hasattr(book_generator, 'generate_book_files'):
+                st.write("✅ generate_book_files function exists")
+                
+                # Test generation
+                question_html, solution_html, filename_base = book_generator.generate_book_files(position)
+                
+                st.write("✅ Book files generated successfully")
+                st.write(f"Filename base: {filename_base}")
+                st.write(f"Question HTML length: {len(question_html)} characters")
+                st.write(f"Solution HTML length: {len(solution_html)} characters")
+                
+                # Show first 500 characters of question
+                st.code(question_html[:500])
+                
+            else:
+                st.error("❌ generate_book_files function not found")
+                
+        except ImportError as e:
+            st.error(f"❌ Import error: {e}")
+            st.write("Make sure book_generator.py is in the same directory as app.py")
+            
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
+            st.exception(e)
+
 
 def main():
     """Main application with enhanced mobile-friendly navigation."""
