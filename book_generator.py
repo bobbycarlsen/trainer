@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-def generate_chess_board_svg(fen: str, size: int = 320) -> str:
+def generate_chess_board_svg(fen: str, size: int = 320, flipped: bool = False) -> str:
     """Generate SVG representation of chess board from FEN."""
     try:
         import chess
@@ -19,6 +19,7 @@ def generate_chess_board_svg(fen: str, size: int = 320) -> str:
             board=board,
             size=size,
             coordinates=True,
+            flipped=flipped,  # Add flipped parameter
             style="""
             .light {fill: #F0D9B5;}
             .dark {fill: #B58863;}
@@ -30,6 +31,45 @@ def generate_chess_board_svg(fen: str, size: int = 320) -> str:
         return f"<div style='padding: 20px; text-align: center; border: 1px solid #ccc;'>Chess library not available: {str(e)}<br/>Please install: pip install chess</div>"
     except Exception as e:
         return f"<div style='padding: 20px; text-align: center; border: 1px solid #ccc;'>Error generating board: {str(e)}<br/>FEN: {fen}</div>"
+
+
+def apply_best_move_to_position(position_data: Dict[str, Any]) -> tuple:
+    """
+    Apply the best move to the position and return the resulting FEN and move details.
+    
+    Returns:
+        tuple: (new_fen, best_move_data, move_notation)
+    """
+    try:
+        import chess
+        
+        fen = position_data.get('fen', '')
+        moves = position_data.get('moves', [])
+        
+        if not moves:
+            return fen, None, None
+        
+        # Get best move (rank 1)
+        best_move_data = moves[0]
+        best_move_uci = best_move_data.get('uci', '')
+        best_move_san = best_move_data.get('move', '')
+        
+        if not best_move_uci:
+            return fen, best_move_data, best_move_san
+        
+        # Apply move to board
+        board = chess.Board(fen)
+        move = chess.Move.from_uci(best_move_uci)
+        board.push(move)
+        
+        # Return new position
+        new_fen = board.fen()
+        return new_fen, best_move_data, best_move_san
+        
+    except Exception as e:
+        print(f"Error applying best move: {e}")
+        return fen, None, None
+
 
 def format_themes(position_classification: List[str]) -> List[str]:
     """Format position themes for display."""
@@ -146,8 +186,9 @@ def generate_question_html(position_data: Dict[str, Any], timestamp: str = None)
     move_number = position_data.get('fullmove_number', 1)
     themes = format_themes(position_data.get('position_classification', []))
     
-    # Generate chess board SVG
-    board_svg = generate_chess_board_svg(fen)
+    # Generate chess board SVG - FLIP if Black to move
+    flipped = (turn.lower() == 'black')
+    board_svg = generate_chess_board_svg(fen, flipped=flipped)
     
     # Create theme tags
     theme_tags = ''.join([f'<span class="theme-tag">{theme}</span>' for theme in themes])
@@ -315,8 +356,13 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
     moves = position_data.get('moves', [])[:5]  # Top 5 moves
     metadata = position_data.get('metadata', {})
     
-    # Generate chess board SVG
-    board_svg = generate_chess_board_svg(fen)
+    # Generate chess board SVG - FLIP if Black to move
+    flipped = (turn.lower() == 'black')
+    board_svg = generate_chess_board_svg(fen, flipped=flipped)
+    
+    # Apply best move and get resulting position
+    result_fen, best_move_data, best_move_notation = apply_best_move_to_position(position_data)
+    result_board_svg = generate_chess_board_svg(result_fen, flipped=flipped)
     
     # Generate material summary
     material_summary = get_material_summary(metadata)
@@ -324,7 +370,7 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
     # Generate strategic insights
     insights = generate_strategic_insights(position_data)
     
-    # Generate moves table
+    # Generate moves table rows
     moves_rows = ""
     rank_emojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
     
@@ -349,6 +395,7 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
         </tr>
         """
     
+    # UPDATED TEMPLATE with two boards
     template = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -357,6 +404,7 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Position {position_id} - Solution</title>
     <style>
+        /* Include all the existing CSS styles here */
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
         
         * {{
@@ -371,7 +419,7 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
             color: #2c3e50;
             background: white;
             padding: 15px;
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             font-size: 14px;
         }}
@@ -401,29 +449,49 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
             margin-bottom: 8px;
         }}
         
-        .content-grid {{
+        .boards-grid {{
             display: grid;
-            grid-template-columns: 320px 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 20px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }}
         
-        .chess-board {{
+        .board-section {{
             text-align: center;
-            padding: 10px;
+            padding: 15px;
             background: #f8f9fa;
-            border-radius: 6px;
-            border: 1px solid #ddd;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+        }}
+        
+        .board-title {{
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }}
+        
+        .best-move-notation {{
+            background: #27ae60;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            margin-top: 10px;
+            display: inline-block;
         }}
         
         .position-summary {{
-            padding: 10px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 20px;
         }}
         
         .summary-item {{
             margin: 8px 0;
             padding: 6px;
-            background: #f8f9fa;
+            background: white;
             border-radius: 4px;
             border-left: 3px solid #3498db;
         }}
@@ -475,12 +543,18 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
         .mistake {{ color: #e67e22; font-weight: 600; }}
         .blunder {{ color: #e74c3c; font-weight: 600; }}
         
-        .analysis-section {{
-            background: #f8f9fa;
-            border: 1px solid #ddd;
+        .insights {{
+            background: #e8f5e8;
+            border: 1px solid #27ae60;
             border-radius: 6px;
             padding: 10px;
-            margin-bottom: 10px;
+            margin-top: 10px;
+        }}
+        
+        .insights-text {{
+            font-size: 13px;
+            line-height: 1.5;
+            color: #2c3e50;
         }}
         
         .analysis-row {{
@@ -502,23 +576,12 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
             font-size: 13px;
         }}
         
-        .insights {{
-            background: #e8f5e8;
-            border: 1px solid #27ae60;
-            border-radius: 6px;
-            padding: 10px;
-            margin-top: 10px;
-        }}
-        
-        .insights-text {{
-            font-size: 13px;
-            line-height: 1.5;
-            color: #2c3e50;
-        }}
-        
-        @media print {{
+        @media (max-width: 768px) {{
+            .boards-grid {{
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }}
             body {{ padding: 8px; font-size: 12px; }}
-            .content-grid {{ grid-template-columns: 280px 1fr; gap: 15px; }}
             .moves-table {{ font-size: 10px; }}
             .pv-cell {{ font-size: 9px; }}
         }}
@@ -533,44 +596,53 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
         <div class="position-number">Position #{position_id} Solution</div>
     </div>
     
-    <div class="content-grid">
-        <div class="chess-board">
+    <div class="boards-grid">
+        <div class="board-section">
+            <div class="board-title">📋 Initial Position</div>
             {board_svg}
+            <div style="margin-top: 10px; color: #666;">
+                {turn} to move - Move {move_number}
+            </div>
         </div>
         
-        <div class="position-summary">
-            <div class="summary-item">
-                <span class="label">Position:</span> {turn} to move, Move {move_number}
+        <div class="board-section" style="border-color: #27ae60;">
+            <div class="board-title">🎯 After Best Move</div>
+            {result_board_svg}
+            <div class="best-move-notation">
+                Best Move: {best_move_notation or 'N/A'}
             </div>
-            <div class="summary-item">
-                <span class="label">Themes:</span> {', '.join(themes)}
-            </div>
-            
+        </div>
+    </div>
+    
+    <div class="position-summary">
+        <div class="summary-item">
+            <span class="label">Themes:</span> {', '.join(themes)}
+        </div>
+        
         <div class="analysis-row">
             <span class="label">Material:</span>
             <span class="value">{material_summary}</span>
-        </div>
-        
         </div>
     </div>
     
     <div class="moves-section">
         <div class="section-title">📊 Top {len(moves)} Candidate Moves</div>
         
-    <table class="moves-table">
-        <thead>
-            <tr>
-                <th>Rank</th>
-                <th>Move</th>
-                <th>Score</th>
-                <th>Quality</th>
-                <th>CP Loss</th>
-                <th>Principal Variation</th>
-            </tr>
-        </thead>
-        <tbody>
-    {moves_rows}
-        </tbody></table>
+        <table class="moves-table">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Move</th>
+                    <th>Score</th>
+                    <th>Quality</th>
+                    <th>CP Loss</th>
+                    <th>Principal Variation</th>
+                </tr>
+            </thead>
+            <tbody>
+        {moves_rows}
+            </tbody>
+        </table>
     </div>
     
     <div class="insights">
@@ -581,6 +653,7 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
 </html>
 """
     return template
+
 
 def generate_book_files(position_data: Dict[str, Any]) -> tuple:
     """
