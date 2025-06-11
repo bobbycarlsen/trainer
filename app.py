@@ -238,9 +238,11 @@ st.markdown("""
 # Enhanced session state management
 def init_session_state():
     """Initialize all session state variables."""
+    # sample position to load by default
+    current_position = {'id': 980, 'fen': '8/5pkp/4n1p1/R5P1/4P2P/1r6/6K1/8 w - - 1 41', 'turn': 'white', 'fullmove_number': 41, 'position_classification': ['middlegame', 'open', 'positional'], 'metadata': {'material': {'white_total': 8, 'black_total': 11, 'white_pawns': 3, 'black_pawns': 3, 'white_knights': 0, 'black_knights': 1, 'white_bishops': 0, 'black_bishops': 0, 'white_rooks': 1, 'black_rooks': 1, 'white_queens': 0, 'black_queens': 0, 'imbalance': -3}, 'mobility': {'white_total': 17, 'black_total': 0, 'white_avg': 8.5, 'black_avg': 0.0}, 'king_safety': {'white': {'attack_count': 3, 'defender_count': 8, 'pawn_shield': 0, 'open_files': 0}, 'black': {'attack_count': 2, 'defender_count': 12, 'pawn_shield': 1, 'open_files': 0}}, 'pawn_structure': {'open_files': 4, 'half_open_files': 2, 'white_pawn_islands': 2, 'black_pawn_islands': 1, 'white_passed_pawns': 0, 'black_passed_pawns': 0, 'white_isolated_pawns': 1, 'black_isolated_pawns': 0, 'white_doubled_pawns': 0, 'black_doubled_pawns': 0, 'pawn_chains': 2}, 'center_control': {'white': 4, 'black': 1}, 'piece_development': {'white': 1, 'black': 2.5}, 'castling_rights': {'white_kingside': False, 'white_queenside': False, 'black_kingside': False, 'black_queenside': False}, 'opening_analysis': {}, 'endgame_analysis': {}, 'tactical_motifs': [], 'positional_themes': [], 'complexity_score': 0, 'difficulty_rating': 'medium'}, 'moves': [{'id': 34238, 'move': 'e5', 'uci': 'e4e5', 'score': -546, 'depth': 20, 'centipawn_loss': 0, 'classification': 'great', 'principal_variation': 'e5 Rc3 Ra1 Re3 Ra4 Rxe5 Kf3 Rf5+ Ke3 Rb5 Rc4 Re5+ Kd3 h6 gxh6+ Kh7 Ra4', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': -1, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 1}, {'id': 34239, 'move': 'Ra4', 'uci': 'a5a4', 'score': -547, 'depth': 20, 'centipawn_loss': 1, 'classification': 'good', 'principal_variation': 'Ra4 Re3 Rc4 Rd3 Rc1 Nf4+ Kf2 Rh3 Rc4 Ne6 e5 Rd3 Rc6 Rd4 Kg3 Re4 Ra6 Rxe5 Kf3 Rb5', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': 0, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 2}, {'id': 34240, 'move': 'Ra6', 'uci': 'a5a6', 'score': -570, 'depth': 20, 'centipawn_loss': 24, 'classification': 'good', 'principal_variation': 'Ra6 Nc5 Rd6 Nxe4 Rd5 Ra3 Rd8 Nc5 Rd5 Ne6 Rd1 Re3 Rb1 Re4 Rh1 Rd4 Kg3 Rb4 Rh2 Nd4', 'tactics': ['hanging_piece'], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': -2, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 3}, {'id': 34241, 'move': 'Ra1', 'uci': 'a5a1', 'score': -570, 'depth': 20, 'centipawn_loss': 24, 'classification': 'good', 'principal_variation': 'Ra1 Re3 e5 Rxe5 Kf3 Rf5+ Kg3 Rf4 Rh1 Ra4 Kg2 Rd4 Kg3 Re4 Kf3 Rc4 Kg3 Rb4 Rh2 Ra4', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 3, 'center_control_change': -2, 'development_impact': -1, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 4}, {'id': 34242, 'move': 'Ra8', 'uci': 'a5a8', 'score': -570, 'depth': 20, 'centipawn_loss': 24, 'classification': 'good', 'principal_variation': 'Ra8 Re3 Ra4 Nc5 Ra5 Nxe4 Rd5 Ra3 Rd8 Nc5 Rd1 Ne6 Rf1 Re3 Rh1 Re4 Kg3 Rb4 Rh2 Nd4', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': -2, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 5}, {'id': 34243, 'move': 'Ra7', 'uci': 'a5a7', 'score': -574, 'depth': 20, 'centipawn_loss': 28, 'classification': 'inaccuracy', 'principal_variation': 'Ra7 Re3 Ra4 Nc5 Ra5 Nxe4 Rd5 Ra3 Rd8 Nc5 Rd1 Ne6 Rf1 Ra5 Rb1 Ra2+ Kg3 Ra4 Rh1 Nd4', 'tactics': ['pin'], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': -2, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 6}, {'id': 34244, 'move': 'Ra2', 'uci': 'a5a2', 'score': -592, 'depth': 20, 'centipawn_loss': 46, 'classification': 'inaccuracy', 'principal_variation': 'Ra2 Nf4+ Kf2 Nd3+ Kg2 Rb2+ Rxb2 Nxb2 Kf3 Nd3 Ke3 Nc5 Kd4 Ne6+ Ke5 Kf8 Kd5 Ke7 Kc6 f6', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 2, 'center_control_change': -2, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 7}, {'id': 34245, 'move': 'Kf2', 'uci': 'g2f2', 'score': -627, 'depth': 20, 'centipawn_loss': 81, 'classification': 'mistake', 'principal_variation': 'Kf2 Rh3 Re5 Rxh4 Kg3 Rh5 Kg4 Rh1 Kg3 Rg1+ Kh4 Rc1 Kg3 Rc3+ Kg4 Rc4 Kf3 Rc5 Rd5 Nxg5+', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': 0, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 8}, {'id': 34246, 'move': 'h5', 'uci': 'h4h5', 'score': -627, 'depth': 20, 'centipawn_loss': 81, 'classification': 'mistake', 'principal_variation': 'h5 gxh5 e5 Kg6 Ra4 Rb5 Re4 Nxg5 Rh4 Rxe5 Rc4 Re4 Rc6+ Ne6 Rc2 Kg5', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': 0, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 9}, {'id': 34247, 'move': 'Kh2', 'uci': 'g2h2', 'score': -629, 'depth': 20, 'centipawn_loss': 83, 'classification': 'mistake', 'principal_variation': 'Kh2 Nf4 Kg1 Rh3 Kf2 Ne6 Re5 Rxh4 Kg3 Rh5 Kg4 Rh1 Kg3 Rg1+ Kh4 Rc1 Kg3 Rc3+ Kf2', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': -2, 'center_control_change': 0, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 10}]}
     defaults = {
         'user_id': None,
-        'current_position': None,
+        'current_position': current_position,
         'timer_start': None,
         'timer_paused': False,
         'paused_time': 0,
@@ -437,7 +439,9 @@ def display_simple_train_page():
     
     # Essential controls only
     col1, col2, col3 = st.columns(3)
-    
+    # if 'id' in st.session_state.current_position.keys()
+    pid = int(st.session_state.current_position.get('id', 11))
+
     with col1:
         if st.button("🎲 Random", use_container_width=True):
             st.session_state.current_position = training.get_random_position()
@@ -447,13 +451,13 @@ def display_simple_train_page():
     
     with col2:
         if st.button("▶️ Next", use_container_width=True):
-            st.session_state.current_position = training.get_sequential_position(st.session_state.user_id)
+            st.session_state.current_position = training.get_position_by_id(pid + 1)
             st.session_state.show_result = False  # Hide previous results
             reset_timer()
             st.rerun()
     
     with col3:
-        position_id = st.number_input("Position ID", min_value=1, value=1, key="simple_pos_id")
+        position_id = st.number_input("Position ID", min_value=1, value=pid, key="simple_pos_id")
         if st.button("📍 Load", use_container_width=True):
             pos = training.get_position_by_id(position_id)
             if pos:
@@ -485,21 +489,22 @@ def display_simple_train_page():
     turn_color = position['turn'].capitalize()
 
     # Set style and emoji based on turn color
+    turn_emoji = "♔"
     if turn_color == "White":
         bg_style = "linear-gradient(90deg, #f0f0f0 0%, #d9d9d9 100%)"
-        text_color = "#333"  # dark text for light background
-        turn_emoji = "♔"
+        text_color = "#333"  # dark text for light background ♔ ♚
+        turn_emoji_mover = "♚"
     else:
         bg_style = "linear-gradient(90deg, #4a4a4a 0%, #2e2e2e 100%)"
-        text_color = "#f0f0f0"  # light text for dark background
-        turn_emoji = "♚"
+        text_color = "#f0f0f0"  # light text for dark background ♔ ♚
+        turn_emoji_mover = "♔"
 
     # Show turn info banner
     st.markdown(f"""
     <div style="text-align: center; padding: 1rem; background: {bg_style};
                 border-radius: 8px; margin: 1rem 0; color: {text_color};">
         <h2 style="margin: 0; font-size: 1.5em;">
-            {turn_emoji} <strong>{turn_color} to Move</strong> {turn_emoji}
+            {turn_emoji} <strong>{turn_color} to Move</strong> {turn_emoji_mover}
         </h2>
     </div>
     """, unsafe_allow_html=True)

@@ -72,40 +72,6 @@ def get_position_by_id(position_id):
     conn.close()
     return position_data
 
-def get_sequential_position(user_id):
-    """Get the next position in sequence for a user based on their training history."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Find the highest position ID the user has attempted
-    cursor.execute('''
-        SELECT MAX(position_id) as last_position 
-        FROM user_moves 
-        WHERE user_id = ?
-    ''', (user_id,))
-    result = cursor.fetchone()
-    last_position_id = result['last_position'] if result and result['last_position'] else 0
-    
-    # Get the next position after the last one attempted
-    cursor.execute('''
-        SELECT MIN(id) as next_position 
-        FROM positions 
-        WHERE id > ?
-    ''', (last_position_id,))
-    result = cursor.fetchone()
-    next_position_id = result['next_position'] if result and result['next_position'] else None
-    
-    # If no next position found (user completed all positions), start from beginning
-    if not next_position_id:
-        cursor.execute('SELECT MIN(id) as first_position FROM positions')
-        result = cursor.fetchone()
-        next_position_id = result['first_position'] if result else None
-    
-    conn.close()
-    
-    if next_position_id:
-        return get_position_by_id(next_position_id)
-    return None
 
 def get_adaptive_position(user_id):
     """
