@@ -243,7 +243,7 @@ def validate_move_enhanced(position_id, selected_move, user_id, position_data, t
         top_move_centipawn_loss = min(move['centipawn_loss'] for move in top_n_moves if move['centipawn_loss'] is not None)
         
         # Multiple success criteria
-        if selected_move_data['centipawn_loss'] <= top_move_centipawn_loss:
+        if selected_move_data['centipawn_loss'] <= top_move_centipawn_loss + score_difference_threshold:
             is_success = True
             success_reasons.append(f"Excellent! Only {selected_move_data['centipawn_loss']} centipawns lost")
         elif rank == 1:
