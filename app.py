@@ -489,22 +489,21 @@ def display_simple_train_page():
     turn_color = position['turn'].capitalize()
 
     # Set style and emoji based on turn color
-    turn_emoji = "♔"
     if turn_color == "White":
-        bg_style = "linear-gradient(90deg, #f0f0f0 0%, #d9d9d9 100%)"
-        text_color = "#333"  # dark text for light background ♔ ♚
-        turn_emoji_mover = "♚"
-    else:
-        bg_style = "linear-gradient(90deg, #4a4a4a 0%, #2e2e2e 100%)"
-        text_color = "#f0f0f0"  # light text for dark background ♔ ♚
+        bg_style = "linear-gradient(180deg, #f0f0f0 100%, #d9d9d9 100%)"
+        text_color = "#333"
         turn_emoji_mover = "♔"
+    else:
+        bg_style = "linear-gradient(90deg, #f0f0f0 0%, #d9d9d9 0%)"
+        text_color = "#333"
+        turn_emoji_mover = "♚"
 
     # Show turn info banner
     st.markdown(f"""
     <div style="text-align: center; padding: 1rem; background: {bg_style};
                 border-radius: 8px; margin: 1rem 0; color: {text_color};">
         <h2 style="margin: 0; font-size: 1.5em;">
-            {turn_emoji} <strong>{turn_color} to Move</strong> {turn_emoji_mover}
+            {turn_emoji_mover} <strong>{turn_color} to Move</strong> {turn_emoji_mover}
         </h2>
     </div>
     """, unsafe_allow_html=True)
