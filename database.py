@@ -651,6 +651,44 @@ def get_user_saved_games(user_id):
         conn.close()
         return []
 
+def get_user_analyzed_games(user_id):
+    """
+    Get all games that have been completely analyzed by a user.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            SELECT uga.*, g.white_player, g.black_player, g.result, g.date, g.opening,
+                   g.total_moves, g.event
+            FROM user_game_analysis uga
+            JOIN games g ON uga.game_id = g.id
+            WHERE uga.user_id = ? AND uga.completed_at IS NOT NULL
+            ORDER BY uga.completed_at DESC
+        ''', (user_id,))
+        
+        analyzed_games = []
+        for row in cursor.fetchall():
+            game_data = dict(row)
+            # Parse analysis data if it exists
+            if game_data.get('analysis_data'):
+                try:
+                    game_data['analysis_data'] = json.loads(game_data['analysis_data'])
+                except json.JSONDecodeError:
+                    game_data['analysis_data'] = {}
+            
+            analyzed_games.append(game_data)
+        
+        conn.close()
+        return analyzed_games
+        
+    except Exception as e:
+        print(f"Error getting analyzed games: {e}")
+        conn.close()
+        return []
+
+# Also update the existing update_user_game_analysis_progress function:
 def update_user_game_analysis_progress(user_id, game_id, move_index, time_spent, analysis_data=None):
     """
     Update user's progress on game analysis.
@@ -668,24 +706,47 @@ def update_user_game_analysis_progress(user_id, game_id, move_index, time_spent,
     
     if existing:
         # Update existing record
-        cursor.execute('''
-            UPDATE user_game_analysis 
-            SET current_move_index = ?, 
-                total_time_spent = total_time_spent + ?,
-                analysis_data = ?,
-                last_analyzed = CURRENT_TIMESTAMP
-            WHERE user_id = ? AND game_id = ?
-        ''', (move_index, time_spent, json.dumps(analysis_data) if analysis_data else None, user_id, game_id))
+        if analysis_data and analysis_data.get('analysis_completed'):
+            # Mark as completed
+            cursor.execute('''
+                UPDATE user_game_analysis 
+                SET current_move_index = ?, 
+                    total_time_spent = total_time_spent + ?,
+                    analysis_data = ?,
+                    analysis_status = 'completed',
+                    completed_at = CURRENT_TIMESTAMP,
+                    last_analyzed = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND game_id = ?
+            ''', (move_index, time_spent, json.dumps(analysis_data) if analysis_data else None, user_id, game_id))
+        else:
+            # Regular progress update
+            cursor.execute('''
+                UPDATE user_game_analysis 
+                SET current_move_index = ?, 
+                    total_time_spent = total_time_spent + ?,
+                    analysis_data = ?,
+                    moves_analyzed = ?,
+                    last_analyzed = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND game_id = ?
+            ''', (move_index, time_spent, json.dumps(analysis_data) if analysis_data else None, 
+                  move_index, user_id, game_id))
     else:
         # Create new record
+        status = 'completed' if (analysis_data and analysis_data.get('analysis_completed')) else 'in_progress'
+        completed_at = 'CURRENT_TIMESTAMP' if status == 'completed' else None
+        
         cursor.execute('''
             INSERT INTO user_game_analysis 
-            (user_id, game_id, current_move_index, total_time_spent, analysis_data)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (user_id, game_id, move_index, time_spent, json.dumps(analysis_data) if analysis_data else None))
+            (user_id, game_id, current_move_index, total_time_spent, analysis_data, 
+             analysis_status, moves_analyzed, completed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, game_id, move_index, time_spent, 
+              json.dumps(analysis_data) if analysis_data else None, 
+              status, move_index, completed_at))
     
     conn.commit()
     conn.close()
+    return True
 
 def get_user_game_statistics(user_id):
     """

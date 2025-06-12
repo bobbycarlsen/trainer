@@ -341,20 +341,22 @@ def display_login_page():
 
 
 def get_piece_icon(move_san):
-    """Get piece icon from SAN notation."""
+    """Get enhanced piece icon from SAN notation with better Unicode symbols."""
+    # Enhanced piece icons for better visibility
     piece_icons = {
-        'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
-        'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
+        'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘',  # White pieces
+        'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞'   # Black pieces (for consistency)
     }
     
     # Extract piece from move (first character if uppercase)
     if move_san and move_san[0].isupper() and move_san[0] in 'KQRBN':
         return piece_icons.get(move_san[0], '')
     else:
-        return piece_icons.get('P', '♙')  # Pawn moves don't have piece prefix
+        return '♙'  # Pawn moves don't have piece prefix, use white pawn icon
+
 
 def format_principal_variation(pv_string, turn_color, starting_move_number=1, for_table=False):
-    """Format principal variation with correct PGN numbering."""
+    """Format principal variation with correct PGN numbering and piece icons."""
     if not pv_string:
         return ""
     
@@ -366,6 +368,7 @@ def format_principal_variation(pv_string, turn_color, starting_move_number=1, fo
     for i, move in enumerate(moves):
         piece_icon = get_piece_icon(move)
         
+        # Enhanced piece icons with colors
         if for_table:
             # PGN-style formatting for table display
             if is_white_turn:
@@ -376,15 +379,17 @@ def format_principal_variation(pv_string, turn_color, starting_move_number=1, fo
                 is_white_turn = True
                 current_move_num += 1
         else:
-            # Enhanced HTML formatting with proper PGN numbering
+            # Enhanced HTML formatting with proper PGN numbering and colors
             if is_white_turn:
                 move_display = f"""<span style='color: #2E7D32; font-weight: 600; background: #E8F5E8; 
-                            padding: 2px 4px; border-radius: 3px; margin: 0 1px; font-size: 0.9em;'>
+                            padding: 3px 6px; border-radius: 4px; margin: 0 2px; font-size: 0.95em;
+                            border: 1px solid #4CAF50;'>
                     {current_move_num}.{piece_icon}{move}</span>"""
                 is_white_turn = False
             else:
                 move_display = f"""<span style='color: #1565C0; font-weight: 600; background: #E3F2FD; 
-                            padding: 2px 4px; border-radius: 3px; margin: 0 1px; font-size: 0.9em;'>
+                            padding: 3px 6px; border-radius: 4px; margin: 0 2px; font-size: 0.95em;
+                            border: 1px solid #2196F3;'>
                     {current_move_num}...{piece_icon}{move}</span>"""
                 is_white_turn = True
                 current_move_num += 1
@@ -549,16 +554,20 @@ def display_simple_train_page():
         text_color = "#333"
         turn_emoji_mover = "♚"
 
-    # Show turn info banner
+    # Show turn info banner with move number
+    move_number = position.get('fullmove_number', 1)
     st.markdown(f"""
     <div style="text-align: center; padding: 1rem; background: {bg_style};
                 border-radius: 8px; margin: 1rem 0; color: {text_color};">
         <h2 style="margin: 0; font-size: 1.5em;">
             {turn_emoji_mover} <strong>{turn_color} to Move</strong> {turn_emoji_mover}
         </h2>
+        <p style="margin: 0.5rem 0 0 0; font-size: 1.1em; font-weight: 500;">
+            Move {move_number}
+        </p>
     </div>
     """, unsafe_allow_html=True)
-    
+
     # Timer (simplified)
     if st.session_state.show_timer:
         timer_col1, timer_col2 = st.columns([4, 1])
@@ -669,33 +678,63 @@ def display_simple_train_page():
             with col3:
                 avg_score = sum(m.get('score', 0) for m in top_moves) / len(top_moves)
                 st.metric("Avg Top 10 Score", f"{avg_score:+.1f}", "")
-        
+
+        # Add spatial analysis section after move analysis
+        if st.checkbox("🗺️ Show Spatial Analysis", key="training_spatial"):
+            try:
+                import spatial_analysis
+                import chess
+                
+                board = chess.Board(position['fen'])
+                spatial_metrics = spatial_analysis.calculate_spatial_metrics(board)
+                insights = spatial_analysis.get_spatial_insights(spatial_metrics)
+                
+                st.markdown("#### 🔍 Position Spatial Analysis")
+                
+                for insight in insights:
+                    st.info(f"💡 {insight}")
+                
+                # Quick spatial comparison
+                white_area = spatial_metrics['white']['area']
+                black_area = spatial_metrics['black']['area']
+                
+                spatial_col1, spatial_col2 = st.columns(2)
+                with spatial_col1:
+                    st.metric("⚪ White Area Control", f"{white_area:.1f}")
+                with spatial_col2:
+                    st.metric("⚫ Black Area Control", f"{black_area:.1f}")
+                    
+            except Exception as e:
+                st.error(f"Spatial analysis error: {e}")
+
         # Book Generation Section
         st.markdown("### 📚 Generate Educational Materials")
-        
+
         # Track current position for generated files
         current_position_id = position.get('id')
         generated_files = st.session_state.get('generated_book_files')
         has_files_for_position = (generated_files and generated_files.get('position_id') == current_position_id)
-        
+
         book_col1, book_col2 = st.columns(2)
-        
+
         with book_col1:
-            generate_button_text = "📖 Generate Book Pages" if not has_files_for_position else "🔄 Regenerate Pages"
+            generate_button_text = "📖 Generate Book Files" if not has_files_for_position else "🔄 Regenerate Files"
             
             if st.button(generate_button_text, key="generate_book", use_container_width=True):
                 with st.spinner("Generating educational materials..."):
                     try:
-                        # Test import first
-                        import book_generator
+                        # Import the enhanced book generator
+                        # if 'book_generator' not in globals():
+                        #     import book_generator
                         
-                        # Generate the book files
-                        question_html, solution_html, filename_base = book_generator.generate_book_files(position)
-                        
+                        # Generate the three book files
+                        problem_html, solution_html, comprehensive_html, filename_base = book_generator.generate_book_files(position)
+
                         # Store in session state
                         st.session_state.generated_book_files = {
-                            'question_html': question_html,
+                            'problem_html': problem_html,
                             'solution_html': solution_html,
+                            'comprehensive_html': comprehensive_html,  # Add this line
                             'filename_base': filename_base,
                             'position_id': current_position_id
                         }
@@ -705,24 +744,25 @@ def display_simple_train_page():
                         
                     except ImportError as e:
                         st.error(f"❌ Book generator module not found: {e}")
-                        st.write("Make sure book_generator.py is in your project directory")
+                        st.write("Make sure enhanced_book_generator.py is in your project directory")
                     except Exception as e:
                         st.error(f"❌ Error generating materials: {e}")
                         with st.expander("🔧 Debug Information"):
                             st.exception(e)
-        
+
         with book_col2:
             if has_files_for_position:
                 files = st.session_state.generated_book_files
                 
-                # Download buttons
-                question_filename = f"{files['filename_base']}_question.html"
+                # Download buttons for all three files
+                problem_filename = f"{files['filename_base']}_problem.html"
                 solution_filename = f"{files['filename_base']}_solution.html"
+                comprehensive_filename = f"{files['filename_base']}_comprehensive.html"
                 
                 st.download_button(
-                    label="⬇️ Download Question",
-                    data=files['question_html'],
-                    file_name=question_filename,
+                    label="⬇️ Download Problem",
+                    data=files['problem_html'],
+                    file_name=problem_filename,
                     mime="text/html",
                     use_container_width=True
                 )
@@ -734,15 +774,23 @@ def display_simple_train_page():
                     mime="text/html",
                     use_container_width=True
                 )
-        
+                
+                st.download_button(
+                    label="⬇️ Download Analysis", 
+                    data=files['comprehensive_html'],
+                    file_name=comprehensive_filename,
+                    mime="text/html",
+                    use_container_width=True
+                )
+
         # Show preview if files exist
         if has_files_for_position:
             with st.expander("📖 Preview Generated Materials"):
-                tab1, tab2 = st.tabs(["Question Preview", "Solution Preview"])
+                tab1, tab2, tab3 = st.tabs(["Problem Preview", "Solution Preview", "Analysis Preview"])
                 
                 with tab1:
                     st.components.v1.html(
-                        st.session_state.generated_book_files['question_html'],
+                        st.session_state.generated_book_files['problem_html'],
                         height=600,
                         scrolling=True
                     )
@@ -753,7 +801,13 @@ def display_simple_train_page():
                         height=600,
                         scrolling=True
                     )
-        
+                
+                with tab3:
+                    st.components.v1.html(
+                        st.session_state.generated_book_files['comprehensive_html'],
+                        height=600,
+                        scrolling=True
+                    )        
         # Option to try again with new move
         st.markdown("---")
         if st.button("🔄 Try Another Move", use_container_width=True):
@@ -1147,14 +1201,107 @@ def display_game_analyzer():
         except Exception as e:
             st.error(f"Error displaying chess board: {e}")
             st.code(f"Position FEN: {current_fen}", language="text")
-        
-        # Analysis features
-        analysis_col1, analysis_col2 = st.columns(2)
-        
+
+        # Spatial Analysis Integration
+        if st.checkbox("🗺️ Show Spatial Analysis", key=f"spatial_{current_index}"):
+            try:
+                import spatial_analysis
+                import chess
+                
+                # Calculate spatial metrics for current position
+                board = chess.Board(current_fen)
+                spatial_metrics = spatial_analysis.calculate_spatial_metrics(board)
+                
+                # Display spatial insights
+                insights = spatial_analysis.get_spatial_insights(spatial_metrics)
+                
+                if insights:
+                    st.markdown("#### 🔍 Spatial Insights")
+                    for insight in insights:
+                        st.info(f"💡 {insight}")
+                
+                # Display spatial metrics
+                spatial_col1, spatial_col2 = st.columns(2)
+                
+                with spatial_col1:
+                    st.markdown("**⚪ White Spatial Control**")
+                    white_metrics = spatial_metrics['white']
+                    st.metric("Area Control", f"{white_metrics['area']:.1f}")
+                    st.metric("Piece Count", white_metrics['piece_count'])
+                    st.metric("Connectivity", f"{white_metrics['connectivity_score']:.2f}")
+                    st.metric("Center Control", white_metrics['center_control'])
+                
+                with spatial_col2:
+                    st.markdown("**⚫ Black Spatial Control**")
+                    black_metrics = spatial_metrics['black']
+                    st.metric("Area Control", f"{black_metrics['area']:.1f}")
+                    st.metric("Piece Count", black_metrics['piece_count'])
+                    st.metric("Connectivity", f"{black_metrics['connectivity_score']:.2f}")
+                    st.metric("Center Control", black_metrics['center_control'])
+                
+                # Display comparison
+                comparison = spatial_metrics['comparison']
+                st.markdown("#### ⚖️ Spatial Comparison")
+                comp_col1, comp_col2, comp_col3 = st.columns(3)
+                
+                with comp_col1:
+                    area_diff = comparison['area_ratio']
+                    if area_diff > 1.2:
+                        st.success(f"⚪ White: +{((area_diff-1)*100):.1f}% area")
+                    elif area_diff < 0.8:
+                        st.error(f"⚫ Black: +{((1/area_diff-1)*100):.1f}% area")
+                    else:
+                        st.info("📊 Balanced area control")
+                
+                with comp_col2:
+                    conn_diff = comparison['connectivity_diff']
+                    if conn_diff > 0.5:
+                        st.success(f"⚪ White: +{conn_diff:.1f} connectivity")
+                    elif conn_diff < -0.5:
+                        st.error(f"⚫ Black: +{abs(conn_diff):.1f} connectivity")
+                    else:
+                        st.info("📊 Similar connectivity")
+                
+                with comp_col3:
+                    center_diff = comparison['center_control_diff']
+                    if center_diff > 1:
+                        st.success(f"⚪ White: +{center_diff} center")
+                    elif center_diff < -1:
+                        st.error(f"⚫ Black: +{abs(center_diff)} center")
+                    else:
+                        st.info("📊 Equal center control")
+                
+                # Control heatmap
+                st.markdown("#### 🌡️ Space Control Heatmap")
+                heatmap_data = spatial_analysis.calculate_space_control_heatmap(board)
+                
+                # Create a simple visualization of the heatmap
+                heatmap_col1, heatmap_col2 = st.columns(2)
+                
+                with heatmap_col1:
+                    st.markdown("**⚪ White Control Intensity**")
+                    white_heatmap = heatmap_data['white']
+                    # Convert to display format
+                    white_total = sum(sum(row) for row in white_heatmap)
+                    st.metric("Total Attack Points", int(white_total))
+                
+                with heatmap_col2:
+                    st.markdown("**⚫ Black Control Intensity**")
+                    black_heatmap = heatmap_data['black']
+                    black_total = sum(sum(row) for row in black_heatmap)
+                    st.metric("Total Attack Points", int(black_total))
+                    
+            except Exception as e:
+                st.error(f"Spatial analysis error: {e}")
+                st.info("💡 Spatial analysis requires valid chess position")
+
+        # Analysis features and save option
+        analysis_col1, analysis_col2, analysis_col3 = st.columns(3)
+
         with analysis_col1:
             if st.button("🧠 Analyze Position", use_container_width=True):
                 st.info("🤖 Position analysis would integrate with chess engine here")
-        
+
         with analysis_col2:
             if st.button("📝 Add Note", use_container_width=True):
                 note = st.text_area("Enter your note:", key=f"note_{current_index}")
@@ -1162,42 +1309,108 @@ def display_game_analyzer():
                     # Save note logic here
                     st.success("✅ Note saved!")
 
+        with analysis_col3:
+            if current_index == len(positions_data) - 1:  # At the end of the game
+                if st.button("💾 Save Analysis", key="save_complete_analysis", use_container_width=True):
+                    # Mark game as analyzed and save
+                    success = database.update_user_game_analysis_progress(
+                        st.session_state.user_id, 
+                        st.session_state.selected_game, 
+                        current_index, 
+                        0, 
+                        {"analysis_completed": True, "completed_at": datetime.now().isoformat()}
+                    )
+                    if success:
+                        st.success("🎉 Game analysis saved! Check 'Analyzed Games' tab.")
+                        st.balloons()
+                    else:
+                        st.error("❌ Failed to save analysis")
+            else:
+                st.button("📊 Complete Analysis", disabled=True, use_container_width=True, 
+                        help="Finish analyzing the entire game to save")
+
 def display_saved_games():
-    """Display user's saved games."""
-    saved_games = database.get_user_saved_games(st.session_state.user_id)
+    """Display user's saved games and analyzed games."""
+    saved_tab, analyzed_tab = st.tabs(["💾 Saved Games", "🧠 Analyzed Games"])
     
-    if saved_games:
-        st.markdown(f"### 💾 Your Saved Games ({len(saved_games)})")
+    with saved_tab:
+        saved_games = database.get_user_saved_games(st.session_state.user_id)
         
-        for saved_game in saved_games:
-            st.markdown(f"""
-            <div class="game-card">
-                <h4 style="margin: 0; color: #333;">
-                    {saved_game['white_player']} vs {saved_game['black_player']}
-                </h4>
-                <div class="game-info">
-                    📅 {saved_game['date']} • 🏆 {saved_game['result']} • 📚 {saved_game['opening']}
+        if saved_games:
+            st.markdown(f"### 💾 Your Saved Games ({len(saved_games)})")
+            
+            for saved_game in saved_games:
+                st.markdown(f"""
+                <div class="game-card">
+                    <h4 style="margin: 0; color: #333;">
+                        {saved_game['white_player']} vs {saved_game['black_player']}
+                    </h4>
+                    <div class="game-info">
+                        📅 {saved_game['date']} • 🏆 {saved_game['result']} • 📚 {saved_game['opening']}
+                    </div>
+                    <div class="game-info">
+                        💾 Saved: {saved_game['saved_at'][:10]}
+                    </div>
                 </div>
-                <div class="game-info">
-                    💾 Saved: {saved_game['saved_at'][:10]}
+                """, unsafe_allow_html=True)
+                
+                save_col1, save_col2 = st.columns(2)
+                
+                with save_col1:
+                    if st.button("🔍 Analyze", key=f"saved_analyze_{saved_game['game_id']}", use_container_width=True):
+                        st.session_state.selected_game = saved_game['game_id']
+                        st.session_state.current_game_move_index = 0
+                        st.rerun()
+                
+                with save_col2:
+                    if st.button("🗑️ Remove", key=f"remove_{saved_game['game_id']}", use_container_width=True):
+                        # Remove from saved games logic
+                        st.success("✅ Game removed from saved list")
+        else:
+            st.info("💾 No saved games yet. Save games from the Browse tab to analyze them later.")
+    
+    with analyzed_tab:
+        # Get completed game analyses
+        analyzed_games = database.get_user_analyzed_games(st.session_state.user_id)
+        
+        if analyzed_games:
+            st.markdown(f"### 🧠 Your Analyzed Games ({len(analyzed_games)})")
+            
+            for analyzed_game in analyzed_games:
+                st.markdown(f"""
+                <div class="game-card" style="border-left: 4px solid #28a745;">
+                    <h4 style="margin: 0; color: #333;">
+                        {analyzed_game['white_player']} vs {analyzed_game['black_player']}
+                    </h4>
+                    <div class="game-info">
+                        📅 {analyzed_game['date']} • 🏆 {analyzed_game['result']} • 📚 {analyzed_game['opening']}
+                    </div>
+                    <div class="game-info">
+                        🧠 Analyzed: {analyzed_game['completed_at'][:10]} • 
+                        ⏱️ Time: {analyzed_game['total_time_spent']:.1f}s •
+                        📊 Moves: {analyzed_game['moves_analyzed']}
+                    </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            save_col1, save_col2 = st.columns(2)
-            
-            with save_col1:
-                if st.button("🔍 Analyze", key=f"saved_analyze_{saved_game['game_id']}", use_container_width=True):
-                    st.session_state.selected_game = saved_game['game_id']
-                    st.session_state.current_game_move_index = 0
-                    st.rerun()
-            
-            with save_col2:
-                if st.button("🗑️ Remove", key=f"remove_{saved_game['game_id']}", use_container_width=True):
-                    # Remove from saved games logic
-                    st.success("✅ Game removed from saved list")
-    else:
-        st.info("💾 No saved games yet. Save games from the Browse tab to analyze them later.")
+                """, unsafe_allow_html=True)
+                
+                analyzed_col1, analyzed_col2 = st.columns(2)
+                
+                with analyzed_col1:
+                    if st.button("🔍 Review", key=f"review_analyze_{analyzed_game['game_id']}", use_container_width=True):
+                        st.session_state.selected_game = analyzed_game['game_id']
+                        st.session_state.current_game_move_index = 0
+                        st.rerun()
+                
+                with analyzed_col2:
+                    if st.button("📊 Analysis Data", key=f"data_{analyzed_game['game_id']}", use_container_width=True):
+                        # Show analysis data
+                        if analyzed_game.get('analysis_data'):
+                            st.json(analyzed_game['analysis_data'])
+                        else:
+                            st.info("No detailed analysis data available.")
+        else:
+            st.info("🧠 No analyzed games yet. Complete a full game analysis to see them here.")
+
 
 def display_enhanced_insights_page():
     """Display enhanced insights page with moved training stats."""

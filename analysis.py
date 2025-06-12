@@ -1159,3 +1159,66 @@ def analyze_positional_complexity(rows):
             bucket_data['avg_time'] = 0
     
     return complexity_buckets
+
+def get_user_saved_games(user_id):
+    """
+    Get all games saved by a user.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            SELECT usg.*, g.white_player, g.black_player, g.result, g.date, g.opening
+            FROM user_saved_games usg
+            JOIN games g ON usg.game_id = g.id
+            WHERE usg.user_id = ?
+            ORDER BY usg.saved_at DESC
+        ''', (user_id,))
+        
+        saved_games = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return saved_games
+    except Exception as e:
+        print(f"Error getting saved games: {e}")
+        conn.close()
+        return []
+
+def get_user_analyzed_games(user_id):
+    """
+    Get all games that have been completely analyzed by a user.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            SELECT uga.*, g.white_player, g.black_player, g.result, g.date, g.opening,
+                   g.total_moves, g.event
+            FROM user_game_analysis uga
+            JOIN games g ON uga.game_id = g.id
+            WHERE uga.user_id = ? AND uga.completed_at IS NOT NULL
+            ORDER BY uga.completed_at DESC
+        ''', (user_id,))
+        
+        analyzed_games = []
+        for row in cursor.fetchall():
+            game_data = dict(row)
+            # Parse analysis data if it exists
+            if game_data.get('analysis_data'):
+                try:
+                    game_data['analysis_data'] = json.loads(game_data['analysis_data'])
+                except json.JSONDecodeError:
+                    game_data['analysis_data'] = {}
+            
+            analyzed_games.append(game_data)
+        
+        conn.close()
+        return analyzed_games
+        
+    except Exception as e:
+        print(f"Error getting analyzed games: {e}")
+        conn.close()
+        return []
+
