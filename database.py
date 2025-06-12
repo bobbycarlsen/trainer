@@ -247,7 +247,7 @@ def init_db():
 
 def load_positions_from_jsonl(file_path):
     """
-    Load positions from JSONL file into the database with enhanced error handling.
+    Load positions from JSONL file into the database with enhanced error handling and new schema support.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -276,8 +276,9 @@ def load_positions_from_jsonl(file_path):
                 # Convert position_classification from list to string
                 position_classification = json.dumps(position_data.get('position_classification', []))
                 
-                # Store all other metadata as JSON - Enhanced to include all JSONL fields
+                # Enhanced metadata to include ALL new JSONL fields
                 metadata = {
+                    # Existing fields
                     'material': position_data.get('material', {}),
                     'mobility': position_data.get('mobility', {}),
                     'king_safety': position_data.get('king_safety', {}),
@@ -285,13 +286,34 @@ def load_positions_from_jsonl(file_path):
                     'center_control': position_data.get('center_control', {}),
                     'piece_development': position_data.get('piece_development', {}),
                     'castling_rights': position_data.get('castling_rights', {}),
-                    # Additional fields for enhanced analysis
                     'opening_analysis': position_data.get('opening_analysis', {}),
                     'endgame_analysis': position_data.get('endgame_analysis', {}),
                     'tactical_motifs': position_data.get('tactical_motifs', []),
                     'positional_themes': position_data.get('positional_themes', []),
-                    'complexity_score': position_data.get('complexity_score', 0),
-                    'difficulty_rating': position_data.get('difficulty_rating', 'medium')
+                    'complexity_score': round(position_data.get('complexity_score', 0), 2),
+                    'difficulty_rating': position_data.get('difficulty_rating', 'medium'),
+                    
+                    # NEW enhanced fields
+                    'comprehensive_analysis': position_data.get('comprehensive_analysis', {}),
+                    'variation_analysis': position_data.get('variation_analysis', {}),
+                    'learning_insights': position_data.get('learning_insights', {}),
+                    'visualization_data': position_data.get('visualization_data', {}),
+                    'position_evaluation': position_data.get('position_evaluation', {}),
+                    'strategic_themes': position_data.get('strategic_themes', []),
+                    'tactical_complexity': round(position_data.get('tactical_complexity', 0), 2),
+                    'positional_complexity': round(position_data.get('positional_complexity', 0), 2),
+                    'pattern_recognition': position_data.get('pattern_recognition', {}),
+                    'move_classification_context': position_data.get('move_classification_context', {}),
+                    'training_difficulty': position_data.get('training_difficulty', 'medium'),
+                    'educational_value': round(position_data.get('educational_value', 0), 2),
+                    'position_themes_detailed': position_data.get('position_themes_detailed', {}),
+                    'analysis_depth': position_data.get('analysis_depth', {}),
+                    'computational_metrics': position_data.get('computational_metrics', {}),
+                    'human_insights': position_data.get('human_insights', {}),
+                    'psychological_factors': position_data.get('psychological_factors', {}),
+                    'time_management_hints': position_data.get('time_management_hints', {}),
+                    'common_mistakes': position_data.get('common_mistakes', []),
+                    'improvement_suggestions': position_data.get('improvement_suggestions', [])
                 }
                 
                 # Insert position
@@ -304,22 +326,20 @@ def load_positions_from_jsonl(file_path):
                 if cursor.rowcount > 0:
                     positions_loaded += 1
                 
-                # Process moves - Enhanced to handle more move data
-                top_moves = position_data.get('top_moves', position_data.get('top_ moves', []))
+                # Enhanced moves processing with new fields
+                top_moves = position_data.get('moves', position_data.get('top_moves', []))
                 for rank, move_data in enumerate(top_moves, 1):
                     move = move_data.get('move')
                     uci = move_data.get('uci')
                     score = move_data.get('score')
                     depth = move_data.get('depth')
-                    centipawn_loss = move_data.get('centipawn_loss', move_data.get('centipawn_ loss', 0))
+                    centipawn_loss = move_data.get('centipawn_loss', 0)
                     classification = move_data.get('classification')
                     pv = move_data.get('pv', move_data.get('principal_variation', ''))
                     tactics = json.dumps(move_data.get('tactics', []))
                     
-                    # Enhanced position impact tracking
-                    position_impact = move_data.get('position_impact', move_data.get('position_ impact', {}))
-                    
-                    # Add additional move analysis if available
+                    # Enhanced position impact with new analysis fields
+                    position_impact = move_data.get('position_impact', {})
                     enhanced_position_impact = {
                         **position_impact,
                         'move_type': move_data.get('move_type', 'normal'),
@@ -330,7 +350,15 @@ def load_positions_from_jsonl(file_path):
                         'is_check': move_data.get('is_check', False),
                         'is_checkmate': move_data.get('is_checkmate', False),
                         'creates_threats': move_data.get('creates_threats', []),
-                        'defends_against': move_data.get('defends_against', [])
+                        'defends_against': move_data.get('defends_against', []),
+                        # New enhanced fields
+                        'strategic_impact': move_data.get('strategic_impact', {}),
+                        'tactical_themes': move_data.get('tactical_themes', []),
+                        'learning_value': round(move_data.get('learning_value', 0), 2),
+                        'mistake_probability': round(move_data.get('mistake_probability', 0), 3),
+                        'pattern_complexity': round(move_data.get('pattern_complexity', 0), 2),
+                        'educational_annotations': move_data.get('educational_annotations', []),
+                        'conceptual_difficulty': move_data.get('conceptual_difficulty', 'medium')
                     }
                     
                     position_impact_json = json.dumps(enhanced_position_impact)
@@ -353,7 +381,7 @@ def load_positions_from_jsonl(file_path):
     conn.commit()
     conn.close()
     
-    print(f"JSONL loading complete: {positions_loaded} positions loaded, {errors} errors encountered.")
+    print(f"Enhanced JSONL loading complete: {positions_loaded} positions loaded, {errors} errors encountered.")
     return positions_loaded
 
 def store_pgn_games(games_data, pgn_source="uploaded"):

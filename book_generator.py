@@ -117,27 +117,6 @@ def format_move_quality(classification: str) -> tuple:
     }
     return quality_map.get(classification, ('', classification.title()))
 
-def format_principal_variation(pv: str, max_length: int = 80) -> str:
-    """Format principal variation for display."""
-    if not pv:
-        return ""
-    
-    # Split moves and format with move numbers
-    moves = pv.split()
-    formatted_moves = []
-    
-    for i, move in enumerate(moves):
-        if i % 2 == 0:  # White move
-            move_num = (i // 2) + 1
-            formatted_moves.append(f"{move_num}.{move}")
-        else:  # Black move
-            formatted_moves.append(move)
-    
-    result = " ".join(formatted_moves)
-    if len(result) > max_length:
-        result = result[:max_length] + "..."
-    
-    return result
 
 def generate_strategic_insights(position_data: Dict[str, Any]) -> str:
     """Generate strategic insights based on position data."""
@@ -175,8 +154,123 @@ def generate_strategic_insights(position_data: Dict[str, Any]) -> str:
     
     return " • ".join(insights) if insights else "Balanced position requiring careful evaluation"
 
-def generate_question_html(position_data: Dict[str, Any], timestamp: str = None) -> str:
-    """Generate question HTML template."""
+def generate_comprehensive_analysis_section(position_data: Dict[str, Any]) -> str:
+    """Generate comprehensive analysis section using enhanced JSONL data."""
+    metadata = position_data.get('metadata', {})
+    
+    analysis_html = ""
+    
+    # Comprehensive Analysis from JSONL
+    comprehensive_analysis = metadata.get('comprehensive_analysis', {})
+    if comprehensive_analysis:
+        analysis_html += f"""
+        <div class="comprehensive-analysis">
+            <h3>🔬 Comprehensive Position Analysis</h3>
+            
+            <div class="analysis-grid">
+                <div class="analysis-section">
+                    <h4>📊 Position Evaluation</h4>
+                    <div class="evaluation-metrics">
+        """
+        
+        position_eval = comprehensive_analysis.get('position_evaluation', {})
+        if position_eval:
+            for metric, value in position_eval.items():
+                if isinstance(value, (int, float)):
+                    analysis_html += f"""
+                    <div class="metric-row">
+                        <span class="metric-name">{metric.replace('_', ' ').title()}:</span>
+                        <span class="metric-value">{value:.1f}</span>
+                    </div>
+                    """
+        
+        analysis_html += """
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+    
+    # Tactical Complexity Analysis
+    tactical_complexity = metadata.get('tactical_complexity', 0)
+    positional_complexity = metadata.get('positional_complexity', 0)
+    
+    if tactical_complexity > 0 or positional_complexity > 0:
+        analysis_html += f"""
+        <div class="complexity-analysis">
+            <h3>🧩 Position Complexity</h3>
+            <div class="complexity-grid">
+                <div class="complexity-item">
+                    <span class="complexity-label">Tactical Complexity:</span>
+                    <div class="complexity-bar">
+                        <div class="complexity-fill" style="width: {min(tactical_complexity * 10, 100)}%; background: #e74c3c;"></div>
+                        <span class="complexity-score">{tactical_complexity:.1f}/10</span>
+                    </div>
+                </div>
+                <div class="complexity-item">
+                    <span class="complexity-label">Positional Complexity:</span>
+                    <div class="complexity-bar">
+                        <div class="complexity-fill" style="width: {min(positional_complexity * 10, 100)}%; background: #3498db;"></div>
+                        <span class="complexity-score">{positional_complexity:.1f}/10</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+    
+    # Learning Insights
+    learning_insights = metadata.get('learning_insights', {})
+    if learning_insights:
+        analysis_html += """
+        <div class="learning-insights">
+            <h3>🎓 Learning Focus Areas</h3>
+        """
+        
+        key_concepts = learning_insights.get('key_concepts', [])
+        if key_concepts:
+            analysis_html += "<div class='key-concepts'><h4>Key Concepts:</h4><ul>"
+            for concept in key_concepts[:5]:
+                analysis_html += f"<li>{concept.replace('_', ' ').title()}</li>"
+            analysis_html += "</ul></div>"
+        
+        difficulty_factors = learning_insights.get('difficulty_factors', [])
+        if difficulty_factors:
+            analysis_html += "<div class='difficulty-factors'><h4>Challenge Areas:</h4><ul>"
+            for factor in difficulty_factors[:3]:
+                analysis_html += f"<li>{factor.replace('_', ' ').title()}</li>"
+            analysis_html += "</ul></div>"
+        
+        analysis_html += "</div>"
+    
+    # Pattern Recognition
+    pattern_recognition = metadata.get('pattern_recognition', {})
+    if pattern_recognition:
+        analysis_html += """
+        <div class="pattern-recognition">
+            <h3>🔍 Pattern Recognition</h3>
+            <div class="patterns-grid">
+        """
+        
+        for pattern_name, pattern_data in list(pattern_recognition.items())[:4]:
+            if isinstance(pattern_data, dict):
+                confidence = pattern_data.get('confidence', 'medium')
+                frequency = pattern_data.get('frequency', 'common')
+                analysis_html += f"""
+                <div class="pattern-item">
+                    <div class="pattern-name">{pattern_name.replace('_', ' ').title()}</div>
+                    <div class="pattern-details">
+                        <span class="confidence">Confidence: {confidence}</span>
+                        <span class="frequency">Frequency: {frequency}</span>
+                    </div>
+                </div>
+                """
+        
+        analysis_html += "</div></div>"
+    
+    return analysis_html
+
+def generate_enhanced_question_html(position_data: Dict[str, Any], timestamp: str = None) -> str:
+    """Generate enhanced question HTML with comprehensive analysis."""
     if timestamp is None:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     
@@ -184,14 +278,27 @@ def generate_question_html(position_data: Dict[str, Any], timestamp: str = None)
     fen = position_data.get('fen', '')
     turn = position_data.get('turn', 'white').capitalize()
     move_number = position_data.get('fullmove_number', 1)
-    themes = format_themes(position_data.get('position_classification', []))
+    metadata = position_data.get('metadata', {})
     
     # Generate chess board SVG - FLIP if Black to move
     flipped = (turn.lower() == 'black')
     board_svg = generate_chess_board_svg(fen, flipped=flipped)
     
-    # Create theme tags
+    # Enhanced themes and difficulty
+    themes = format_themes(position_data.get('position_classification', []))
     theme_tags = ''.join([f'<span class="theme-tag">{theme}</span>' for theme in themes])
+    
+    # Training difficulty and educational value
+    training_difficulty = metadata.get('training_difficulty', 'medium')
+    educational_value = metadata.get('educational_value', 0)
+    
+    difficulty_colors = {
+        'beginner': '#28a745',
+        'intermediate': '#ffc107', 
+        'advanced': '#fd7e14',
+        'expert': '#dc3545'
+    }
+    difficulty_color = difficulty_colors.get(training_difficulty, '#6c757d')
     
     template = f"""
 <!DOCTYPE html>
@@ -199,7 +306,7 @@ def generate_question_html(position_data: Dict[str, Any], timestamp: str = None)
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Position {position_id} - Question</title>
+    <title>Position {position_id} - Enhanced Question</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
         
@@ -215,7 +322,7 @@ def generate_question_html(position_data: Dict[str, Any], timestamp: str = None)
             color: #2c3e50;
             background: white;
             padding: 20px;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
         }}
         
@@ -253,6 +360,28 @@ def generate_question_html(position_data: Dict[str, Any], timestamp: str = None)
             font-size: 1.1rem;
             font-weight: 600;
             margin-bottom: 15px;
+        }}
+        
+        .difficulty-indicator {{
+            display: inline-block;
+            padding: 6px 15px;
+            background: {difficulty_color};
+            color: white;
+            border-radius: 15px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin: 5px;
+        }}
+        
+        .educational-value {{
+            display: inline-block;
+            padding: 6px 15px;
+            background: #27ae60;
+            color: white;
+            border-radius: 15px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin: 5px;
         }}
         
         .chess-board {{
@@ -314,13 +443,19 @@ def generate_question_html(position_data: Dict[str, Any], timestamp: str = None)
 </head>
 <body>
     <div class="header">
-        <h1>♟️ Chess Position Analysis</h1>
+        <h1>♟️ Enhanced Chess Position Analysis</h1>
     </div>
     
     <div class="position-info">
         <div class="position-number">Position #{position_id}</div>
         <div class="turn-indicator">
             {turn} to Move - Move {move_number}
+        </div>
+        <div class="difficulty-indicator">
+            Difficulty: {training_difficulty.title()}
+        </div>
+        <div class="educational-value">
+            Educational Value: {educational_value:.1f}/10
         </div>
     </div>
     
@@ -343,14 +478,15 @@ def generate_question_html(position_data: Dict[str, Any], timestamp: str = None)
 """
     return template
 
-def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None) -> str:
-    """Generate solution HTML template."""
+def generate_enhanced_solution_html(position_data: Dict[str, Any], timestamp: str = None) -> str:
+    """Generate enhanced solution HTML with comprehensive analysis."""
     if timestamp is None:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     
     position_id = position_data.get('id', 'unknown')
     fen = position_data.get('fen', '')
-    turn = position_data.get('turn', 'white').capitalize()
+    turn = position_data.get('turn', 'white')
+    turn_display = turn.capitalize()
     move_number = position_data.get('fullmove_number', 1)
     themes = format_themes(position_data.get('position_classification', []))
     moves = position_data.get('moves', [])[:5]  # Top 5 moves
@@ -367,10 +503,13 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
     # Generate material summary
     material_summary = get_material_summary(metadata)
     
-    # Generate strategic insights
-    insights = generate_strategic_insights(position_data)
+    # Generate enhanced strategic insights
+    insights = generate_enhanced_strategic_insights(position_data)
     
-    # Generate moves table rows
+    # Generate comprehensive analysis section
+    comprehensive_analysis_html = generate_comprehensive_analysis_section(position_data)
+    
+    # Generate moves table rows with FIXED PGN numbering
     moves_rows = ""
     rank_emojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
     
@@ -380,7 +519,28 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
         score = move_data.get('score', 0)
         classification = move_data.get('classification', 'unknown')
         centipawn_loss = move_data.get('centipawn_loss', 0)
-        pv = format_principal_variation(move_data.get('principal_variation', ''))
+        
+        # FIX: Proper PGN formatting for principal variation
+        pv_raw = move_data.get('principal_variation', '')
+        if pv_raw:
+            pv_moves = pv_raw.split()
+            pv_formatted = ""
+            current_move = move_number
+            is_white_move = (turn.lower() == 'white')
+            
+            for j, pv_move in enumerate(pv_moves[:10]):  # Limit to 10 moves
+                if is_white_move:
+                    pv_formatted += f"{current_move}.{pv_move} "
+                    is_white_move = False
+                else:
+                    pv_formatted += f"{current_move}...{pv_move} "
+                    is_white_move = True
+                    current_move += 1
+            
+            if len(pv_moves) > 10:
+                pv_formatted += "..."
+        else:
+            pv_formatted = ""
         
         quality_class, quality_text = format_move_quality(classification)
         
@@ -388,23 +548,23 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
         <tr>
             <td class="rank-cell">{rank_emoji}</td>
             <td class="move-cell">{move}</td>
-            <td class="score-cell">{score:+}</td>
+            <td class="score-cell">{score:+d}</td>
             <td class="quality-cell {quality_class}">{quality_text}</td>
-            <td class="loss-cell">{centipawn_loss}</td>
-            <td class="pv-cell">{pv}</td>
+            <td class="loss-cell">{centipawn_loss:.0f}</td>
+            <td class="pv-cell">{pv_formatted}</td>
         </tr>
         """
     
-    # UPDATED TEMPLATE with two boards
+    # Enhanced template with comprehensive analysis
     template = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Position {position_id} - Solution</title>
+    <title>Position {position_id} - Enhanced Solution</title>
     <style>
-        /* Include all the existing CSS styles here */
+        /* Enhanced CSS with comprehensive analysis styles */
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
         
         * {{
@@ -419,7 +579,7 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
             color: #2c3e50;
             background: white;
             padding: 15px;
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
             font-size: 14px;
         }}
@@ -557,29 +717,129 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
             color: #2c3e50;
         }}
         
-        .analysis-row {{
-            display: flex;
-            justify-content: space-between;
-            margin: 4px 0;
-            padding: 3px 0;
-            border-bottom: 1px solid #eee;
+        /* Comprehensive Analysis Styles */
+        .comprehensive-analysis {{
+            background: #f0f8ff;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
         }}
         
-        .label {{
-            font-weight: 600;
-            color: #34495e;
+        .analysis-grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 10px;
         }}
         
-        .value {{
+        .analysis-section {{
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }}
+        
+        .complexity-analysis {{
+            background: #fff5ee;
+            border: 2px solid #ff6b6b;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }}
+        
+        .complexity-grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 10px;
+        }}
+        
+        .complexity-item {{
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }}
+        
+        .complexity-bar {{
+            background: #ecf0f1;
+            height: 20px;
+            border-radius: 10px;
+            position: relative;
+            margin-top: 5px;
+        }}
+        
+        .complexity-fill {{
+            height: 100%;
+            border-radius: 10px;
+            position: relative;
+        }}
+        
+        .complexity-score {{
+            position: absolute;
+            top: 50%;
+            right: 5px;
+            transform: translateY(-50%);
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }}
+        
+        .learning-insights {{
+            background: #f0fff0;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }}
+        
+        .pattern-recognition {{
+            background: #fff0f5;
+            border: 2px solid #e91e63;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }}
+        
+        .patterns-grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }}
+        
+        .pattern-item {{
+            background: white;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }}
+        
+        .pattern-name {{
+            font-weight: bold;
             color: #2c3e50;
-            font-family: 'Source Code Pro', monospace;
-            font-size: 13px;
+            margin-bottom: 3px;
+        }}
+        
+        .pattern-details {{
+            font-size: 11px;
+            color: #666;
         }}
         
         @media (max-width: 768px) {{
             .boards-grid {{
                 grid-template-columns: 1fr;
                 gap: 15px;
+            }}
+            .analysis-grid {{
+                grid-template-columns: 1fr;
+            }}
+            .complexity-grid {{
+                grid-template-columns: 1fr;
+            }}
+            .patterns-grid {{
+                grid-template-columns: 1fr;
             }}
             body {{ padding: 8px; font-size: 12px; }}
             .moves-table {{ font-size: 10px; }}
@@ -589,11 +849,11 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
 </head>
 <body>
     <div class="header">
-        <h1>✅ Solution Analysis</h1>
+        <h1>✅ Enhanced Solution Analysis</h1>
     </div>
     
     <div class="position-info">
-        <div class="position-number">Position #{position_id} Solution</div>
+        <div class="position-number">Position #{position_id} - Complete Analysis</div>
     </div>
     
     <div class="boards-grid">
@@ -601,7 +861,7 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
             <div class="board-title">📋 Initial Position</div>
             {board_svg}
             <div style="margin-top: 10px; color: #666;">
-                {turn} to move - Move {move_number}
+                {turn_display} to move - Move {move_number}
             </div>
         </div>
         
@@ -618,10 +878,8 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
         <div class="summary-item">
             <span class="label">Themes:</span> {', '.join(themes)}
         </div>
-        
-        <div class="analysis-row">
-            <span class="label">Material:</span>
-            <span class="value">{material_summary}</span>
+        <div class="summary-item">
+            <span class="label">Material:</span> {material_summary}
         </div>
     </div>
     
@@ -645,8 +903,10 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
         </table>
     </div>
     
+    {comprehensive_analysis_html}
+    
     <div class="insights">
-        <div class="section-title">💡 Key Strategic Insights</div>
+        <div class="section-title">💡 Enhanced Strategic Insights</div>
         <div class="insights-text">{insights}</div>
     </div>
 </body>
@@ -654,14 +914,8 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
 """
     return template
 
-
 def generate_book_files(position_data: Dict[str, Any]) -> tuple:
-    """
-    Generate both question and solution HTML files for a position.
-    
-    Returns:
-        tuple: (question_html, solution_html, filename_base)
-    """
+    """Generate enhanced book files with comprehensive analysis."""
     try:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         position_id = position_data.get('id', 'unknown')
@@ -673,16 +927,16 @@ def generate_book_files(position_data: Dict[str, Any]) -> tuple:
         if not position_data.get('fen'):
             raise ValueError("Position FEN is missing")
         
-        question_html = generate_question_html(position_data, timestamp)
-        solution_html = generate_solution_html(position_data, timestamp)
+        question_html = generate_enhanced_question_html(position_data, timestamp)
+        solution_html = generate_enhanced_solution_html(position_data, timestamp)
         
-        filename_base = f"position_{position_id}_{timestamp}"
+        filename_base = f"enhanced_position_{position_id}_{timestamp}"
         
         return question_html, solution_html, filename_base
         
     except Exception as e:
         # Return error templates if generation fails
-        error_msg = f"Error generating book files: {str(e)}"
+        error_msg = f"Error generating enhanced book files: {str(e)}"
         error_html = f"""
         <!DOCTYPE html>
         <html><head><title>Generation Error</title></head>
@@ -717,3 +971,60 @@ def save_book_files(question_html: str, solution_html: str, filename_base: str) 
         f.write(solution_html)
     
     return question_path, solution_path
+
+def generate_enhanced_strategic_insights(position_data: Dict[str, Any]) -> str:
+    """Generate enhanced strategic insights using new JSONL data."""
+    insights = []
+    
+    metadata = position_data.get('metadata', {})
+    
+    # Use comprehensive analysis if available
+    comprehensive_analysis = metadata.get('comprehensive_analysis', {})
+    if comprehensive_analysis:
+        strategic_summary = comprehensive_analysis.get('strategic_summary', '')
+        if strategic_summary:
+            insights.append(strategic_summary)
+    
+    # Use learning insights
+    learning_insights = metadata.get('learning_insights', {})
+    key_concepts = learning_insights.get('key_concepts', [])
+    if key_concepts:
+        insights.append(f"Key concepts: {', '.join(key_concepts[:3])}")
+    
+    # Use strategic themes
+    strategic_themes = metadata.get('strategic_themes', [])
+    if strategic_themes:
+        insights.append(f"Strategic themes: {', '.join(strategic_themes[:3])}")
+    
+    # Use pattern recognition data
+    pattern_recognition = metadata.get('pattern_recognition', {})
+    if pattern_recognition:
+        main_patterns = list(pattern_recognition.keys())[:2]
+        if main_patterns:
+            insights.append(f"Pattern focus: {', '.join(main_patterns)}")
+    
+    # Educational value insight
+    educational_value = metadata.get('educational_value', 0)
+    if educational_value >= 8:
+        insights.append("High educational value - excellent for learning")
+    elif educational_value >= 5:
+        insights.append("Good learning opportunity")
+    
+    # Training difficulty insight
+    training_difficulty = metadata.get('training_difficulty', 'medium')
+    difficulty_map = {
+        'beginner': 'Suitable for beginners',
+        'intermediate': 'Intermediate level challenge',
+        'advanced': 'Advanced tactical/positional understanding required',
+        'expert': 'Expert-level position requiring deep analysis'
+    }
+    if training_difficulty in difficulty_map:
+        insights.append(difficulty_map[training_difficulty])
+    
+    # Common mistakes warning
+    common_mistakes = metadata.get('common_mistakes', [])
+    if common_mistakes:
+        insights.append(f"Common pitfalls: {', '.join(common_mistakes[:2])}")
+    
+    return " • ".join(insights) if insights else generate_strategic_insights(position_data)
+

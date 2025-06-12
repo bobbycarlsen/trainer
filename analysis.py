@@ -831,3 +831,331 @@ def get_recent_performance_summary(user_id, days=7):
     
     conn.close()
     return recent_summary
+
+def get_comprehensive_position_analysis(user_id):
+    """
+    Get comprehensive position analysis using enhanced JSONL data.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT 
+            um.result,
+            p.metadata,
+            p.turn,
+            um.time_taken
+        FROM user_moves um
+        JOIN positions p ON um.position_id = p.id
+        WHERE um.user_id = ?
+    ''', (user_id,))
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    if not rows:
+        return None
+    
+    # Enhanced analysis categories
+    analysis_results = {
+        'tactical_complexity': analyze_tactical_complexity(rows),
+        'positional_complexity': analyze_positional_complexity(rows),
+        'pattern_recognition': analyze_pattern_recognition(rows),
+        'strategic_themes': analyze_strategic_themes(rows),
+        'educational_insights': analyze_educational_insights(rows),
+        'psychological_factors': analyze_psychological_factors(rows),
+        'improvement_recommendations': generate_improvement_recommendations(rows),
+        'learning_curve': calculate_learning_curve(rows)
+    }
+    
+    return analysis_results
+
+def analyze_tactical_complexity(rows):
+    """Analyze performance based on tactical complexity."""
+    complexity_buckets = {
+        'low': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},
+        'medium': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},
+        'high': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},
+        'extreme': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []}
+    }
+    
+    for row in rows:
+        metadata = json.loads(row['metadata']) if row['metadata'] else {}
+        tactical_complexity = metadata.get('tactical_complexity', 0)
+        
+        if tactical_complexity <= 2:
+            bucket = 'low'
+        elif tactical_complexity <= 5:
+            bucket = 'medium'
+        elif tactical_complexity <= 8:
+            bucket = 'high'
+        else:
+            bucket = 'extreme'
+        
+        complexity_buckets[bucket]['total'] += 1
+        complexity_buckets[bucket]['times'].append(row['time_taken'])
+        if row['result'] == 'pass':
+            complexity_buckets[bucket]['correct'] += 1
+    
+    # Calculate performance metrics
+    for bucket_data in complexity_buckets.values():
+        if bucket_data['total'] > 0:
+            bucket_data['accuracy'] = round((bucket_data['correct'] / bucket_data['total']) * 100, 2)
+            bucket_data['avg_time'] = round(sum(bucket_data['times']) / len(bucket_data['times']), 2)
+        else:
+            bucket_data['accuracy'] = 0
+            bucket_data['avg_time'] = 0
+    
+    return complexity_buckets
+
+def analyze_pattern_recognition(rows):
+    """Analyze pattern recognition performance."""
+    pattern_performance = {}
+    
+    for row in rows:
+        metadata = json.loads(row['metadata']) if row['metadata'] else {}
+        pattern_data = metadata.get('pattern_recognition', {})
+        
+        for pattern_type, pattern_info in pattern_data.items():
+            if pattern_type not in pattern_performance:
+                pattern_performance[pattern_type] = {'total': 0, 'correct': 0}
+            
+            pattern_performance[pattern_type]['total'] += 1
+            if row['result'] == 'pass':
+                pattern_performance[pattern_type]['correct'] += 1
+    
+    # Calculate accuracies
+    for pattern_type, data in pattern_performance.items():
+        data['accuracy'] = round((data['correct'] / data['total']) * 100, 2) if data['total'] > 0 else 0
+    
+    return pattern_performance
+
+def analyze_strategic_themes(rows):
+    """Analyze performance by strategic themes."""
+    theme_performance = {}
+    
+    for row in rows:
+        metadata = json.loads(row['metadata']) if row['metadata'] else {}
+        strategic_themes = metadata.get('strategic_themes', [])
+        
+        for theme in strategic_themes:
+            if theme not in theme_performance:
+                theme_performance[theme] = {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []}
+            
+            theme_performance[theme]['total'] += 1
+            theme_performance[theme]['times'].append(row['time_taken'])
+            if row['result'] == 'pass':
+                theme_performance[theme]['correct'] += 1
+    
+    # Calculate metrics
+    for theme_data in theme_performance.values():
+        if theme_data['total'] > 0:
+            theme_data['accuracy'] = round((theme_data['correct'] / theme_data['total']) * 100, 2)
+            theme_data['avg_time'] = round(sum(theme_data['times']) / len(theme_data['times']), 2)
+    
+    return theme_performance
+
+def analyze_educational_insights(rows):
+    """Analyze educational value and learning insights."""
+    educational_analysis = {
+        'high_value_positions': 0,
+        'medium_value_positions': 0,
+        'low_value_positions': 0,
+        'learning_efficiency': 0,
+        'concept_mastery': {},
+        'difficulty_progression': []
+    }
+    
+    total_educational_value = 0
+    concept_tracking = {}
+    
+    for row in rows:
+        metadata = json.loads(row['metadata']) if row['metadata'] else {}
+        educational_value = metadata.get('educational_value', 0)
+        learning_insights = metadata.get('learning_insights', {})
+        
+        # Track educational value distribution
+        if educational_value >= 8:
+            educational_analysis['high_value_positions'] += 1
+        elif educational_value >= 5:
+            educational_analysis['medium_value_positions'] += 1
+        else:
+            educational_analysis['low_value_positions'] += 1
+        
+        total_educational_value += educational_value
+        
+        # Track concept mastery
+        concepts = learning_insights.get('key_concepts', [])
+        for concept in concepts:
+            if concept not in concept_tracking:
+                concept_tracking[concept] = {'attempts': 0, 'successes': 0}
+            concept_tracking[concept]['attempts'] += 1
+            if row['result'] == 'pass':
+                concept_tracking[concept]['successes'] += 1
+    
+    # Calculate concept mastery
+    for concept, data in concept_tracking.items():
+        mastery_rate = (data['successes'] / data['attempts']) * 100 if data['attempts'] > 0 else 0
+        educational_analysis['concept_mastery'][concept] = round(mastery_rate, 2)
+    
+    # Calculate learning efficiency
+    total_positions = len(rows)
+    if total_positions > 0:
+        educational_analysis['learning_efficiency'] = round(total_educational_value / total_positions, 2)
+    
+    return educational_analysis
+
+def analyze_psychological_factors(rows):
+    """Analyze psychological factors affecting performance."""
+    psychological_analysis = {
+        'pressure_performance': {},
+        'confidence_indicators': {},
+        'time_pressure_impact': {},
+        'mistake_patterns': {},
+        'emotional_state_impact': {}
+    }
+    
+    for row in rows:
+        metadata = json.loads(row['metadata']) if row['metadata'] else {}
+        psychological_factors = metadata.get('psychological_factors', {})
+        time_taken = row['time_taken']
+        
+        # Analyze time pressure impact
+        if time_taken < 10:
+            pressure_level = 'high_pressure'
+        elif time_taken < 30:
+            pressure_level = 'medium_pressure'
+        else:
+            pressure_level = 'low_pressure'
+        
+        if pressure_level not in psychological_analysis['time_pressure_impact']:
+            psychological_analysis['time_pressure_impact'][pressure_level] = {'total': 0, 'correct': 0}
+        
+        psychological_analysis['time_pressure_impact'][pressure_level]['total'] += 1
+        if row['result'] == 'pass':
+            psychological_analysis['time_pressure_impact'][pressure_level]['correct'] += 1
+    
+    # Calculate pressure performance accuracies
+    for pressure_data in psychological_analysis['time_pressure_impact'].values():
+        if pressure_data['total'] > 0:
+            pressure_data['accuracy'] = round((pressure_data['correct'] / pressure_data['total']) * 100, 2)
+    
+    return psychological_analysis
+
+def generate_improvement_recommendations(rows):
+    """Generate personalized improvement recommendations."""
+    recommendations = []
+    
+    # Analyze recent performance
+    recent_accuracy = 0
+    if len(rows) >= 10:
+        recent_moves = rows[-10:]
+        recent_correct = sum(1 for move in recent_moves if move['result'] == 'pass')
+        recent_accuracy = (recent_correct / len(recent_moves)) * 100
+    
+    # Analyze weak areas
+    weak_tactical_themes = []
+    weak_strategic_areas = []
+    
+    for row in rows:
+        metadata = json.loads(row['metadata']) if row['metadata'] else {}
+        if row['result'] == 'fail':
+            # Collect failed tactical themes
+            tactical_motifs = metadata.get('tactical_motifs', [])
+            weak_tactical_themes.extend(tactical_motifs)
+            
+            # Collect failed strategic themes
+            strategic_themes = metadata.get('strategic_themes', [])
+            weak_strategic_areas.extend(strategic_themes)
+    
+    # Generate specific recommendations
+    if recent_accuracy < 50:
+        recommendations.append({
+            'priority': 'high',
+            'category': 'accuracy',
+            'title': 'Focus on Basic Pattern Recognition',
+            'description': 'Your recent accuracy is below 50%. Practice fundamental tactical patterns.',
+            'suggested_actions': ['Study basic tactics', 'Solve simpler puzzles', 'Review missed positions']
+        })
+    
+    # Most common tactical weaknesses
+    if weak_tactical_themes:
+        from collections import Counter
+        common_weak_tactics = Counter(weak_tactical_themes).most_common(3)
+        for tactic, count in common_weak_tactics:
+            if count >= 3:
+                recommendations.append({
+                    'priority': 'medium',
+                    'category': 'tactical',
+                    'title': f'Improve {tactic.replace("_", " ").title()} Recognition',
+                    'description': f'You\'ve missed {count} positions involving {tactic}.',
+                    'suggested_actions': [f'Practice {tactic} puzzles', 'Study pattern examples']
+                })
+    
+    return recommendations
+
+def calculate_learning_curve(rows):
+    """Calculate learning curve progression."""
+    if len(rows) < 10:
+        return {'insufficient_data': True}
+    
+    # Split data into chunks to analyze progression
+    chunk_size = max(10, len(rows) // 5)
+    chunks = [rows[i:i + chunk_size] for i in range(0, len(rows), chunk_size)]
+    
+    learning_progression = []
+    for i, chunk in enumerate(chunks):
+        correct = sum(1 for move in chunk if move['result'] == 'pass')
+        accuracy = (correct / len(chunk)) * 100
+        avg_time = sum(move['time_taken'] for move in chunk) / len(chunk)
+        
+        learning_progression.append({
+            'period': i + 1,
+            'accuracy': round(accuracy, 2),
+            'avg_time': round(avg_time, 2),
+            'total_moves': len(chunk)
+        })
+    
+    return {
+        'progression': learning_progression,
+        'trend': 'improving' if learning_progression[-1]['accuracy'] > learning_progression[0]['accuracy'] else 'declining',
+        'improvement_rate': round(learning_progression[-1]['accuracy'] - learning_progression[0]['accuracy'], 2)
+    }
+
+def analyze_positional_complexity(rows):
+    """Analyze performance based on positional complexity."""
+    complexity_buckets = {
+        'low': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},
+        'medium': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},
+        'high': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},
+        'extreme': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []}
+    }
+    
+    for row in rows:
+        metadata = json.loads(row['metadata']) if row['metadata'] else {}
+        positional_complexity = metadata.get('positional_complexity', 0)
+        
+        if positional_complexity <= 2:
+            bucket = 'low'
+        elif positional_complexity <= 5:
+            bucket = 'medium'
+        elif positional_complexity <= 8:
+            bucket = 'high'
+        else:
+            bucket = 'extreme'
+        
+        complexity_buckets[bucket]['total'] += 1
+        complexity_buckets[bucket]['times'].append(row['time_taken'])
+        if row['result'] == 'pass':
+            complexity_buckets[bucket]['correct'] += 1
+    
+    # Calculate performance metrics
+    for bucket_data in complexity_buckets.values():
+        if bucket_data['total'] > 0:
+            bucket_data['accuracy'] = round((bucket_data['correct'] / bucket_data['total']) * 100, 2)
+            bucket_data['avg_time'] = round(sum(bucket_data['times']) / len(bucket_data['times']), 2)
+        else:
+            bucket_data['accuracy'] = 0
+            bucket_data['avg_time'] = 0
+    
+    return complexity_buckets

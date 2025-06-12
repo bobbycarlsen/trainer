@@ -13,9 +13,15 @@ Ensure there're no breaking changes. Modular code, best practices in python and 
 Chess Trainer
 A comprehensive chess training application that helps users improve their chess skills through targeted position practice, game analysis, and insights.
 
-1. Consider these as well while generating the stats, insights, and book generation - new template with these detailed stats (pawn_structure, center_control, piece_development, castling_rights, comprehensive_analysis, variation_analysis, learning_insights, visualization_data)
+1. Consider these as well while generating the stats, insights, and more importantly the entities for book generation - new template with these detailed stats (pawn_structure, center_control, piece_development, castling_rights, comprehensive_analysis, variation_analysis, learning_insights, visualization_data etc.)
 2. In the top moves table displayed after move submission, update principal variation to start a move by adding the move number with actual move number.
 If white played last move and last move was 10, then principal variation should start like 10. <white's last move> <topmost move for black> 11. <white's next move> <black's next move> 12. ...
 If black played last move and last move was 10, then principal variation should start like 10. ... <black's last move> 11. <topmost move for white> <black's next move> 12. <white's next move> ...
 
-
+# Instructions
+-Ensure existing features are not lost. Do not introduce breaking changes.
+-Return complete code if there're multiple changes which needs to be merged, else just the snippet with details of file name and how to merge.
+-Round all decimal points to 2 or 3 positions at max while saving in db.
+-Always follow best design and coding practices while applying design thinking principles.
+-Keep in mind that there's a context window and message limit. So ensure you get it right first time itself. Avoid further back & forths.
+-If there are chances of exceeding message window limit then ensure you provide working code with placeholders for remaining functionalities.

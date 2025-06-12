@@ -340,8 +340,21 @@ def display_login_page():
 
 
 
+def get_piece_icon(move_san):
+    """Get piece icon from SAN notation."""
+    piece_icons = {
+        'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
+        'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
+    }
+    
+    # Extract piece from move (first character if uppercase)
+    if move_san and move_san[0].isupper() and move_san[0] in 'KQRBN':
+        return piece_icons.get(move_san[0], '')
+    else:
+        return piece_icons.get('P', '♙')  # Pawn moves don't have piece prefix
+
 def format_principal_variation(pv_string, turn_color, starting_move_number=1, for_table=False):
-    """Format principal variation with proper move numbers and color coding"""
+    """Format principal variation with correct PGN numbering."""
     if not pv_string:
         return ""
     
@@ -351,22 +364,28 @@ def format_principal_variation(pv_string, turn_color, starting_move_number=1, fo
     is_white_turn = (turn_color.lower() == 'white')
     
     for i, move in enumerate(moves):
+        piece_icon = get_piece_icon(move)
+        
         if for_table:
-            # Plain text formatting for table display
+            # PGN-style formatting for table display
             if is_white_turn:
-                move_display = f"{current_move_num}.{move}"
+                move_display = f"{current_move_num}.{piece_icon}{move}"
                 is_white_turn = False
             else:
-                move_display = f"{move}"
+                move_display = f"{current_move_num}...{piece_icon}{move}"
                 is_white_turn = True
                 current_move_num += 1
         else:
-            # HTML formatting for rich display
+            # Enhanced HTML formatting with proper PGN numbering
             if is_white_turn:
-                move_display = f"<span style='color: #3E591E; font-weight: bold;'>{current_move_num}.{move}</span>"
+                move_display = f"""<span style='color: #2E7D32; font-weight: 600; background: #E8F5E8; 
+                            padding: 2px 4px; border-radius: 3px; margin: 0 1px; font-size: 0.9em;'>
+                    {current_move_num}.{piece_icon}{move}</span>"""
                 is_white_turn = False
             else:
-                move_display = f"<span style='color: #D2691E; font-weight: bold;'>{move}</span>"
+                move_display = f"""<span style='color: #1565C0; font-weight: 600; background: #E3F2FD; 
+                            padding: 2px 4px; border-radius: 3px; margin: 0 1px; font-size: 0.9em;'>
+                    {current_move_num}...{piece_icon}{move}</span>"""
                 is_white_turn = True
                 current_move_num += 1
             
@@ -375,42 +394,65 @@ def format_principal_variation(pv_string, turn_color, starting_move_number=1, fo
     return " ".join(formatted_moves)
 
 def get_impact_summary(position_impact):
-    """Create a concise summary of position impact"""
+    """Create a clean, concise summary of position impact."""
     if not position_impact:
-        return "No impact data"
+        return "Neutral position"
     
     impacts = []
-    for key, value in position_impact.items():
-        # Only process numeric values
-        if isinstance(value, (int, float)) and value != 0:
-            icon = "📈" if value > 0 else "📉" if value < 0 else "➖"
-            impacts.append(f"{icon} {key.replace('_', ' ').title()}: {value:+}")
+    impact_mapping = {
+        'material_change': ('Material', '♔'),
+        'center_control_change': ('Center', '🎯'),
+        'king_safety_impact': ('King Safety', '🛡️'),
+        'development_impact': ('Development', '🚀'),
+        'space_advantage_change': ('Space', '📏'),
+        'initiative_change': ('Initiative', '⚡')
+    }
     
-    return " | ".join(impacts) if impacts else "⚖️ Neutral"
+    for key, (label, icon) in impact_mapping.items():
+        value = position_impact.get(key, 0)
+        if isinstance(value, (int, float)) and abs(value) >= 0.5:  # Only show significant changes
+            if value > 0:
+                impacts.append(f"{icon}+{value:.1f}")
+            else:
+                impacts.append(f"{icon}{value:.1f}")
+    
+    return " ".join(impacts) if impacts else "Neutral"
 
 def create_moves_table(moves_data, selected_move, turn_color, starting_move_number=1):
-    """Create a comprehensive moves analysis table"""
+    """Create a user-friendly moves analysis table."""
     
-    # Prepare data for the table
     table_data = []
     
-    for i, move_data in enumerate(moves_data[:10]):  # Top 10 moves
-        rank_icons = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
-        rank_icon = rank_icons[i] if i < len(rank_icons) else f"{i+1}️⃣"
+    for i, move_data in enumerate(moves_data[:8]):  # Top 8 moves for better display
+        # Rank with clean icons
+        rank_icons = ['🥇', '🥈', '🥉'] + [f"{j}th" for j in range(4, 9)]
+        rank_display = rank_icons[i] if i < len(rank_icons) else f"{i+1}th"
         
-        # Classification styling
+        # Move with piece icon
+        move_san = move_data.get('move', 'Unknown')
+        piece_icon = get_piece_icon(move_san)
+        
+        # Check if this is user's move
+        is_user_move = (move_san == selected_move)
+        move_display = f"{'👤 ' if is_user_move else ''}{piece_icon}{move_san}"
+        
+        # Clean classification
         classification = move_data.get('classification', 'unknown')
-        class_colors = {
-            'great': '🟢 Great',
-            'good': '🟡 Good', 
-            'inaccuracy': '🟠 Inaccuracy',
-            'mistake': '🔴 Mistake',
-            'blunder': '⚫ Blunder'
+        class_emojis = {
+            'great': '🟢',
+            'good': '🟡', 
+            'inaccuracy': '🟠',
+            'mistake': '🔴',
+            'blunder': '⚫'
         }
+        class_emoji = class_emojis.get(classification, '⚪')
+        class_display = f"{class_emoji} {classification.title()}"
         
-        classification_display = class_colors.get(classification, f"⚪ {classification.title()}")
+        # Clean scores
+        score = move_data.get('score', 0)
+        cp_loss = move_data.get('centipawn_loss', 0)
         
-        # Format principal variation for table (plain text)
+        # Shortened principal variation
         pv_formatted = format_principal_variation(
             move_data.get('principal_variation', ''), 
             turn_color, 
@@ -418,30 +460,33 @@ def create_moves_table(moves_data, selected_move, turn_color, starting_move_numb
             for_table=True
         )
         
-        # Truncate PV for table display
-        pv_display = pv_formatted[:80] + "..." if len(pv_formatted) > 80 else pv_formatted
+        # Limit PV to first 6 moves for readability
+        pv_moves = pv_formatted.split()[:6]
+        pv_display = " ".join(pv_moves)
+        if len(pv_formatted.split()) > 6:
+            pv_display += "..."
         
-        # Position impact summary
-        impact_summary = get_impact_summary(move_data.get('position_impact', {}))
+        # Clean impact summary
+        impact = get_impact_summary(move_data.get('position_impact', {}))
         
-        # Mark user's move with simple indicator
-        move_display = move_data.get('move', 'Unknown')
-        is_user_move = (move_display == selected_move)
+        # Clean tactics list
+        tactics = move_data.get('tactics', [])
+        tactics_display = ", ".join(tactics[:2]) if tactics else "None"
+        if len(tactics) > 2:
+            tactics_display += f" +{len(tactics)-2} more"
         
         table_data.append({
-            'Rank': rank_icon,
+            'Rank': rank_display,
             'Move': move_display,
-            'Score': f"{move_data.get('score', 0):+}",
-            'Classification': classification_display,
-            'Depth': move_data.get('depth', 0),
-            'CP Loss': move_data.get('centipawn_loss', 0),
-            'Position Impact': impact_summary,
-            'Tactics': ", ".join(move_data.get('tactics', [])) or "None",
-            'Principal Variation': pv_display
+            'Score': f"{score:+d}",  # Integer scores
+            'Quality': class_display,
+            'CP Loss': f"{cp_loss:.0f}",  # No decimals for CP loss
+            'Key Changes': impact,
+            'Tactics': tactics_display,
+            'Continuation': pv_display
         })
     
     return pd.DataFrame(table_data)
-
 
 # REPLACE the entire display_simple_train_page() function with this:
 def display_simple_train_page():
@@ -589,7 +634,22 @@ def display_simple_train_page():
         if top_moves:
             moves_df = create_moves_table(top_moves, selected_move, turn_color, move_number)
             st.dataframe(moves_df, use_container_width=True, hide_index=True)
-            
+
+            # Add legend for Key Changes
+            with st.expander("📖 Key Changes Legend", expanded=False):
+                st.markdown("""
+                **Understanding the Key Changes Icons:**
+                
+                - **♔ Material**: Change in material balance (positive = gaining material)
+                - **🎯 Center**: Change in center control (positive = better center control)  
+                - **🛡️ King Safety**: Impact on king safety (positive = safer king)
+                - **🚀 Development**: Effect on piece development (positive = better development)
+                - **📏 Space**: Change in space advantage (positive = more space)
+                - **⚡ Initiative**: Change in initiative/tempo (positive = gaining initiative)
+                
+                **Example:** `♔+2.0 🎯-1.0` means gaining 2 points of material but losing 1 point of center control.
+                """)
+
             # Position insights
             st.markdown("### 📊 Position Insights")
             col1, col2, col3 = st.columns(3)
@@ -1155,20 +1215,23 @@ def display_enhanced_insights_page():
         user_summary = {'total_attempts': 0, 'accuracy': 0, 'avg_time': 0.0}
     
     # Main insights tabs
-    insights_tab1, insights_tab2, insights_tab3, insights_tab4 = st.tabs([
-        "📊 Training Performance", "🎯 Tactical Analysis", "📈 Progress Trends", "🔮 AI Recommendations"
+    insights_tab1, insights_tab2, insights_tab3, insights_tab4, insights_tab5 = st.tabs([
+        "📊 Training Performance", "🎯 Enhanced Analytics", "🧩 Pattern Analysis", "📈 Learning Curve", "🔮 AI Recommendations"
     ])
     
     with insights_tab1:
         display_training_performance_insights(user_summary)
     
     with insights_tab2:
-        display_tactical_insights()
+        display_enhanced_analytics()
     
     with insights_tab3:
-        display_progress_trends(user_summary)
+        display_pattern_analysis()
     
     with insights_tab4:
+        display_learning_curve_analysis()
+    
+    with insights_tab5:
         display_ai_recommendations(user_summary)
 
 def display_training_performance_insights(user_summary):
@@ -2209,6 +2272,180 @@ def test_book_generator():
         except Exception as e:
             st.error(f"❌ Error: {e}")
             st.exception(e)
+
+
+
+def display_enhanced_analytics():
+    """Display enhanced analytics with proper error handling."""
+    st.markdown("### 🎯 Enhanced Position Analytics")
+    
+    try:
+        comprehensive_analysis = analysis.get_comprehensive_position_analysis(st.session_state.user_id)
+        
+        if comprehensive_analysis:
+            # Tactical Complexity Analysis
+            st.markdown("#### ⚔️ Tactical Complexity Performance")
+            tactical_data = comprehensive_analysis.get('tactical_complexity', {})
+            
+            if tactical_data and any(data.get('total', 0) > 0 for data in tactical_data.values()):
+                complexity_items = []
+                for complexity_level, stats in tactical_data.items():
+                    if stats.get('total', 0) > 0:
+                        complexity_items.append({
+                            'Level': complexity_level.replace('_', ' ').title(),
+                            'Accuracy': f"{stats.get('accuracy', 0):.1f}%",
+                            'Attempts': stats.get('total', 0),
+                            'Avg Time': f"{stats.get('avg_time', 0):.1f}s"
+                        })
+                
+                if complexity_items:
+                    st.dataframe(pd.DataFrame(complexity_items), use_container_width=True, hide_index=True)
+            else:
+                st.info("🎯 Complete more positions to see tactical complexity analysis!")
+            
+            # Educational Progress
+            st.markdown("#### 📚 Learning Progress")
+            educational_data = comprehensive_analysis.get('educational_insights', {})
+            
+            if educational_data:
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    high_value = educational_data.get('high_value_positions', 0)
+                    st.metric("🎯 High Value", high_value)
+                
+                with col2:
+                    medium_value = educational_data.get('medium_value_positions', 0)
+                    st.metric("📈 Medium Value", medium_value)
+                
+                with col3:
+                    learning_eff = educational_data.get('learning_efficiency', 0)
+                    st.metric("🧠 Learning Rate", f"{learning_eff:.1f}")
+                
+                with col4:
+                    concepts = educational_data.get('concept_mastery', {})
+                    mastered = sum(1 for score in concepts.values() if score > 80)
+                    st.metric("✅ Concepts Mastered", mastered)
+        else:
+            st.info("🚀 Enhanced analytics will appear as you complete more positions with the new data format!")
+            
+    except Exception as e:
+        st.error(f"Analytics temporarily unavailable: {str(e)}")
+        st.info("💡 This feature requires positions imported with the enhanced JSONL format.")
+
+
+def display_pattern_analysis():
+    """Display pattern recognition analysis with error handling."""
+    st.markdown("### 🧩 Pattern Recognition Analysis")
+    
+    try:
+        if hasattr(analysis, 'get_comprehensive_position_analysis'):
+            comprehensive_analysis = analysis.get_comprehensive_position_analysis(st.session_state.user_id)
+            
+            if comprehensive_analysis and 'pattern_recognition' in comprehensive_analysis:
+                pattern_data = comprehensive_analysis['pattern_recognition']
+                
+                if pattern_data and any(v.get('total', 0) > 0 for v in pattern_data.values()):
+                    pattern_df = pd.DataFrame([
+                        {
+                            'Pattern': k.replace('_', ' ').title(), 
+                            'Accuracy': round(v.get('accuracy', 0), 2), 
+                            'Attempts': v.get('total', 0)
+                        }
+                        for k, v in pattern_data.items() if v.get('total', 0) > 0
+                    ])
+                    
+                    if not pattern_df.empty:
+                        # Top patterns
+                        top_patterns = pattern_df.nlargest(5, 'Accuracy')
+                        fig = px.bar(top_patterns, x='Pattern', y='Accuracy',
+                                   title='Top 5 Pattern Recognition Strengths',
+                                   color='Accuracy', color_continuous_scale='Greens')
+                        fig.update_layout(xaxis_tickangle=-45, height=350)
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Weak patterns
+                        weak_patterns = pattern_df.nsmallest(3, 'Accuracy')
+                        if len(weak_patterns) > 0:
+                            st.markdown("#### 📈 Patterns Needing Improvement")
+                            for _, pattern in weak_patterns.iterrows():
+                                st.warning(f"**{pattern['Pattern']}**: {pattern['Accuracy']:.1f}% accuracy ({pattern['Attempts']} attempts)")
+                else:
+                    st.info("Pattern recognition data will appear as you complete more positions!")
+            else:
+                st.info("Pattern analysis will be available after completing more positions!")
+        else:
+            st.info("Pattern recognition analysis requires enhanced position data!")
+            
+    except Exception as e:
+        st.error(f"Error loading pattern analysis: {e}")
+
+def display_learning_curve_analysis():
+    """Display learning curve with error handling."""
+    st.markdown("### 📈 Learning Curve Analysis")
+    
+    try:
+        if hasattr(analysis, 'get_comprehensive_position_analysis'):
+            comprehensive_analysis = analysis.get_comprehensive_position_analysis(st.session_state.user_id)
+            
+            if comprehensive_analysis and 'learning_curve' in comprehensive_analysis:
+                learning_curve = comprehensive_analysis['learning_curve']
+                
+                if learning_curve and 'insufficient_data' not in learning_curve:
+                    progression_data = learning_curve.get('progression', [])
+                    
+                    if progression_data:
+                        progression_df = pd.DataFrame(progression_data)
+                        
+                        # Learning progression chart
+                        fig = make_subplots(specs=[[{"secondary_y": True}]])
+                        
+                        fig.add_trace(
+                            go.Scatter(x=progression_df['period'], y=progression_df['accuracy'],
+                                     mode='lines+markers', name='Accuracy %', 
+                                     line=dict(color='green', width=3),
+                                     marker=dict(size=8)),
+                            secondary_y=False,
+                        )
+                        
+                        fig.add_trace(
+                            go.Scatter(x=progression_df['period'], y=progression_df['avg_time'],
+                                     mode='lines+markers', name='Avg Time (s)', 
+                                     line=dict(color='blue', width=3),
+                                     marker=dict(size=8)),
+                            secondary_y=True,
+                        )
+                        
+                        fig.update_layout(title='Learning Progression Over Time', height=400)
+                        fig.update_xaxes(title_text="Training Period")
+                        fig.update_yaxes(title_text="Accuracy (%)", secondary_y=False)
+                        fig.update_yaxes(title_text="Average Time (seconds)", secondary_y=True)
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Improvement metrics
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            trend = learning_curve.get('trend', 'stable')
+                            trend_emoji = "📈" if trend == 'improving' else "📉" if trend == 'declining' else "➡️"
+                            st.metric("Overall Trend", f"{trend_emoji} {trend.title()}")
+                        with col2:
+                            improvement_rate = learning_curve.get('improvement_rate', 0)
+                            st.metric("Improvement Rate", f"{improvement_rate:+.1f}%")
+                        with col3:
+                            latest_accuracy = progression_df['accuracy'].iloc[-1]
+                            st.metric("Current Accuracy", f"{latest_accuracy:.1f}%")
+                    else:
+                        st.info("More position data needed for learning curve analysis!")
+                else:
+                    st.info("Complete at least 10 positions to see your learning curve!")
+            else:
+                st.info("Learning curve analysis requires more training data!")
+        else:
+            st.info("Advanced learning curve analysis coming soon!")
+            
+    except Exception as e:
+        st.error(f"Error loading learning curve: {e}")
 
 
 def main():
