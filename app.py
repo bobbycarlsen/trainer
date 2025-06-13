@@ -13,7 +13,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from plotly.subplots import make_subplots
 
 # Import our modules
@@ -30,7 +30,7 @@ import book_generator
 
 from utils import convert_to_piece_icons
 from spatial_analysis import calculate_comprehensive_spatial_metrics, create_control_board_visualization
-from spatial_analysis import display_detailed_metrics_table, generate_spatial_insights, display_detailed_single_metrics_table
+from spatial_analysis import generate_spatial_insights, display_detailed_metrics_table
 
 # Initialize the database if it doesn't exist
 database.init_db()
@@ -3373,85 +3373,6 @@ def display_space_control_html_in_streamlit(fen: str, flipped: bool = False):
         st.error(f"Space control visualization error: {e}")
         st.info("💡 Basic position analysis available")
 
-def display_enhanced_position_info(position):
-    """Enhanced position info display with KPIs."""
-    
-    # Title with enhanced info
-    st.markdown("### 🎯 Position Analysis")
-    
-    # KPI Row
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        position_id = position.get('id', 'Unknown')
-        st.metric("Position", f"#{position_id}")
-    
-    with col2:
-        move_num = position.get('fullmove_number', 1)
-        turn = position.get('turn', 'white').capitalize()
-        st.metric("Move", f"{move_num} ({turn})")
-    
-    with col3:
-        # ENHANCED: Show last move as KPI
-        last_move = position.get('last_move', '')
-        if not last_move:
-            # Fallback to first move in moves array
-            moves = position.get('moves', [])
-            last_move = moves[0].get('move', 'N/A') if moves else 'N/A'
-        st.metric("Last Move", last_move)
-    
-    with col4:
-        # ENHANCED: Show opening or complexity
-        opening = position.get('opening_name', '')
-        if opening:
-            st.metric("Opening", opening[:15] + "..." if len(opening) > 15 else opening)
-        else:
-            complexity = position.get('complexity_score', 0)
-            if complexity > 0:
-                st.metric("Complexity", f"{complexity:.1f}")
-            else:
-                st.metric("Difficulty", f"Level {position.get('difficulty_rating', 1)}")
-
-def display_basic_move_history(position):
-    """Basic move history display for immediate implementation."""
-    
-    move_history = position.get('move_history', [])
-    
-    if not move_history:
-        # Try to create basic history from moves
-        moves = position.get('moves', [])
-        if moves:
-            st.info(f"💡 Best moves available: {len(moves)} candidate moves")
-            
-            # Show top 3 moves
-            for i, move in enumerate(moves[:3], 1):
-                move_san = move.get('move', 'Unknown')
-                score = move.get('score', 0)
-                cp_loss = move.get('centipawn_loss', 0)
-                st.markdown(f"**{i}.** {move_san} (Score: {score}, CP Loss: {cp_loss:.1f})")
-        else:
-            st.info("💡 No move history available for this position")
-        return
-    
-    st.markdown("### 📖 Move History")
-    
-    # Simple move list display
-    if len(move_history) > 0:
-        st.markdown("**Moves that led to this position:**")
-        
-        move_text = []
-        for i, move_data in enumerate(move_history[-10:], 1):  # Show last 10 moves
-            if isinstance(move_data, dict):
-                san = move_data.get('san', move_data.get('move', f'Move{i}'))
-                player = move_data.get('player', 'white' if i % 2 == 1 else 'black')
-                move_text.append(f"{san} ({player[0].upper()})")
-            else:
-                move_text.append(str(move_data))
-        
-        st.markdown(" → ".join(move_text))
-        
-        if len(move_history) > 10:
-            st.caption(f"Showing last 10 of {len(move_history)} moves")
 
 def main():
     """Main application with enhanced mobile-friendly navigation."""

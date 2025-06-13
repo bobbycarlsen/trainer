@@ -1,5 +1,3 @@
-# Enhanced database.py - Add support for all JSONL fields
-
 import sqlite3
 import json
 from datetime import datetime
@@ -21,7 +19,6 @@ def get_db_connection():
 def init_db():
     """
     Initialize the database tables if they don't exist.
-    Updated to support all JSONL fields.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -37,7 +34,7 @@ def init_db():
     )
     ''')
     
-    # Enhanced Positions table - Store ALL JSONL fields
+    # Create Positions table - Store positions with their metadata
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS positions (
         id INTEGER PRIMARY KEY,
@@ -47,54 +44,9 @@ def init_db():
         timestamp TEXT,
         position_classification TEXT,
         metadata TEXT,
-        last_move TEXT,
-        move_history TEXT,
-        game_id TEXT,
-        game_metadata TEXT,
-        opening_name TEXT,
-        opening_eco TEXT,
-        evaluation TEXT,
-        position_themes TEXT,
-        tactical_motifs TEXT,
-        strategic_elements TEXT,
-        complexity_score REAL,
-        difficulty_rating INTEGER,
-        source_game TEXT,
-        position_annotations TEXT,
         UNIQUE(fen)
     )
     ''')
-    
-    # Add new columns to existing positions table if they don't exist
-    try:
-        # Check existing columns
-        cursor.execute("PRAGMA table_info(positions);")
-        existing_columns = [row[1] for row in cursor.fetchall()]
-        
-        new_columns = {
-            'last_move': 'TEXT',
-            'move_history': 'TEXT',
-            'game_id': 'TEXT', 
-            'game_metadata': 'TEXT',
-            'opening_name': 'TEXT',
-            'opening_eco': 'TEXT',
-            'evaluation': 'TEXT',
-            'position_themes': 'TEXT',
-            'tactical_motifs': 'TEXT',
-            'strategic_elements': 'TEXT',
-            'complexity_score': 'REAL',
-            'difficulty_rating': 'INTEGER',
-            'source_game': 'TEXT',
-            'position_annotations': 'TEXT'
-        }
-        
-        for column_name, column_type in new_columns.items():
-            if column_name not in existing_columns:
-                cursor.execute(f"ALTER TABLE positions ADD COLUMN {column_name} {column_type};")
-                print(f"✅ Added column: {column_name}")
-                
-    except Exception as e:
-        print(f"Note: Column addition info - {e}")
     
     # Create Moves table - Store moves for each position
     cursor.execute('''
@@ -139,16 +91,56 @@ def init_db():
         user_id INTEGER PRIMARY KEY,
         random_positions BOOLEAN DEFAULT TRUE,
         top_n_threshold INTEGER DEFAULT 3,
-        score_difference_threshold INTEGER DEFAULT 100,
-        theme TEXT DEFAULT 'light',
+        score_difference_threshold INTEGER DEFAULT 10,
+        theme TEXT DEFAULT 'default',
         FOREIGN KEY (user_id) REFERENCES users (id)
     )
     ''')
     
-    # Create Games table (for PGN imports)
+    # Enhanced analysis tracking table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS user_move_analysis (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        move_record_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        analysis_data TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (move_record_id) REFERENCES user_moves (id),
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+    ''')
+    
+    # User insights cache table for performance
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS user_insights_cache (
+        user_id INTEGER PRIMARY KEY,
+        insights_data TEXT NOT NULL,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+    ''')
+    
+    # Training sessions table for grouping moves
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS training_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        session_id TEXT NOT NULL,
+        start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        end_time TIMESTAMP,
+        total_moves INTEGER DEFAULT 0,
+        correct_moves INTEGER DEFAULT 0,
+        session_metadata TEXT,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+    ''')
+    
+    # Games table - Store complete chess games from PGNs
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS games (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pgn_source TEXT,
+        game_index INTEGER,
         white_player TEXT,
         black_player TEXT,
         white_elo INTEGER,
@@ -158,174 +150,239 @@ def init_db():
         event TEXT,
         site TEXT,
         round TEXT,
-        eco TEXT,
-        pgn_content TEXT,
-        pgn_source TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        opening TEXT,
+        eco_code TEXT,
+        time_control TEXT,
         total_moves INTEGER,
-        game_length_seconds REAL,
-        opening_moves TEXT,
-        metadata TEXT
+        pgn_text TEXT,
+        moves_data TEXT,
+        positions_data TEXT,
+        metadata TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     ''')
+    
+    # User game analysis table - Track user's game analysis progress
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS user_game_analysis (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        game_id INTEGER NOT NULL,
+        analysis_status TEXT DEFAULT 'not_started',
+        current_move_index INTEGER DEFAULT 0,
+        total_time_spent REAL DEFAULT 0,
+        moves_analyzed INTEGER DEFAULT 0,
+        correct_moves INTEGER DEFAULT 0,
+        notes TEXT,
+        analysis_data TEXT,
+        last_analyzed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id),
+        FOREIGN KEY (game_id) REFERENCES games (id),
+        UNIQUE(user_id, game_id)
+    )
+    ''')
+    
+    # Saved games table - Users can save games for later analysis
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS user_saved_games (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        game_id INTEGER NOT NULL,
+        saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        notes TEXT,
+        tags TEXT,
+        FOREIGN KEY (user_id) REFERENCES users (id),
+        FOREIGN KEY (game_id) REFERENCES games (id),
+        UNIQUE(user_id, game_id)
+    )
+    ''')
+    
+    # User game sessions - Track analysis sessions
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS user_game_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        session_type TEXT DEFAULT 'game_analysis',
+        start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        end_time TIMESTAMP,
+        games_analyzed INTEGER DEFAULT 0,
+        total_moves_analyzed INTEGER DEFAULT 0,
+        session_metadata TEXT,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+    ''')
+    
+    # Create indexes for better performance (separate statements)
+    index_statements = [
+        'CREATE INDEX IF NOT EXISTS idx_user_moves_user_id ON user_moves(user_id)',
+        'CREATE INDEX IF NOT EXISTS idx_user_moves_timestamp ON user_moves(timestamp)',
+        'CREATE INDEX IF NOT EXISTS idx_user_move_analysis_user_id ON user_move_analysis(user_id)',
+        'CREATE INDEX IF NOT EXISTS idx_positions_fullmove ON positions(fullmove_number)',
+        'CREATE INDEX IF NOT EXISTS idx_moves_position_rank ON moves(position_id, rank)',
+        'CREATE INDEX IF NOT EXISTS idx_games_white_player ON games(white_player)',
+        'CREATE INDEX IF NOT EXISTS idx_games_black_player ON games(black_player)',
+        'CREATE INDEX IF NOT EXISTS idx_games_date ON games(date)',
+        'CREATE INDEX IF NOT EXISTS idx_games_result ON games(result)',
+        'CREATE INDEX IF NOT EXISTS idx_games_opening ON games(opening)',
+        'CREATE INDEX IF NOT EXISTS idx_user_game_analysis_user_id ON user_game_analysis(user_id)',
+        'CREATE INDEX IF NOT EXISTS idx_user_game_analysis_status ON user_game_analysis(analysis_status)',
+        'CREATE INDEX IF NOT EXISTS idx_user_saved_games ON user_saved_games(user_id)',
+        'CREATE INDEX IF NOT EXISTS idx_games_players ON games(white_player, black_player)',
+        'CREATE INDEX IF NOT EXISTS idx_user_moves_result ON user_moves(user_id, result)',
+        'CREATE INDEX IF NOT EXISTS idx_user_moves_position ON user_moves(position_id)',
+        'CREATE INDEX IF NOT EXISTS idx_moves_score ON moves(position_id, score DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_positions_turn ON positions(turn)',
+        'CREATE INDEX IF NOT EXISTS idx_analysis_user_created ON user_move_analysis(user_id, created_at DESC)'
+    ]
+    
+    for index_sql in index_statements:
+        try:
+            cursor.execute(index_sql)
+        except sqlite3.Error as e:
+            print(f"Index creation warning: {e}")
     
     conn.commit()
     conn.close()
 
 def load_positions_from_jsonl(file_path):
     """
-    Enhanced function to load positions from JSONL file with ALL fields.
+    Load positions from JSONL file into the database with enhanced error handling and new schema support.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    loaded_count = 0
+    positions_loaded = 0
+    errors = 0
     
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            for line_num, line in enumerate(file, 1):
-                if not line.strip():
+    with open(file_path, 'r') as f:
+        for line_number, line in enumerate(f, 1):
+            try:
+                position_data = json.loads(line)
+                
+                # Extract main position data
+                position_id = position_data.get('id')
+                fen = position_data.get('fen')
+                turn = position_data.get('turn')
+                fullmove_number = position_data.get('fullmove_number')
+                timestamp = position_data.get('timestamp')
+                
+                # Validate required fields
+                if not all([position_id, fen, turn, fullmove_number]):
+                    errors += 1
+                    print(f"Line {line_number}: Missing required fields")
                     continue
+                
+                # Convert position_classification from list to string
+                position_classification = json.dumps(position_data.get('position_classification', []))
+                
+                # Enhanced metadata to include ALL new JSONL fields
+                metadata = {
+                    # Existing fields
+                    'material': position_data.get('material', {}),
+                    'mobility': position_data.get('mobility', {}),
+                    'king_safety': position_data.get('king_safety', {}),
+                    'pawn_structure': position_data.get('pawn_structure', {}),
+                    'center_control': position_data.get('center_control', {}),
+                    'piece_development': position_data.get('piece_development', {}),
+                    'castling_rights': position_data.get('castling_rights', {}),
+                    'opening_analysis': position_data.get('opening_analysis', {}),
+                    'endgame_analysis': position_data.get('endgame_analysis', {}),
+                    'tactical_motifs': position_data.get('tactical_motifs', []),
+                    'positional_themes': position_data.get('positional_themes', []),
+                    'complexity_score': round(position_data.get('complexity_score', 0), 2),
+                    'difficulty_rating': position_data.get('difficulty_rating', 'medium'),
                     
-                try:
-                    position = json.loads(line.strip())
+                    # NEW enhanced fields
+                    'comprehensive_analysis': position_data.get('comprehensive_analysis', {}),
+                    'variation_analysis': position_data.get('variation_analysis', {}),
+                    'learning_insights': position_data.get('learning_insights', {}),
+                    'visualization_data': position_data.get('visualization_data', {}),
+                    'position_evaluation': position_data.get('position_evaluation', {}),
+                    'strategic_themes': position_data.get('strategic_themes', []),
+                    'tactical_complexity': round(position_data.get('tactical_complexity', 0), 2),
+                    'positional_complexity': round(position_data.get('positional_complexity', 0), 2),
+                    'pattern_recognition': position_data.get('pattern_recognition', {}),
+                    'move_classification_context': position_data.get('move_classification_context', {}),
+                    'training_difficulty': position_data.get('training_difficulty', 'medium'),
+                    'educational_value': round(position_data.get('educational_value', 0), 2),
+                    'position_themes_detailed': position_data.get('position_themes_detailed', {}),
+                    'analysis_depth': position_data.get('analysis_depth', {}),
+                    'computational_metrics': position_data.get('computational_metrics', {}),
+                    'human_insights': position_data.get('human_insights', {}),
+                    'psychological_factors': position_data.get('psychological_factors', {}),
+                    'time_management_hints': position_data.get('time_management_hints', {}),
+                    'common_mistakes': position_data.get('common_mistakes', []),
+                    'improvement_suggestions': position_data.get('improvement_suggestions', [])
+                }
+                
+                # Insert position
+                cursor.execute('''
+                INSERT OR IGNORE INTO positions (id, fen, turn, fullmove_number, timestamp, position_classification, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (position_id, fen, turn, fullmove_number, timestamp, position_classification, json.dumps(metadata)))
+                
+                # Check if position was inserted (not ignored due to duplicate)
+                if cursor.rowcount > 0:
+                    positions_loaded += 1
+                
+                # Enhanced moves processing with new fields
+                top_moves = position_data.get('moves', position_data.get('top_moves', []))
+                for rank, move_data in enumerate(top_moves, 1):
+                    move = move_data.get('move')
+                    uci = move_data.get('uci')
+                    score = move_data.get('score')
+                    depth = move_data.get('depth')
+                    centipawn_loss = move_data.get('centipawn_loss', 0)
+                    classification = move_data.get('classification')
+                    pv = move_data.get('pv', move_data.get('principal_variation', ''))
+                    tactics = json.dumps(move_data.get('tactics', []))
                     
-                    # Extract all possible fields with safe defaults
-                    position_id = position.get('id')
-                    if not position_id:
-                        continue
+                    # Enhanced position impact with new analysis fields
+                    position_impact = move_data.get('position_impact', {})
+                    enhanced_position_impact = {
+                        **position_impact,
+                        'move_type': move_data.get('move_type', 'normal'),
+                        'piece_moved': move_data.get('piece_moved', ''),
+                        'square_from': move_data.get('square_from', ''),
+                        'square_to': move_data.get('square_to', ''),
+                        'is_capture': move_data.get('is_capture', False),
+                        'is_check': move_data.get('is_check', False),
+                        'is_checkmate': move_data.get('is_checkmate', False),
+                        'creates_threats': move_data.get('creates_threats', []),
+                        'defends_against': move_data.get('defends_against', []),
+                        # New enhanced fields
+                        'strategic_impact': move_data.get('strategic_impact', {}),
+                        'tactical_themes': move_data.get('tactical_themes', []),
+                        'learning_value': round(move_data.get('learning_value', 0), 2),
+                        'mistake_probability': round(move_data.get('mistake_probability', 0), 3),
+                        'pattern_complexity': round(move_data.get('pattern_complexity', 0), 2),
+                        'educational_annotations': move_data.get('educational_annotations', []),
+                        'conceptual_difficulty': move_data.get('conceptual_difficulty', 'medium')
+                    }
                     
-                    # Core position data
-                    fen = position.get('fen', '')
-                    turn = position.get('turn', 'white')
-                    fullmove_number = position.get('fullmove_number', 1)
-                    timestamp = position.get('timestamp', datetime.now().isoformat())
+                    position_impact_json = json.dumps(enhanced_position_impact)
                     
-                    # Classification and metadata (existing)
-                    position_classification = json.dumps(position.get('position_classification', []))
-                    metadata = json.dumps(position.get('metadata', {}))
-                    
-                    # NEW FIELDS - Extract all additional JSONL data
-                    last_move = position.get('last_move', '')
-                    move_history = json.dumps(position.get('move_history', []))
-                    game_id = position.get('game_id', '')
-                    game_metadata = json.dumps(position.get('game_metadata', {}))
-                    opening_name = position.get('opening_name', '')
-                    opening_eco = position.get('opening_eco', '')
-                    evaluation = json.dumps(position.get('evaluation', {}))
-                    position_themes = json.dumps(position.get('position_themes', []))
-                    tactical_motifs = json.dumps(position.get('tactical_motifs', []))
-                    strategic_elements = json.dumps(position.get('strategic_elements', []))
-                    complexity_score = round(float(position.get('complexity_score', 0.0)), 3)
-                    difficulty_rating = position.get('difficulty_rating', 1)
-                    source_game = position.get('source_game', '')
-                    position_annotations = json.dumps(position.get('position_annotations', {}))
-                    
-                    # Insert position with ALL fields
                     cursor.execute('''
-                        INSERT OR REPLACE INTO positions
-                        (id, fen, turn, fullmove_number, timestamp, position_classification, metadata,
-                         last_move, move_history, game_id, game_metadata, opening_name, opening_eco,
-                         evaluation, position_themes, tactical_motifs, strategic_elements,
-                         complexity_score, difficulty_rating, source_game, position_annotations)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        position_id, fen, turn, fullmove_number, timestamp,
-                        position_classification, metadata, last_move, move_history,
-                        game_id, game_metadata, opening_name, opening_eco,
-                        evaluation, position_themes, tactical_motifs, strategic_elements,
-                        complexity_score, difficulty_rating, source_game, position_annotations
-                    ))
-                    
-                    # Insert moves (existing logic)
-                    moves = position.get('moves', [])
-                    for rank, move_data in enumerate(moves, 1):
-                        cursor.execute('''
-                            INSERT OR REPLACE INTO moves
-                            (position_id, move, uci, score, depth, centipawn_loss, 
-                             classification, principal_variation, tactics, position_impact, rank)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (
-                            position_id,
-                            move_data.get('move', ''),
-                            move_data.get('uci', ''),
-                            move_data.get('score', 0),
-                            move_data.get('depth', 0),
-                            round(float(move_data.get('centipawn_loss', 0)), 2),
-                            move_data.get('classification', ''),
-                            move_data.get('principal_variation', ''),
-                            json.dumps(move_data.get('tactics', [])),
-                            json.dumps(move_data.get('position_impact', {})),
-                            rank
-                        ))
-                    
-                    loaded_count += 1
-                    
-                    if loaded_count % 100 == 0:
-                        print(f"Loaded {loaded_count} positions...")
-                        
-                except json.JSONDecodeError as e:
-                    print(f"JSON error on line {line_num}: {e}")
-                    continue
-                except Exception as e:
-                    print(f"Error processing line {line_num}: {e}")
-                    continue
-        
-        conn.commit()
-        print(f"✅ Successfully loaded {loaded_count} positions with enhanced metadata")
-        
-    except Exception as e:
-        print(f"❌ Error loading JSONL: {e}")
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+                    INSERT OR IGNORE INTO moves (position_id, move, uci, score, depth, centipawn_loss, classification, 
+                                                principal_variation, tactics, position_impact, rank)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (position_id, move, uci, score, depth, centipawn_loss, classification, pv, tactics, position_impact_json, rank))
+                
+            except json.JSONDecodeError as e:
+                errors += 1
+                print(f"Error decoding JSON at line {line_number}: {e}")
+                continue
+            except Exception as e:
+                errors += 1
+                print(f"Error processing position at line {line_number}: {e}")
+                continue
+                
+    conn.commit()
+    conn.close()
     
-    return loaded_count
-    
-def get_position_with_metadata(position_id):
-    """
-    Get position with all enhanced metadata fields.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute('''
-            SELECT * FROM positions WHERE id = ?
-        ''', (position_id,))
-        
-        position = cursor.fetchone()
-        
-        if position:
-            # Convert to dict and parse JSON fields
-            position_dict = dict(position)
-            
-            # Parse JSON fields safely
-            json_fields = [
-                'position_classification', 'metadata', 'move_history', 'game_metadata',
-                'evaluation', 'position_themes', 'tactical_motifs', 'strategic_elements',
-                'position_annotations'
-            ]
-            
-            for field in json_fields:
-                if position_dict.get(field):
-                    try:
-                        position_dict[field] = json.loads(position_dict[field])
-                    except:
-                        position_dict[field] = [] if field.endswith('_themes') or field.endswith('_motifs') or field.endswith('_elements') or field == 'position_classification' else {}
-                else:
-                    position_dict[field] = [] if field.endswith('_themes') or field.endswith('_motifs') or field.endswith('_elements') or field == 'position_classification' else {}
-            
-            return position_dict
-        
-        return None
-        
-    except Exception as e:
-        print(f"Error getting position metadata: {e}")
-        return None
-    finally:
-        conn.close()
+    print(f"Enhanced JSONL loading complete: {positions_loaded} positions loaded, {errors} errors encountered.")
+    return positions_loaded
 
 def store_pgn_games(games_data, pgn_source="uploaded"):
     """
@@ -1099,66 +1156,6 @@ def update_saved_game_notes(user_id: int, game_id: int, notes: str) -> bool:
         print(f"Error updating saved game notes: {e}")
         conn.close()
         return False
-
-def add_enhanced_columns_quick():
-    """Quick function to add essential enhanced columns."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    try:
-        # Add most important columns
-        essential_columns = [
-            'last_move TEXT',
-            'move_history TEXT', 
-            'opening_name TEXT',
-            'complexity_score REAL'
-        ]
-        
-        for column_def in essential_columns:
-            try:
-                column_name = column_def.split()[0]
-                cursor.execute(f"ALTER TABLE positions ADD COLUMN {column_def};")
-                print(f"✅ Added column: {column_name}")
-            except Exception as e:
-                if "duplicate column name" not in str(e).lower():
-                    print(f"⚠️ Column error: {e}")
-        
-        conn.commit()
-        print("✅ Essential columns added successfully")
-        
-    except Exception as e:
-        print(f"❌ Error adding columns: {e}")
-        conn.rollback()
-    finally:
-        conn.close()
-
-def populate_last_move_quick():
-    """Quick function to populate last_move field."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute('''
-            UPDATE positions 
-            SET last_move = (
-                SELECT move 
-                FROM moves 
-                WHERE moves.position_id = positions.id 
-                ORDER BY rank ASC 
-                LIMIT 1
-            )
-            WHERE last_move IS NULL OR last_move = ''
-        ''')
-        
-        affected = cursor.rowcount
-        conn.commit()
-        print(f"✅ Updated {affected} positions with last_move")
-        
-    except Exception as e:
-        print(f"❌ Error populating last_move: {e}")
-        conn.rollback()
-    finally:
-        conn.close()
 
 if __name__ == "__main__":
     # Initialize the database with enhanced tables
