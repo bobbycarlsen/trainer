@@ -1,13 +1,28 @@
 """
-Spatial analysis module for chess positions.
-Handles polygon generation, connectivity analysis, and spatial metrics.
+Enhanced spatial analysis module for chess positions.
+Handles polygon generation, connectivity analysis, spatial metrics, and visual control board.
 """
 import chess
 import numpy as np
 import json
+import streamlit as st
 from typing import List, Dict, Any, Tuple, Set, Optional
 from scipy.spatial import ConvexHull
 from collections import deque
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
+import pandas as pd
+
+# Piece values for material calculation
+PIECE_VALUES = {
+    chess.PAWN: 1,
+    chess.KNIGHT: 3,
+    chess.BISHOP: 3,
+    chess.ROOK: 5,
+    chess.QUEEN: 9,
+    chess.KING: 0  # King has no material value
+}
 
 def get_piece_positions(board: chess.Board, color: chess.Color) -> List[Tuple[int, int]]:
     """
@@ -31,151 +46,42 @@ def get_piece_positions(board: chess.Board, color: chess.Color) -> List[Tuple[in
     
     return positions
 
-def calculate_convex_hull(positions: List[Tuple[int, int]]) -> List[Tuple[float, float]]:
+def calculate_material_balance(board: chess.Board) -> Dict[str, Any]:
     """
-    Calculate convex hull for piece positions.
+    Calculate material balance and piece counts.
     
     Args:
-        positions: List of (file, rank) positions
+        board: Chess board object
         
     Returns:
-        List of hull vertices as (x, y) coordinates
+        Dictionary with material metrics
     """
-    if len(positions) < 3:
-        # For less than 3 points, return expanded positions
-        expanded_positions = []
-        for pos in positions:
-            x, y = pos
-            # Add small offsets to create a minimal polygon
-            expanded_positions.extend([
-                (x - 0.4, y - 0.4),
-                (x + 0.4, y - 0.4),
-                (x + 0.4, y + 0.4),
-                (x - 0.4, y + 0.4)
-            ])
-        
-        if len(expanded_positions) < 3:
-            return [(0, 0), (1, 0), (0, 1)]  # Default triangle
-        
-        points = np.array(expanded_positions)
-    else:
-        # Add small random offsets to avoid collinear points
-        points = np.array(positions) + np.random.normal(0, 0.01, (len(positions), 2))
+    white_material = 0
+    black_material = 0
+    white_pieces = {piece_type: 0 for piece_type in PIECE_VALUES.keys()}
+    black_pieces = {piece_type: 0 for piece_type in PIECE_VALUES.keys()}
     
-    try:
-        hull = ConvexHull(points)
-        hull_points = points[hull.vertices]
-        return [(float(p[0]), float(p[1])) for p in hull_points]
-    except Exception:
-        # Fallback for degenerate cases
-        if len(positions) >= 2:
-            # Create a simple rectangle around the points
-            xs = [p[0] for p in positions]
-            ys = [p[1] for p in positions]
-            min_x, max_x = min(xs) - 0.5, max(xs) + 0.5
-            min_y, max_y = min(ys) - 0.5, max(ys) + 0.5
-            return [(min_x, min_y), (max_x, min_y), (max_x, max_y), (min_x, max_y)]
-        else:
-            return [(0, 0), (1, 0), (0, 1)]
-
-def calculate_polygon_area(vertices: List[Tuple[float, float]]) -> float:
-    """
-    Calculate polygon area using the shoelace formula.
+    for square in chess.SQUARES:
+        piece = board.piece_at(square)
+        if piece:
+            value = PIECE_VALUES[piece.piece_type]
+            if piece.color == chess.WHITE:
+                white_material += value
+                white_pieces[piece.piece_type] += 1
+            else:
+                black_material += value
+                black_pieces[piece.piece_type] += 1
     
-    Args:
-        vertices: List of (x, y) coordinates
-        
-    Returns:
-        Area of the polygon
-    """
-    if len(vertices) < 3:
-        return 0.0
+    material_diff = white_material - black_material
     
-    n = len(vertices)
-    area = 0.0
-    
-    for i in range(n):
-        j = (i + 1) % n
-        area += vertices[i][0] * vertices[j][1]
-        area -= vertices[j][0] * vertices[i][1]
-    
-    return abs(area) / 2.0
-
-def calculate_centroid(vertices: List[Tuple[float, float]]) -> Tuple[float, float]:
-    """
-    Calculate the centroid of a polygon.
-    
-    Args:
-        vertices: List of (x, y) coordinates
-        
-    Returns:
-        (x, y) coordinates of centroid
-    """
-    if not vertices:
-        return (0.0, 0.0)
-    
-    n = len(vertices)
-    cx = sum(v[0] for v in vertices) / n
-    cy = sum(v[1] for v in vertices) / n
-    
-    return (cx, cy)
-
-def find_connected_components(positions: List[Tuple[int, int]]) -> List[List[Tuple[int, int]]]:
-    """
-    Find connected components of pieces using adjacency.
-    
-    Args:
-        positions: List of piece positions
-        
-    Returns:
-        List of connected components (each is a list of positions)
-    """
-    if not positions:
-        return []
-    
-    # Create adjacency graph
-    pos_set = set(positions)
-    visited = set()
-    components = []
-    
-    def get_neighbors(pos: Tuple[int, int]) -> List[Tuple[int, int]]:
-        """Get adjacent positions (including diagonals)."""
-        x, y = pos
-        neighbors = []
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                if dx == 0 and dy == 0:
-                    continue
-                nx, ny = x + dx, y + dy
-                if 0 <= nx <= 7 and 0 <= ny <= 7 and (nx, ny) in pos_set:
-                    neighbors.append((nx, ny))
-        return neighbors
-    
-    def bfs(start_pos: Tuple[int, int]) -> List[Tuple[int, int]]:
-        """Breadth-first search to find connected component."""
-        component = []
-        queue = deque([start_pos])
-        visited.add(start_pos)
-        
-        while queue:
-            pos = queue.popleft()
-            component.append(pos)
-            
-            for neighbor in get_neighbors(pos):
-                if neighbor not in visited:
-                    visited.add(neighbor)
-                    queue.append(neighbor)
-        
-        return component
-    
-    # Find all connected components
-    for pos in positions:
-        if pos not in visited:
-            component = bfs(pos)
-            if component:
-                components.append(component)
-    
-    return components
+    return {
+        'white_material': white_material,
+        'black_material': black_material,
+        'material_difference': material_diff,
+        'white_pieces': white_pieces,
+        'black_pieces': black_pieces,
+        'material_advantage': 'white' if material_diff > 0 else 'black' if material_diff < 0 else 'equal'
+    }
 
 def get_controlled_squares(board: chess.Board, color: chess.Color) -> List[Tuple[int, int]]:
     """
@@ -198,6 +104,110 @@ def get_controlled_squares(board: chess.Board, color: chess.Color) -> List[Tuple
     
     return list(controlled_squares)
 
+def calculate_space_control_matrix(board: chess.Board) -> Dict[str, List[List[int]]]:
+    """
+    Calculate control matrix for visualization showing which side controls each square.
+    
+    Args:
+        board: Chess board object
+        
+    Returns:
+        Dictionary with control matrices and summary
+    """
+    control_matrix = [[0 for _ in range(8)] for _ in range(8)]  # 0=neutral, 1=white, -1=black, 2=contested
+    white_control_count = [[0 for _ in range(8)] for _ in range(8)]
+    black_control_count = [[0 for _ in range(8)] for _ in range(8)]
+    
+    for square in chess.SQUARES:
+        file = chess.square_file(square)
+        rank = chess.square_rank(square)
+        
+        white_attackers = len(board.attackers(chess.WHITE, square))
+        black_attackers = len(board.attackers(chess.BLACK, square))
+        
+        white_control_count[rank][file] = white_attackers
+        black_control_count[rank][file] = black_attackers
+        
+        if white_attackers > black_attackers:
+            control_matrix[rank][file] = 1  # White control
+        elif black_attackers > white_attackers:
+            control_matrix[rank][file] = -1  # Black control
+        elif white_attackers > 0 and black_attackers > 0:
+            control_matrix[rank][file] = 2  # Contested
+        else:
+            control_matrix[rank][file] = 0  # Neutral
+    
+    # Calculate summary statistics
+    white_controlled = sum(row.count(1) for row in control_matrix)
+    black_controlled = sum(row.count(-1) for row in control_matrix)
+    contested = sum(row.count(2) for row in control_matrix)
+    neutral = sum(row.count(0) for row in control_matrix)
+    
+    return {
+        'control_matrix': control_matrix,
+        'white_control_count': white_control_count,
+        'black_control_count': black_control_count,
+        'summary': {
+            'white_controlled': white_controlled,
+            'black_controlled': black_controlled,
+            'contested': contested,
+            'neutral': neutral,
+            'total_controlled_white': white_controlled + contested / 2,
+            'total_controlled_black': black_controlled + contested / 2
+        }
+    }
+
+def calculate_center_control(board: chess.Board) -> Dict[str, Any]:
+    """
+    Calculate center control metrics for both extended and core center.
+    
+    Args:
+        board: Chess board object
+        
+    Returns:
+        Dictionary with center control metrics
+    """
+    # Core center squares (e4, e5, d4, d5)
+    core_center = [(3, 3), (3, 4), (4, 3), (4, 4)]  # d4, d5, e4, e5
+    
+    # Extended center (c3-f6 area)
+    extended_center = []
+    for file in range(2, 6):  # c-f files
+        for rank in range(2, 6):  # 3-6 ranks
+            extended_center.append((file, rank))
+    
+    white_core_control = 0
+    black_core_control = 0
+    white_extended_control = 0
+    black_extended_control = 0
+    
+    for square in chess.SQUARES:
+        file = chess.square_file(square)
+        rank = chess.square_rank(square)
+        pos = (file, rank)
+        
+        white_attacks = len(board.attackers(chess.WHITE, square))
+        black_attacks = len(board.attackers(chess.BLACK, square))
+        
+        if pos in core_center:
+            white_core_control += white_attacks
+            black_core_control += black_attacks
+        
+        if pos in extended_center:
+            white_extended_control += white_attacks
+            black_extended_control += black_attacks
+    
+    return {
+        'white_core_control': white_core_control,
+        'black_core_control': black_core_control,
+        'white_extended_control': white_extended_control,
+        'black_extended_control': black_extended_control,
+        'core_control_difference': white_core_control - black_core_control,
+        'extended_control_difference': white_extended_control - black_extended_control,
+        'core_control_ratio': round(white_core_control / max(black_core_control, 1), 2),
+        'extended_control_ratio': round(white_extended_control / max(black_extended_control, 1), 2)
+    }
+
 def calculate_convex_hull_from_controlled_squares(controlled_squares: List[Tuple[int, int]]) -> List[Tuple[float, float]]:
     """
     Calculate convex hull for controlled square centers.
@@ -209,25 +219,19 @@ def calculate_convex_hull_from_controlled_squares(controlled_squares: List[Tuple
         List of hull vertices as (x, y) coordinates (square centers)
     """
     if len(controlled_squares) < 3:
-        # For less than 3 squares, create a minimal polygon around them
         if len(controlled_squares) == 0:
-            return [(0, 0), (1, 0), (0, 1)]  # Default triangle
+            return [(0, 0), (1, 0), (0, 1)]
         elif len(controlled_squares) == 1:
             x, y = controlled_squares[0]
-            # Create small square around the single controlled square
             return [(x, y), (x+1, y), (x+1, y+1), (x, y+1)]
-        else:  # 2 squares
-            # Create rectangle encompassing both squares
+        else:
             xs = [s[0] for s in controlled_squares]
             ys = [s[1] for s in controlled_squares]
             min_x, max_x = min(xs), max(xs)
             min_y, max_y = min(ys), max(ys)
             return [(min_x, min_y), (max_x+1, min_y), (max_x+1, max_y+1), (min_x, max_y+1)]
     
-    # Convert to square centers (add 0.5 to get center of each square)
     square_centers = [(s[0] + 0.5, s[1] + 0.5) for s in controlled_squares]
-    
-    # Add small random offsets to avoid collinear points
     points = np.array(square_centers) + np.random.normal(0, 0.01, (len(square_centers), 2))
     
     try:
@@ -235,29 +239,115 @@ def calculate_convex_hull_from_controlled_squares(controlled_squares: List[Tuple
         hull_points = points[hull.vertices]
         return [(float(p[0]), float(p[1])) for p in hull_points]
     except Exception:
-        # Fallback for degenerate cases
         xs = [s[0] for s in controlled_squares]
         ys = [s[1] for s in controlled_squares]
         min_x, max_x = min(xs), max(xs)
         min_y, max_y = min(ys), max(ys)
         return [(min_x, min_y), (max_x+1, min_y), (max_x+1, max_y+1), (min_x, max_y+1)]
 
-def calculate_spatial_metrics(board: chess.Board) -> Dict[str, Any]:
+def calculate_polygon_area(vertices: List[Tuple[float, float]]) -> float:
+    """Calculate polygon area using the shoelace formula."""
+    if len(vertices) < 3:
+        return 0.0
+    
+    n = len(vertices)
+    area = 0.0
+    
+    for i in range(n):
+        j = (i + 1) % n
+        area += vertices[i][0] * vertices[j][1]
+        area -= vertices[j][0] * vertices[i][1]
+    
+    return round(abs(area) / 2.0, 2)
+
+def calculate_centroid(vertices: List[Tuple[float, float]]) -> Tuple[float, float]:
+    """Calculate the centroid of a polygon."""
+    if not vertices:
+        return (0.0, 0.0)
+    
+    n = len(vertices)
+    cx = sum(v[0] for v in vertices) / n
+    cy = sum(v[1] for v in vertices) / n
+    
+    return (round(cx, 2), round(cy, 2))
+
+def find_connected_components(positions: List[Tuple[int, int]]) -> List[List[Tuple[int, int]]]:
+    """Find connected components of pieces using adjacency."""
+    if not positions:
+        return []
+    
+    pos_set = set(positions)
+    visited = set()
+    components = []
+    
+    def get_neighbors(pos: Tuple[int, int]) -> List[Tuple[int, int]]:
+        x, y = pos
+        neighbors = []
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0:
+                    continue
+                nx, ny = x + dx, y + dy
+                if 0 <= nx <= 7 and 0 <= ny <= 7 and (nx, ny) in pos_set:
+                    neighbors.append((nx, ny))
+        return neighbors
+    
+    def bfs(start_pos: Tuple[int, int]) -> List[Tuple[int, int]]:
+        component = []
+        queue = deque([start_pos])
+        visited.add(start_pos)
+        
+        while queue:
+            pos = queue.popleft()
+            component.append(pos)
+            
+            for neighbor in get_neighbors(pos):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append(neighbor)
+        
+        return component
+    
+    for pos in positions:
+        if pos not in visited:
+            component = bfs(pos)
+            if component:
+                components.append(component)
+    
+    return components
+
+def calculate_comprehensive_spatial_metrics(board: chess.Board) -> Dict[str, Any]:
     """
-    Calculate comprehensive spatial metrics for both colors.
+    Calculate comprehensive spatial metrics for both colors including all enhancements.
     
     Args:
         board: Chess board object
         
     Returns:
-        Dictionary with spatial analysis data
+        Dictionary with comprehensive spatial analysis data
     """
     metrics = {
         'white': {},
         'black': {},
-        'comparison': {}
+        'comparison': {},
+        'material_balance': {},
+        'center_control': {},
+        'space_control': {}
     }
     
+    # Material balance
+    material_metrics = calculate_material_balance(board)
+    metrics['material_balance'] = material_metrics
+    
+    # Center control
+    center_metrics = calculate_center_control(board)
+    metrics['center_control'] = center_metrics
+    
+    # Space control matrix
+    space_control = calculate_space_control_matrix(board)
+    metrics['space_control'] = space_control
+    
+    # Calculate metrics for each color
     for color in [chess.WHITE, chess.BLACK]:
         color_name = 'white' if color == chess.WHITE else 'black'
         positions = get_piece_positions(board, color)
@@ -273,7 +363,6 @@ def calculate_spatial_metrics(board: chess.Board) -> Dict[str, Any]:
                 'connected_components': [],
                 'connectivity_score': 0.0,
                 'piece_count': 0,
-                'center_control': 0.0,
                 'squares_controlled': 0
             }
             continue
@@ -285,18 +374,7 @@ def calculate_spatial_metrics(board: chess.Board) -> Dict[str, Any]:
         components = find_connected_components(positions)
         
         # Connectivity score (higher = more connected)
-        connectivity_score = len(positions) / len(components) if components else 0.0
-        
-        # Center control (count pieces in center 4x4 square)
-        center_squares = [(2, 2), (2, 3), (2, 4), (2, 5), 
-                         (3, 2), (3, 3), (3, 4), (3, 5),
-                         (4, 2), (4, 3), (4, 4), (4, 5),
-                         (5, 2), (5, 3), (5, 4), (5, 5)]
-        center_control = sum(1 for pos in positions if pos in center_squares)
-        center_control_ratio = center_control / len(positions) if positions else 0.0
-        
-        # Count controlled center squares
-        controlled_center_squares = sum(1 for sq in controlled_squares if sq in center_squares)
+        connectivity_score = round(len(positions) / len(components) if components else 0.0, 2)
         
         metrics[color_name] = {
             'positions': positions,
@@ -307,10 +385,7 @@ def calculate_spatial_metrics(board: chess.Board) -> Dict[str, Any]:
             'connected_components': components,
             'connectivity_score': connectivity_score,
             'piece_count': len(positions),
-            'center_control': center_control,
-            'center_control_ratio': center_control_ratio,
-            'squares_controlled': len(controlled_squares),
-            'controlled_center_squares': controlled_center_squares
+            'squares_controlled': len(controlled_squares)
         }
     
     # Comparison metrics
@@ -318,174 +393,423 @@ def calculate_spatial_metrics(board: chess.Board) -> Dict[str, Any]:
     black_metrics = metrics['black']
     
     metrics['comparison'] = {
-        'area_ratio': white_metrics['area'] / black_metrics['area'] if black_metrics['area'] > 0 else float('inf'),
-        'connectivity_diff': white_metrics['connectivity_score'] - black_metrics['connectivity_score'],
-        'center_control_diff': white_metrics['center_control'] - black_metrics['center_control'],
+        'area_ratio': round(white_metrics['area'] / max(black_metrics['area'], 0.1), 2),
+        'connectivity_diff': round(white_metrics['connectivity_score'] - black_metrics['connectivity_score'], 2),
         'piece_count_diff': white_metrics['piece_count'] - black_metrics['piece_count'],
-        'squares_controlled_diff': white_metrics['squares_controlled'] - black_metrics['squares_controlled']
+        'squares_controlled_diff': white_metrics['squares_controlled'] - black_metrics['squares_controlled'],
+        'space_control_advantage': round(space_control['summary']['total_controlled_white'] - space_control['summary']['total_controlled_black'], 1)
     }
     
     return metrics
 
-def generate_polygon_svg_path(vertices: List[Tuple[float, float]], board_size: int = 800) -> str:
+def generate_spatial_insights(metrics: Dict[str, Any], previous_metrics: Optional[Dict[str, Any]] = None) -> List[Dict[str, str]]:
     """
-    Generate SVG path string for polygon overlay.
+    Generate enhanced spatial insights with move highlighting.
     
     Args:
-        vertices: List of polygon vertices
-        board_size: Size of the chess board in pixels
+        metrics: Current spatial metrics
+        previous_metrics: Previous move metrics for comparison
         
     Returns:
-        SVG path string
-    """
-    if len(vertices) < 3:
-        return ""
-    
-    square_size = board_size / 8
-    
-    # Convert chess coordinates to SVG coordinates
-    svg_points = []
-    for x, y in vertices:
-        svg_x = (x + 0.5) * square_size
-        svg_y = (7.5 - y) * square_size  # Flip Y coordinate
-        svg_points.append((svg_x, svg_y))
-    
-    # Create SVG path
-    if not svg_points:
-        return ""
-    
-    path = f"M {svg_points[0][0]} {svg_points[0][1]}"
-    for x, y in svg_points[1:]:
-        path += f" L {x} {y}"
-    path += " Z"
-    
-    return path
-
-def analyze_position_evolution(positions: List[str]) -> List[Dict[str, Any]]:
-    """
-    Analyze how spatial metrics evolve through a sequence of positions.
-    
-    Args:
-        positions: List of FEN strings
-        
-    Returns:
-        List of spatial metrics for each position
-    """
-    evolution = []
-    
-    for i, fen in enumerate(positions):
-        try:
-            board = chess.Board(fen)
-            metrics = calculate_spatial_metrics(board)
-            metrics['move_number'] = i
-            metrics['fen'] = fen
-            evolution.append(metrics)
-        except Exception as e:
-            # Skip invalid positions
-            continue
-    
-    return evolution
-
-def get_spatial_insights(metrics: Dict[str, Any]) -> List[str]:
-    """
-    Generate textual insights from spatial metrics.
-    
-    Args:
-        metrics: Spatial metrics dictionary
-        
-    Returns:
-        List of insight strings
+        List of insight dictionaries with type and message
     """
     insights = []
     
     white = metrics['white']
     black = metrics['black']
     comparison = metrics['comparison']
+    material = metrics['material_balance']
+    center = metrics['center_control']
+    space = metrics['space_control']
     
-    # Area insights
-    if comparison['area_ratio'] > 1.5:
-        insights.append("White controls significantly more board space")
-    elif comparison['area_ratio'] < 0.67:
-        insights.append("Black controls significantly more board space")
-    else:
-        insights.append("Both sides have similar spatial control")
+    # Material insights
+    if material['material_difference'] > 3:
+        insights.append({
+            'type': 'material_advantage',
+            'message': f"White has a significant material advantage (+{material['material_difference']})",
+            'severity': 'high'
+        })
+    elif material['material_difference'] < -3:
+        insights.append({
+            'type': 'material_advantage',
+            'message': f"Black has a significant material advantage (+{abs(material['material_difference'])})",
+            'severity': 'high'
+        })
     
-    # Squares controlled insights
-    if comparison['squares_controlled_diff'] > 10:
-        insights.append(f"White controls {comparison['squares_controlled_diff']} more squares")
-    elif comparison['squares_controlled_diff'] < -10:
-        insights.append(f"Black controls {abs(comparison['squares_controlled_diff'])} more squares")
+    # Space control insights
+    if comparison['space_control_advantage'] > 10:
+        insights.append({
+            'type': 'space_control',
+            'message': f"White dominates space control (+{comparison['space_control_advantage']:.1f} squares)",
+            'severity': 'medium'
+        })
+    elif comparison['space_control_advantage'] < -10:
+        insights.append({
+            'type': 'space_control',
+            'message': f"Black dominates space control (+{abs(comparison['space_control_advantage']):.1f} squares)",
+            'severity': 'medium'
+        })
+    
+    # Center control insights
+    if center['core_control_difference'] > 3:
+        insights.append({
+            'type': 'center_control',
+            'message': f"White has strong central control (+{center['core_control_difference']} core attacks)",
+            'severity': 'medium'
+        })
+    elif center['core_control_difference'] < -3:
+        insights.append({
+            'type': 'center_control',
+            'message': f"Black has strong central control (+{abs(center['core_control_difference'])} core attacks)",
+            'severity': 'medium'
+        })
     
     # Connectivity insights
-    if white['connectivity_score'] > black['connectivity_score'] + 1:
-        insights.append("White's pieces are better connected")
-    elif black['connectivity_score'] > white['connectivity_score'] + 1:
-        insights.append("Black's pieces are better connected")
+    if comparison['connectivity_diff'] > 1:
+        insights.append({
+            'type': 'connectivity',
+            'message': f"White's pieces are better coordinated (connectivity +{comparison['connectivity_diff']})",
+            'severity': 'low'
+        })
+    elif comparison['connectivity_diff'] < -1:
+        insights.append({
+            'type': 'connectivity',
+            'message': f"Black's pieces are better coordinated (connectivity +{abs(comparison['connectivity_diff'])})",
+            'severity': 'low'
+        })
     
-    # Component insights
+    # Piece activity insights
     white_components = len(white['connected_components'])
     black_components = len(black['connected_components'])
     
-    if white_components > 2:
-        insights.append(f"White's pieces are split into {white_components} groups")
-    if black_components > 2:
-        insights.append(f"Black's pieces are split into {black_components} groups")
+    if white_components > 3:
+        insights.append({
+            'type': 'piece_coordination',
+            'message': f"White's pieces are scattered in {white_components} groups",
+            'severity': 'medium'
+        })
     
-    # Center control insights
-    if comparison['center_control_diff'] > 2:
-        insights.append("White has strong central control")
-    elif comparison['center_control_diff'] < -2:
-        insights.append("Black has strong central control")
+    if black_components > 3:
+        insights.append({
+            'type': 'piece_coordination',
+            'message': f"Black's pieces are scattered in {black_components} groups",
+            'severity': 'medium'
+        })
     
-    # Controlled center squares
-    white_center_controlled = white.get('controlled_center_squares', 0)
-    black_center_controlled = black.get('controlled_center_squares', 0)
-    
-    if white_center_controlled > black_center_controlled + 3:
-        insights.append("White dominates the center squares")
-    elif black_center_controlled > white_center_controlled + 3:
-        insights.append("Black dominates the center squares")
-    
-    # Centroid insights
-    white_centroid = white['centroid']
-    black_centroid = black['centroid']
-    
-    if white_centroid[1] > 5:
-        insights.append("White's forces are advanced")
-    elif white_centroid[1] < 2:
-        insights.append("White's pieces are on the back rank")
-    
-    if black_centroid[1] < 2:
-        insights.append("Black's forces are advanced")
-    elif black_centroid[1] > 5:
-        insights.append("Black's pieces are on the back rank")
+    # Movement insights (if previous metrics available)
+    if previous_metrics:
+        prev_space_advantage = previous_metrics.get('comparison', {}).get('space_control_advantage', 0)
+        current_space_advantage = comparison['space_control_advantage']
+        space_change = current_space_advantage - prev_space_advantage
+        
+        if abs(space_change) > 5:
+            color = "White" if space_change > 0 else "Black"
+            insights.append({
+                'type': 'major_move',
+                'message': f"🔥 MAJOR MOVE: {color} gained {abs(space_change):.1f} squares of space control!",
+                'severity': 'critical'
+            })
     
     return insights
 
-def calculate_space_control_heatmap(board: chess.Board) -> Dict[str, List[List[float]]]:
+def create_control_board_visualization(metrics: Dict[str, Any], flipped: bool = False) -> go.Figure:
     """
-    Calculate a heatmap of space control for visualization.
+    Create a visual representation of the control board.
     
     Args:
-        board: Chess board object
+        metrics: Spatial metrics dictionary
+        flipped: Whether to flip the board display
         
     Returns:
-        Dictionary with 8x8 heatmaps for white and black control
+        Plotly figure showing control board
     """
-    heatmap = {
-        'white': [[0.0 for _ in range(8)] for _ in range(8)],
-        'black': [[0.0 for _ in range(8)] for _ in range(8)]
-    }
+    control_matrix = metrics['space_control']['control_matrix']
     
-    for square in chess.SQUARES:
-        file = chess.square_file(square)
-        rank = chess.square_rank(square)
-        
-        # Count attackers for each square
-        white_attackers = len(board.attackers(chess.WHITE, square))
-        black_attackers = len(board.attackers(chess.BLACK, square))
-        
-        heatmap['white'][rank][file] = float(white_attackers)
-        heatmap['black'][rank][file] = float(black_attackers)
+    # Create color mapping
+    colors = []
+    text = []
+    for rank in range(8):
+        color_row = []
+        text_row = []
+        for file in range(8):
+            # Handle flipping logic
+            if flipped:
+                display_rank = rank
+                display_file = 7 - file
+            else:
+                display_rank = 7 - rank  # Normal display (flip rank for proper chess board view)
+                display_file = file
+            
+            control = control_matrix[display_rank][display_file]
+            if control == 1:  # White control
+                color_row.append(0.8)
+                text_row.append("W")
+            elif control == -1:  # Black control
+                color_row.append(-0.8)
+                text_row.append("B")
+            elif control == 2:  # Contested
+                color_row.append(0)
+                text_row.append("⚡")
+            else:  # Neutral
+                color_row.append(0.1)
+                text_row.append("")
+        colors.append(color_row)
+        text.append(text_row)
     
-    return heatmap
+    fig = go.Figure(data=go.Heatmap(
+        z=colors,
+        text=text,
+        texttemplate="%{text}",
+        textfont={"size": 16, "color": "black"},
+        colorscale=[
+            [0, '#8B4513'],      # Brown for black control
+            [0.4, '#D2691E'],    # Light brown
+            [0.45, '#F5F5DC'],   # Beige for neutral
+            [0.55, '#F5F5DC'],   # Beige for neutral
+            [0.6, '#E6E6FA'],    # Light blue
+            [1, '#4169E1']       # Blue for white control
+        ],
+        showscale=False,
+        hovertemplate="File: %{x}<br>Rank: %{y}<br>Control: %{text}<extra></extra>"
+    ))
+    
+    # Add board styling
+    if flipped:
+        file_labels = ['h', 'g', 'f', 'e', 'd', 'c', 'b', 'a']
+        rank_labels = ['8', '7', '6', '5', '4', '3', '2', '1']
+    else:
+        file_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+        rank_labels = ['1', '2', '3', '4', '5', '6', '7', '8']
+    
+    fig.update_layout(
+        title="Space Control Board",
+        xaxis=dict(
+            tickmode='array',
+            tickvals=list(range(8)),
+            ticktext=file_labels,
+            side='bottom'
+        ),
+        yaxis=dict(
+            tickmode='array',
+            tickvals=list(range(8)),
+            ticktext=rank_labels,
+            autorange='reversed'
+        ),
+        width=400,
+        height=400,
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+    
+    return fig
+
+def create_metrics_table(metrics: Dict[str, Any]) -> pd.DataFrame:
+    """
+    Create a comprehensive metrics table for display.
+    
+    Args:
+        metrics: Spatial metrics dictionary
+        
+    Returns:
+        Pandas DataFrame with formatted metrics
+    """
+    data = []
+    
+    # Material metrics
+    material = metrics['material_balance']
+    material_diff = material['material_difference']
+    data.append({
+        'Metric': 'Material Points',
+        'White': int(material['white_material']),
+        'Black': int(material['black_material']),
+        'Difference': f"+{material_diff}" if material_diff >= 0 else str(material_diff)
+    })
+    
+    # Space control
+    space = metrics['space_control']['summary']
+    space_diff = space['total_controlled_white'] - space['total_controlled_black']
+    data.append({
+        'Metric': 'Squares Controlled',
+        'White': round(space['total_controlled_white'], 1),
+        'Black': round(space['total_controlled_black'], 1),
+        'Difference': f"+{space_diff:.1f}" if space_diff >= 0 else f"{space_diff:.1f}"
+    })
+    
+    # Center control
+    center = metrics['center_control']
+    center_diff = center['core_control_difference']
+    data.append({
+        'Metric': 'Core Center Control',
+        'White': int(center['white_core_control']),
+        'Black': int(center['black_core_control']),
+        'Difference': f"+{center_diff}" if center_diff >= 0 else str(center_diff)
+    })
+    
+    extended_diff = center['extended_control_difference']
+    data.append({
+        'Metric': 'Extended Center Control',
+        'White': int(center['white_extended_control']),
+        'Black': int(center['black_extended_control']),
+        'Difference': f"+{extended_diff}" if extended_diff >= 0 else str(extended_diff)
+    })
+    
+    # Connectivity
+    white_conn = metrics['white']['connectivity_score']
+    black_conn = metrics['black']['connectivity_score']
+    conn_diff = white_conn - black_conn
+    data.append({
+        'Metric': 'Piece Connectivity',
+        'White': round(white_conn, 2),
+        'Black': round(black_conn, 2),
+        'Difference': f"+{conn_diff:.2f}" if conn_diff >= 0 else f"{conn_diff:.2f}"
+    })
+    
+    # Area control
+    white_area = metrics['white']['area']
+    black_area = metrics['black']['area']
+    area_diff = white_area - black_area
+    data.append({
+        'Metric': 'Controlled Area',
+        'White': round(white_area, 2),
+        'Black': round(black_area, 2),
+        'Difference': f"+{area_diff:.2f}" if area_diff >= 0 else f"{area_diff:.2f}"
+    })
+    
+    return pd.DataFrame(data)
+
+def display_enhanced_spatial_analysis(current_fen: str, previous_fen: Optional[str] = None, flipped: bool = False):
+    """
+    Display enhanced spatial analysis with control board and comprehensive metrics.
+    
+    Args:
+        current_fen: Current position FEN
+        previous_fen: Previous position FEN for move comparison
+        flipped: Whether to display boards flipped by default
+    """
+    try:
+        board = chess.Board(current_fen)
+        metrics = calculate_comprehensive_spatial_metrics(board)
+        
+        # Calculate previous metrics if available
+        previous_metrics = None
+        if previous_fen:
+            try:
+                prev_board = chess.Board(previous_fen)
+                previous_metrics = calculate_comprehensive_spatial_metrics(prev_board)
+            except:
+                pass
+        
+        # Add flip board control
+        flip_col1, flip_col2 = st.columns([1, 3])
+        
+        with flip_col1:
+            board_flipped = st.checkbox("🔄 Flip Boards", value=flipped, key=f"flip_boards_{current_fen[:10]}")
+        
+        # Create two columns for boards
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### 🏁 Game Position")
+            # Original chess board would be displayed here
+            # Using the existing chess_board module
+            try:
+                import chess_board
+                chess_board.display_chess_board(
+                    fen=current_fen,
+                    theme='default',
+                    highlight_best_move=False,
+                    board_size=400,
+                    show_coordinates=True,
+                    interactive=False,
+                    flipped=board_flipped
+                )
+            except:
+                st.code(f"FEN: {current_fen}")
+        
+        with col2:
+            st.markdown("### 🎯 Space Control Board")
+            control_fig = create_control_board_visualization(metrics, flipped=board_flipped)
+            st.plotly_chart(control_fig, use_container_width=True)
+            
+            # Control legend
+            st.markdown("""
+            **Legend:**
+            - 🔵 Blue: White Control
+            - 🟤 Brown: Black Control  
+            - ⚡ Contested Squares
+            - ⚪ Neutral Squares
+            """)
+        
+        # Insights section with highlighting
+        insights = generate_spatial_insights(metrics, previous_metrics)
+        if insights:
+            st.markdown("### 💡 Position Insights")
+            
+            for insight in insights:
+                if insight['severity'] == 'critical':
+                    st.error(f"🔥 {insight['message']}")
+                elif insight['severity'] == 'high':
+                    st.warning(f"⚠️ {insight['message']}")
+                elif insight['severity'] == 'medium':
+                    st.info(f"📊 {insight['message']}")
+                else:
+                    st.success(f"✅ {insight['message']}")
+        
+        # Comprehensive metrics table
+        st.markdown("### 📈 Detailed Metrics")
+        metrics_df = create_metrics_table(metrics)
+        
+        # Style the dataframe
+        def highlight_advantage(val):
+            if isinstance(val, str) and val.startswith('+'):
+                return 'background-color: lightgreen'
+            elif isinstance(val, str) and val.startswith('-'):
+                return 'background-color: lightcoral'
+            return ''
+        
+        styled_df = metrics_df.style.applymap(highlight_advantage, subset=['Difference'])
+        st.dataframe(styled_df, use_container_width=True)
+        
+        # Additional visualizations
+        st.markdown("### 📊 Position Evolution")
+        
+        # Create summary metrics visualization
+        summary_col1, summary_col2, summary_col3 = st.columns(3)
+        
+        with summary_col1:
+            st.metric(
+                "Material Balance",
+                f"{metrics['material_balance']['white_material']} - {metrics['material_balance']['black_material']}",
+                f"{metrics['material_balance']['material_difference']:+d}"
+            )
+        
+        with summary_col2:
+            space_diff = metrics['comparison']['space_control_advantage']
+            st.metric(
+                "Space Control",
+                f"{metrics['space_control']['summary']['total_controlled_white']:.1f} - {metrics['space_control']['summary']['total_controlled_black']:.1f}",
+                f"{space_diff:+.1f}"
+            )
+        
+        with summary_col3:
+            center_diff = metrics['center_control']['core_control_difference']
+            st.metric(
+                "Center Control",
+                f"{metrics['center_control']['white_core_control']} - {metrics['center_control']['black_core_control']}",
+                f"{center_diff:+d}"
+            )
+        
+        return metrics
+        
+    except Exception as e:
+        st.error(f"Error in spatial analysis: {e}")
+        return None
+
+# Legacy function compatibility
+def calculate_spatial_metrics(board: chess.Board) -> Dict[str, Any]:
+    """Legacy compatibility function."""
+    return calculate_comprehensive_spatial_metrics(board)
+
+def get_spatial_insights(metrics: Dict[str, Any]) -> List[str]:
+    """Legacy compatibility function."""
+    insights = generate_spatial_insights(metrics)
+    return [insight['message'] for insight in insights]

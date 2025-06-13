@@ -515,25 +515,7 @@ def generate_solution_html(position_data: Dict[str, Any], timestamp: str = None)
         <h3 style="text-align: center; margin-bottom: 10px;">📊 Position Comparison</h3>
         {comparison_data}
     </div>
-    
-    <div style="margin: 20px 0;">
-        <h3 style="text-align: center; margin-bottom: 10px;">📊 Top 5 Candidate Moves</h3>
-        <table class="moves-table">
-            <thead>
-                <tr>
-                    <th>Rank</th>
-                    <th>Move</th>
-                    <th>Score</th>
-                    <th>Quality</th>
-                    <th>CP Loss</th>
-                    <th>Continuation</th>
-                </tr>
-            </thead>
-            <tbody>
-                {moves_rows}
-            </tbody>
-        </table>
-    </div>
+
 </body>
 </html>
 """
@@ -939,24 +921,13 @@ def generate_moves_table_html(moves: List[Dict[str, Any]], move_number: int, tur
         centipawn_loss = move_data.get('centipawn_loss', 0)
         
         # Format principal variation with proper PGN notation
-        pv_raw = move_data.get('principal_variation', '')
-        if pv_raw:
-            pv_moves = pv_raw.split()
-            pv_formatted = ""
+        pv_formatted = move_data.get('principal_variation', '')
+        if pv_formatted:
             current_move = move_number
             is_white_move = (turn.lower() == 'white')
-            
-            for j, pv_move in enumerate(pv_moves[:8]):  # Limit for readability
-                if is_white_move:
-                    pv_formatted += f"{current_move}.{pv_move} "
-                    is_white_move = False
-                else:
-                    pv_formatted += f"{current_move}...{pv_move} "
-                    is_white_move = True
-                    current_move += 1
-            
-            if len(pv_moves) > 8:
-                pv_formatted += "..."
+            if not is_white_move:
+                pv_formatted = str(current_move) + " ... " + pv_formatted
+
         else:
             pv_formatted = "No continuation available"
         

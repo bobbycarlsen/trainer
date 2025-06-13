@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -27,6 +28,9 @@ import spatial_analysis
 
 # Add this import at the top of app.py with the other imports:
 import book_generator
+
+# type check
+from typing import Any, Dict, List
 
 # Initialize the database if it doesn't exist
 database.init_db()
@@ -243,7 +247,7 @@ st.markdown("""
 def init_session_state():
     """Initialize all session state variables."""
     # sample position to load by default
-    current_position = {'id': 980, 'fen': '8/5pkp/4n1p1/R5P1/4P2P/1r6/6K1/8 w - - 1 41', 'turn': 'white', 'fullmove_number': 41, 'position_classification': ['middlegame', 'open', 'positional'], 'metadata': {'material': {'white_total': 8, 'black_total': 11, 'white_pawns': 3, 'black_pawns': 3, 'white_knights': 0, 'black_knights': 1, 'white_bishops': 0, 'black_bishops': 0, 'white_rooks': 1, 'black_rooks': 1, 'white_queens': 0, 'black_queens': 0, 'imbalance': -3}, 'mobility': {'white_total': 17, 'black_total': 0, 'white_avg': 8.5, 'black_avg': 0.0}, 'king_safety': {'white': {'attack_count': 3, 'defender_count': 8, 'pawn_shield': 0, 'open_files': 0}, 'black': {'attack_count': 2, 'defender_count': 12, 'pawn_shield': 1, 'open_files': 0}}, 'pawn_structure': {'open_files': 4, 'half_open_files': 2, 'white_pawn_islands': 2, 'black_pawn_islands': 1, 'white_passed_pawns': 0, 'black_passed_pawns': 0, 'white_isolated_pawns': 1, 'black_isolated_pawns': 0, 'white_doubled_pawns': 0, 'black_doubled_pawns': 0, 'pawn_chains': 2}, 'center_control': {'white': 4, 'black': 1}, 'piece_development': {'white': 1, 'black': 2.5}, 'castling_rights': {'white_kingside': False, 'white_queenside': False, 'black_kingside': False, 'black_queenside': False}, 'opening_analysis': {}, 'endgame_analysis': {}, 'tactical_motifs': [], 'positional_themes': [], 'complexity_score': 0, 'difficulty_rating': 'medium'}, 'moves': [{'id': 34238, 'move': 'e5', 'uci': 'e4e5', 'score': -546, 'depth': 20, 'centipawn_loss': 0, 'classification': 'great', 'principal_variation': 'e5 Rc3 Ra1 Re3 Ra4 Rxe5 Kf3 Rf5+ Ke3 Rb5 Rc4 Re5+ Kd3 h6 gxh6+ Kh7 Ra4', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': -1, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 1}, {'id': 34239, 'move': 'Ra4', 'uci': 'a5a4', 'score': -547, 'depth': 20, 'centipawn_loss': 1, 'classification': 'good', 'principal_variation': 'Ra4 Re3 Rc4 Rd3 Rc1 Nf4+ Kf2 Rh3 Rc4 Ne6 e5 Rd3 Rc6 Rd4 Kg3 Re4 Ra6 Rxe5 Kf3 Rb5', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': 0, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 2}, {'id': 34240, 'move': 'Ra6', 'uci': 'a5a6', 'score': -570, 'depth': 20, 'centipawn_loss': 24, 'classification': 'good', 'principal_variation': 'Ra6 Nc5 Rd6 Nxe4 Rd5 Ra3 Rd8 Nc5 Rd5 Ne6 Rd1 Re3 Rb1 Re4 Rh1 Rd4 Kg3 Rb4 Rh2 Nd4', 'tactics': ['hanging_piece'], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': -2, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 3}, {'id': 34241, 'move': 'Ra1', 'uci': 'a5a1', 'score': -570, 'depth': 20, 'centipawn_loss': 24, 'classification': 'good', 'principal_variation': 'Ra1 Re3 e5 Rxe5 Kf3 Rf5+ Kg3 Rf4 Rh1 Ra4 Kg2 Rd4 Kg3 Re4 Kf3 Rc4 Kg3 Rb4 Rh2 Ra4', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 3, 'center_control_change': -2, 'development_impact': -1, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 4}, {'id': 34242, 'move': 'Ra8', 'uci': 'a5a8', 'score': -570, 'depth': 20, 'centipawn_loss': 24, 'classification': 'good', 'principal_variation': 'Ra8 Re3 Ra4 Nc5 Ra5 Nxe4 Rd5 Ra3 Rd8 Nc5 Rd1 Ne6 Rf1 Re3 Rh1 Re4 Kg3 Rb4 Rh2 Nd4', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': -2, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 5}, {'id': 34243, 'move': 'Ra7', 'uci': 'a5a7', 'score': -574, 'depth': 20, 'centipawn_loss': 28, 'classification': 'inaccuracy', 'principal_variation': 'Ra7 Re3 Ra4 Nc5 Ra5 Nxe4 Rd5 Ra3 Rd8 Nc5 Rd1 Ne6 Rf1 Ra5 Rb1 Ra2+ Kg3 Ra4 Rh1 Nd4', 'tactics': ['pin'], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': -2, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 6}, {'id': 34244, 'move': 'Ra2', 'uci': 'a5a2', 'score': -592, 'depth': 20, 'centipawn_loss': 46, 'classification': 'inaccuracy', 'principal_variation': 'Ra2 Nf4+ Kf2 Nd3+ Kg2 Rb2+ Rxb2 Nxb2 Kf3 Nd3 Ke3 Nc5 Kd4 Ne6+ Ke5 Kf8 Kd5 Ke7 Kc6 f6', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 2, 'center_control_change': -2, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 7}, {'id': 34245, 'move': 'Kf2', 'uci': 'g2f2', 'score': -627, 'depth': 20, 'centipawn_loss': 81, 'classification': 'mistake', 'principal_variation': 'Kf2 Rh3 Re5 Rxh4 Kg3 Rh5 Kg4 Rh1 Kg3 Rg1+ Kh4 Rc1 Kg3 Rc3+ Kg4 Rc4 Kf3 Rc5 Rd5 Nxg5+', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': 0, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 8}, {'id': 34246, 'move': 'h5', 'uci': 'h4h5', 'score': -627, 'depth': 20, 'centipawn_loss': 81, 'classification': 'mistake', 'principal_variation': 'h5 gxh5 e5 Kg6 Ra4 Rb5 Re4 Nxg5 Rh4 Rxe5 Rc4 Re4 Rc6+ Ne6 Rc2 Kg5', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': 0, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 9}, {'id': 34247, 'move': 'Kh2', 'uci': 'g2h2', 'score': -629, 'depth': 20, 'centipawn_loss': 83, 'classification': 'mistake', 'principal_variation': 'Kh2 Nf4 Kg1 Rh3 Kf2 Ne6 Re5 Rxh4 Kg3 Rh5 Kg4 Rh1 Kg3 Rg1+ Kh4 Rc1 Kg3 Rc3+ Kf2', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': -2, 'center_control_change': 0, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 10}]}
+    current_position = {'id': 1, 'fen': 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 'turn': 'white', 'fullmove_number': 1, 'position_classification': ['opening', 'positional', 'defensive'], 'metadata': {'material': {'white_total': 8, 'black_total': 11, 'white_pawns': 3, 'black_pawns': 3, 'white_knights': 0, 'black_knights': 1, 'white_bishops': 0, 'black_bishops': 0, 'white_rooks': 1, 'black_rooks': 1, 'white_queens': 0, 'black_queens': 0, 'imbalance': -3}, 'mobility': {'white_total': 17, 'black_total': 0, 'white_avg': 8.5, 'black_avg': 0.0}, 'king_safety': {'white': {'attack_count': 3, 'defender_count': 8, 'pawn_shield': 0, 'open_files': 0}, 'black': {'attack_count': 2, 'defender_count': 12, 'pawn_shield': 1, 'open_files': 0}}, 'pawn_structure': {'open_files': 4, 'half_open_files': 2, 'white_pawn_islands': 2, 'black_pawn_islands': 1, 'white_passed_pawns': 0, 'black_passed_pawns': 0, 'white_isolated_pawns': 1, 'black_isolated_pawns': 0, 'white_doubled_pawns': 0, 'black_doubled_pawns': 0, 'pawn_chains': 2}, 'center_control': {'white': 4, 'black': 1}, 'piece_development': {'white': 1, 'black': 2.5}, 'castling_rights': {'white_kingside': False, 'white_queenside': False, 'black_kingside': False, 'black_queenside': False}, 'opening_analysis': {}, 'endgame_analysis': {}, 'tactical_motifs': [], 'positional_themes': [], 'complexity_score': 0, 'difficulty_rating': 'medium'}, 'moves': [{'id': 34238, 'move': 'e5', 'uci': 'e4e5', 'score': -546, 'depth': 20, 'centipawn_loss': 0, 'classification': 'great', 'principal_variation': 'e5 Rc3 Ra1 Re3 Ra4 Rxe5 Kf3 Rf5+ Ke3 Rb5 Rc4 Re5+ Kd3 h6 gxh6+ Kh7 Ra4', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': -1, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 1}, {'id': 34239, 'move': 'Ra4', 'uci': 'a5a4', 'score': -547, 'depth': 20, 'centipawn_loss': 1, 'classification': 'good', 'principal_variation': 'Ra4 Re3 Rc4 Rd3 Rc1 Nf4+ Kf2 Rh3 Rc4 Ne6 e5 Rd3 Rc6 Rd4 Kg3 Re4 Ra6 Rxe5 Kf3 Rb5', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': 0, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 2}, {'id': 34240, 'move': 'Ra6', 'uci': 'a5a6', 'score': -570, 'depth': 20, 'centipawn_loss': 24, 'classification': 'good', 'principal_variation': 'Ra6 Nc5 Rd6 Nxe4 Rd5 Ra3 Rd8 Nc5 Rd5 Ne6 Rd1 Re3 Rb1 Re4 Rh1 Rd4 Kg3 Rb4 Rh2 Nd4', 'tactics': ['hanging_piece'], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': -2, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 3}, {'id': 34241, 'move': 'Ra1', 'uci': 'a5a1', 'score': -570, 'depth': 20, 'centipawn_loss': 24, 'classification': 'good', 'principal_variation': 'Ra1 Re3 e5 Rxe5 Kf3 Rf5+ Kg3 Rf4 Rh1 Ra4 Kg2 Rd4 Kg3 Re4 Kf3 Rc4 Kg3 Rb4 Rh2 Ra4', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 3, 'center_control_change': -2, 'development_impact': -1, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 4}, {'id': 34242, 'move': 'Ra8', 'uci': 'a5a8', 'score': -570, 'depth': 20, 'centipawn_loss': 24, 'classification': 'good', 'principal_variation': 'Ra8 Re3 Ra4 Nc5 Ra5 Nxe4 Rd5 Ra3 Rd8 Nc5 Rd1 Ne6 Rf1 Re3 Rh1 Re4 Kg3 Rb4 Rh2 Nd4', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': -2, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 5}, {'id': 34243, 'move': 'Ra7', 'uci': 'a5a7', 'score': -574, 'depth': 20, 'centipawn_loss': 28, 'classification': 'inaccuracy', 'principal_variation': 'Ra7 Re3 Ra4 Nc5 Ra5 Nxe4 Rd5 Ra3 Rd8 Nc5 Rd1 Ne6 Rf1 Ra5 Rb1 Ra2+ Kg3 Ra4 Rh1 Nd4', 'tactics': ['pin'], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': -2, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 6}, {'id': 34244, 'move': 'Ra2', 'uci': 'a5a2', 'score': -592, 'depth': 20, 'centipawn_loss': 46, 'classification': 'inaccuracy', 'principal_variation': 'Ra2 Nf4+ Kf2 Nd3+ Kg2 Rb2+ Rxb2 Nxb2 Kf3 Nd3 Ke3 Nc5 Kd4 Ne6+ Ke5 Kf8 Kd5 Ke7 Kc6 f6', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 2, 'center_control_change': -2, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 7}, {'id': 34245, 'move': 'Kf2', 'uci': 'g2f2', 'score': -627, 'depth': 20, 'centipawn_loss': 81, 'classification': 'mistake', 'principal_variation': 'Kf2 Rh3 Re5 Rxh4 Kg3 Rh5 Kg4 Rh1 Kg3 Rg1+ Kh4 Rc1 Kg3 Rc3+ Kg4 Rc4 Kf3 Rc5 Rd5 Nxg5+', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': 0, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 8}, {'id': 34246, 'move': 'h5', 'uci': 'h4h5', 'score': -627, 'depth': 20, 'centipawn_loss': 81, 'classification': 'mistake', 'principal_variation': 'h5 gxh5 e5 Kg6 Ra4 Rb5 Re4 Nxg5 Rh4 Rxe5 Rc4 Re4 Rc6+ Ne6 Rc2 Kg5', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': 0, 'center_control_change': 0, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 9}, {'id': 34247, 'move': 'Kh2', 'uci': 'g2h2', 'score': -629, 'depth': 20, 'centipawn_loss': 83, 'classification': 'mistake', 'principal_variation': 'Kh2 Nf4 Kg1 Rh3 Kf2 Ne6 Re5 Rxh4 Kg3 Rh5 Kg4 Rh1 Kg3 Rg1+ Kh4 Rc1 Kg3 Rc3+ Kf2', 'tactics': [], 'position_impact': {'material_change': 0, 'king_safety_impact': -2, 'center_control_change': 0, 'development_impact': 0, 'move_type': 'normal', 'piece_moved': '', 'square_from': '', 'square_to': '', 'is_capture': False, 'is_check': False, 'is_checkmate': False, 'creates_threats': [], 'defends_against': []}, 'rank': 10}]}
     defaults = {
         'user_id': None,
         'current_position': current_position,
@@ -359,44 +363,14 @@ def format_principal_variation(pv_string, turn_color, starting_move_number=1, fo
     """Format principal variation with correct PGN numbering and piece icons."""
     if not pv_string:
         return ""
-    
-    moves = pv_string.split()
-    formatted_moves = []
     current_move_num = starting_move_number
     is_white_turn = (turn_color.lower() == 'white')
     
-    for i, move in enumerate(moves):
-        piece_icon = get_piece_icon(move)
-        
-        # Enhanced piece icons with colors
-        if for_table:
-            # PGN-style formatting for table display
-            if is_white_turn:
-                move_display = f"{current_move_num}.{piece_icon}{move}"
-                is_white_turn = False
-            else:
-                move_display = f"{current_move_num}...{piece_icon}{move}"
-                is_white_turn = True
-                current_move_num += 1
-        else:
-            # Enhanced HTML formatting with proper PGN numbering and colors
-            if is_white_turn:
-                move_display = f"""<span style='color: #2E7D32; font-weight: 600; background: #E8F5E8; 
-                            padding: 3px 6px; border-radius: 4px; margin: 0 2px; font-size: 0.95em;
-                            border: 1px solid #4CAF50;'>
-                    {current_move_num}.{piece_icon}{move}</span>"""
-                is_white_turn = False
-            else:
-                move_display = f"""<span style='color: #1565C0; font-weight: 600; background: #E3F2FD; 
-                            padding: 3px 6px; border-radius: 4px; margin: 0 2px; font-size: 0.95em;
-                            border: 1px solid #2196F3;'>
-                    {current_move_num}...{piece_icon}{move}</span>"""
-                is_white_turn = True
-                current_move_num += 1
-            
-        formatted_moves.append(move_display)
-    
-    return " ".join(formatted_moves)
+    if not is_white_turn:
+        pv_string = str(current_move_num) + " ... " + pv_string
+
+    return pv_string
+
 
 def get_impact_summary(position_impact):
     """Create a clean, concise summary of position impact."""
@@ -466,9 +440,9 @@ def create_moves_table(moves_data, selected_move, turn_color, starting_move_numb
         )
         
         # Limit PV to first 6 moves for readability
-        pv_moves = pv_formatted.split()[:6]
+        pv_moves = pv_formatted.split()[:16]
         pv_display = " ".join(pv_moves)
-        if len(pv_formatted.split()) > 6:
+        if len(pv_formatted.split()) > 16:
             pv_display += "..."
         
         # Clean impact summary
@@ -476,9 +450,7 @@ def create_moves_table(moves_data, selected_move, turn_color, starting_move_numb
         
         # Clean tactics list
         tactics = move_data.get('tactics', [])
-        tactics_display = ", ".join(tactics[:2]) if tactics else "None"
-        if len(tactics) > 2:
-            tactics_display += f" +{len(tactics)-2} more"
+        tactics_display = ", ".join(tactics) if tactics else "None"
         
         table_data.append({
             'Rank': rank_display,
@@ -679,34 +651,16 @@ def display_simple_train_page():
                 avg_score = sum(m.get('score', 0) for m in top_moves) / len(top_moves)
                 st.metric("Avg Top 10 Score", f"{avg_score:+.1f}", "")
 
-        # Add spatial analysis section after move analysis
-        if st.checkbox("🗺️ Show Spatial Analysis", key="training_spatial"):
-            try:
-                import spatial_analysis
-                import chess
-                
-                board = chess.Board(position['fen'])
-                spatial_metrics = spatial_analysis.calculate_spatial_metrics(board)
-                insights = spatial_analysis.get_spatial_insights(spatial_metrics)
-                
-                st.markdown("#### 🔍 Position Spatial Analysis")
-                
-                for insight in insights:
-                    st.info(f"💡 {insight}")
-                
-                # Quick spatial comparison
-                white_area = spatial_metrics['white']['area']
-                black_area = spatial_metrics['black']['area']
-                
-                spatial_col1, spatial_col2 = st.columns(2)
-                with spatial_col1:
-                    st.metric("⚪ White Area Control", f"{white_area:.1f}")
-                with spatial_col2:
-                    st.metric("⚫ Black Area Control", f"{black_area:.1f}")
-                    
-            except Exception as e:
-                st.error(f"Spatial analysis error: {e}")
+        # Add spatial analysis toggle with flip option
+        if st.checkbox("🗺️ Show Spatial Analysis", key=f"spatial_training_{position.get('id', 'unknown')}"):
+            flip_training = st.checkbox("🔄 Flip Board", key=f"flip_training_{position.get('id', 'unknown')}")
+            display_position_spatial_analysis(
+                position['fen'], 
+                show_control_board=True, 
+                flipped=flip_training
+            )
 
+            
         # Book Generation Section
         st.markdown("### 📚 Generate Educational Materials")
 
@@ -2247,20 +2201,88 @@ def get_position_detailed_history(user_id, position_id):
         print(f"Error getting position history: {e}")
         return []
 
-def display_advanced_analysis_page():
-    """Display advanced analysis page with spatial analysis."""
-    st.title("🔬 Advanced Analysis")
+
+# Integration helper for other modules
+def get_position_spatial_summary(fen: str) -> Dict[str, Any]:
+    """
+    Get a quick spatial summary for a position (for use in other modules).
     
-    # Keep existing spatial analysis functionality
-    display_spatial_analysis()
+    Args:
+        fen: Position FEN string
+        
+    Returns:
+        Dictionary with key spatial metrics
+    """
+    try:
+        import spatial_analysis
+        import chess
+        
+        board = chess.Board(fen)
+        metrics = spatial_analysis.calculate_comprehensive_spatial_metrics(board)
+        
+        # Return simplified summary
+        return {
+            'material_balance': metrics['material_balance']['material_difference'],
+            'space_control_advantage': metrics['comparison']['space_control_advantage'],
+            'center_control_advantage': metrics['center_control']['core_control_difference'],
+            'connectivity_advantage': metrics['comparison']['connectivity_diff'],
+            'major_insights': [
+                insight['message'] for insight in 
+                spatial_analysis.generate_spatial_insights(metrics)
+                if insight['severity'] in ['critical', 'high']
+            ]
+        }
+    except Exception as e:
+        return {'error': str(e)}
+
 
 def display_spatial_analysis():
-    """Display complete spatial analysis functionality."""
-    st.markdown("## 🗺️ Spatial Analysis")
+    """Display enhanced spatial analysis functionality with dual board view."""
+    st.markdown("## 🗺️ Enhanced Spatial Analysis")
+    
+    # Initialize session state for spatial analysis - ENSURE this runs first
+    if 'spatial_settings' not in st.session_state:
+        st.session_state.spatial_settings = {
+            'show_metrics': True,
+            'show_insights': True,
+            'show_control_board': True,
+            'highlight_moves': True,
+            'flip_boards': False
+        }
+    
+    # Ensure all required keys exist (backward compatibility)
+    required_keys = ['show_metrics', 'show_insights', 'show_control_board', 'highlight_moves', 'flip_boards']
+    for key in required_keys:
+        if key not in st.session_state.spatial_settings:
+            st.session_state.spatial_settings[key] = True if key != 'flip_boards' else False
     
     # Sidebar controls
     with st.sidebar:
         st.markdown("### 🎮 Spatial Controls")
+        
+        # Settings toggles
+        st.session_state.spatial_settings['show_control_board'] = st.checkbox(
+            "🎯 Show Control Board", 
+            value=st.session_state.spatial_settings['show_control_board']
+        )
+        st.session_state.spatial_settings['show_metrics'] = st.checkbox(
+            "📊 Show Detailed Metrics", 
+            value=st.session_state.spatial_settings['show_metrics']
+        )
+        st.session_state.spatial_settings['show_insights'] = st.checkbox(
+            "💡 Show Position Insights", 
+            value=st.session_state.spatial_settings['show_insights']
+        )
+        st.session_state.spatial_settings['highlight_moves'] = st.checkbox(
+            "🔥 Highlight Major Moves", 
+            value=st.session_state.spatial_settings['highlight_moves']
+        )
+        st.session_state.spatial_settings['flip_boards'] = st.checkbox(
+            "🔄 Flip Boards by Default", 
+            value=st.session_state.spatial_settings['flip_boards']
+        )
+        
+        st.markdown("---")
         
         # Upload PGN file
         uploaded_file = st.file_uploader("📁 Upload PGN File", type=['pgn'], key="spatial_pgn")
@@ -2294,154 +2316,275 @@ def display_spatial_analysis():
             else:
                 st.error(f"❌ {message}")
         
-        # Game selection and spatial settings
-        if st.session_state.loaded_games:
-            st.markdown("### 🎲 Game Selection")
+        # Game selection
+        if hasattr(st.session_state, 'loaded_games') and st.session_state.loaded_games:
+            st.markdown("### 🎲 Select Game")
             
-            # Create game selector
             game_options = []
-            for i, game in enumerate(st.session_state.loaded_games):
+            for i, game in enumerate(st.session_state.loaded_games[:50]):  # Limit to first 50 games
                 white = game.get('white', 'Unknown')
                 black = game.get('black', 'Unknown')
                 result = game.get('result', '*')
                 date = game.get('date', 'Unknown')
-                moves = game.get('move_count', 0)
-                game_options.append(f"Game {i+1}: {white} vs {black} ({result}) - {moves} moves")
+                game_options.append(f"Game {i+1}: {white} vs {black} ({result}) - {date}")
             
-            selected_game_idx = st.selectbox("🏁 Select Game", range(len(game_options)), 
-                                           format_func=lambda x: game_options[x])
+            selected_index = st.selectbox("Choose a game:", range(len(game_options)), 
+                                        format_func=lambda x: game_options[x])
             
-            if st.button("🚀 Load Selected Game", use_container_width=True):
-                # Load the full game with moves
-                if hasattr(st.session_state, 'games_file_content'):
-                    full_games = pgn_loader.load_pgn_games(st.session_state.games_file_content, max_games=selected_game_idx+1)
-                    if full_games and len(full_games) > selected_game_idx:
-                        st.session_state.current_game = full_games[selected_game_idx]
-                        st.session_state.current_move_index = 0
-                        st.success(f"🎯 Loaded game!")
-                        st.rerun()
+            if st.button("🎯 Load Game", use_container_width=True):
+                st.session_state.current_game = st.session_state.loaded_games[selected_index]
+                st.session_state.current_move_index = 0
+                st.success("✅ Game loaded!")
+                st.rerun()
         
-        # Spatial visualization settings
-        if st.session_state.current_game:
-            st.markdown("### 🎨 Visualization Settings")
-            
-            settings = st.session_state.spatial_settings
-            
-            settings['show_white_polygon'] = st.checkbox("⚪ White Polygon", value=settings['show_white_polygon'])
-            settings['show_black_polygon'] = st.checkbox("⚫ Black Polygon", value=settings['show_black_polygon'])
-            settings['show_centroids'] = st.checkbox("🎯 Centroids", value=settings['show_centroids'])
-            settings['show_metrics'] = st.checkbox("📊 Metrics", value=settings['show_metrics'])
-            settings['show_insights'] = st.checkbox("💡 Insights", value=settings['show_insights'])
-            settings['polygon_opacity'] = st.slider("🌫️ Opacity", 0.1, 1.0, value=settings['polygon_opacity'])
-            
-            st.session_state.spatial_settings = settings
-    
-    # Main spatial analysis content
-    if not st.session_state.loaded_games:
-        # Welcome screen
         st.markdown("""
-        ### 🚀 Welcome to Spatial Analysis!
+        ---
+        
+        ### 📘 About Enhanced Spatial Analysis
+        
+        #### 🆕 New Features:
+        - **🎯 Dual Board View**: Game position + Control visualization
+        - **🔄 Flip Board Option**: One-click flip for both boards
+        - **🔥 Move Highlighting**: Major spatial changes emphasized
+        - **📊 Comprehensive Metrics**: Material, space, center control
+        - **⚡ Live Updates**: Dynamic analysis as you navigate
+        - **🎨 Visual Legend**: Clear color coding for control
+        
+        #### 🗺️ Control Board Legend:
+        - **🔵 Blue Squares**: White controls
+        - **🟤 Brown Squares**: Black controls  
+        - **⚡ Lightning**: Contested squares
+        - **⚪ Light**: Neutral squares
         
         Upload a PGN file to start analyzing spatial patterns in chess games.
-        
-        #### 🤔 What is Spatial Analysis?
-        
-        Spatial analysis visualizes how pieces control space on the chessboard:
-        
-        - **🗺️ Piece Distribution**: Polygons showing area controlled by each side
-        - **🎯 Centroids**: Center of mass for each player's pieces  
-        - **🔗 Connectivity**: How well-connected pieces are
-        - **📊 Space Control**: Quantitative metrics of board control
-        - **💡 Insights**: AI-generated observations about positioning
         """)
         return
     
-    # If we have a loaded game, show spatial analysis
+    # Main content area
+    if not hasattr(st.session_state, 'current_game') or not st.session_state.current_game:
+        st.info("🎲 Select and load a game from the sidebar to start enhanced spatial analysis.")
+        
+        # Show demo position
+        st.markdown("### 🎯 Demo: Enhanced Spatial Analysis")
+        st.markdown("Here's how the enhanced spatial analysis works with a sample position:")
+        
+        # Demo with a middle game position
+        demo_fen = "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 4 4"
+        
+        try:
+            import spatial_analysis
+            spatial_analysis.display_enhanced_spatial_analysis(
+                demo_fen, 
+                flipped=st.session_state.spatial_settings['flip_boards']
+            )
+        except Exception as e:
+            st.error(f"Demo error: {e}")
+        
+        return
+    
+    # If we have a loaded game, show enhanced spatial analysis
     if st.session_state.current_game:
-        st.markdown("### 🎯 Spatial Game Analysis")
+        st.markdown("### 🎯 Enhanced Spatial Game Analysis")
         
         game = st.session_state.current_game
         positions = game.get('positions', [])
         moves = game.get('moves', [])
         
-        if positions:
-            # Navigation controls
-            nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
+        if not positions:
+            st.error("No positions found in the selected game.")
+            return
+        
+        # Game header information
+        game_info_col1, game_info_col2, game_info_col3 = st.columns(3)
+        
+        with game_info_col1:
+            st.markdown(f"**⚪ White:** {game.get('white', 'Unknown')}")
+        with game_info_col2:
+            st.markdown(f"**⚫ Black:** {game.get('black', 'Unknown')}")
+        with game_info_col3:
+            st.markdown(f"**🏆 Result:** {game.get('result', '*')}")
+        
+        # Navigation controls
+        st.markdown("---")
+        nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([1, 1, 3, 1])
+        
+        with nav_col1:
+            if st.button("⏮️ First", use_container_width=True) and st.session_state.current_move_index > 0:
+                st.session_state.current_move_index = 0
+                st.rerun()
+        
+        with nav_col2:
+            if st.button("⏪ Prev", use_container_width=True) and st.session_state.current_move_index > 0:
+                st.session_state.current_move_index -= 1
+                st.rerun()
+        
+        with nav_col3:
+            move_index = st.slider(
+                "Navigate through moves", 
+                0, 
+                len(positions) - 1, 
+                st.session_state.current_move_index,
+                key="move_slider"
+            )
+            if move_index != st.session_state.current_move_index:
+                st.session_state.current_move_index = move_index
+                st.rerun()
+        
+        with nav_col4:
+            max_moves = len(positions) - 1
+            if st.button("⏩ Next", use_container_width=True) and st.session_state.current_move_index < max_moves:
+                st.session_state.current_move_index += 1
+                st.rerun()
+        
+        # Additional navigation buttons
+        nav_col5, nav_col6 = st.columns(2)
+        with nav_col5:
+            if st.button("⏭️ Last", use_container_width=True) and st.session_state.current_move_index < max_moves:
+                st.session_state.current_move_index = max_moves
+                st.rerun()
+        
+        with nav_col6:
+            if st.button("🔄 Reset to Start", use_container_width=True):
+                st.session_state.current_move_index = 0
+                st.rerun()
+        
+        # Current position info
+        current_index = st.session_state.current_move_index
+        current_fen = positions[current_index]
+        
+        # Move information
+        move_info_col1, move_info_col2 = st.columns(2)
+        with move_info_col1:
+            if current_index > 0 and current_index <= len(moves):
+                move_info = moves[current_index - 1]
+                st.markdown(f"**📍 Move {current_index}:** {move_info['san']} ({move_info['turn']})")
+            else:
+                st.markdown("**📍 Starting Position**")
+        
+        with move_info_col2:
+            st.markdown(f"**🎯 Position {current_index + 1}** of {len(positions)}")
+        
+        # Enhanced Spatial Analysis Display
+        try:
+            # Get previous position for move comparison
+            previous_fen = positions[current_index - 1] if current_index > 0 else None
             
-            with nav_col1:
-                if st.button("⏮️ First") and st.session_state.current_move_index > 0:
-                    st.session_state.current_move_index = 0
-                    st.rerun()
+            # Get flip setting from session state
+            flip_boards = st.session_state.spatial_settings.get('flip_boards', False)
             
-            with nav_col2:
-                move_index = st.slider("Move", 0, len(positions)-1, st.session_state.current_move_index)
-                if move_index != st.session_state.current_move_index:
-                    st.session_state.current_move_index = move_index
-                    st.rerun()
+            # Display the enhanced spatial analysis
+            import spatial_analysis
+            current_metrics = spatial_analysis.display_enhanced_spatial_analysis(
+                current_fen, 
+                previous_fen,
+                flipped=flip_boards
+            )
             
-            with nav_col3:
-                if st.button("⏭️ Last") and st.session_state.current_move_index < len(positions)-1:
-                    st.session_state.current_move_index = len(positions)-1
-                    st.rerun()
+            # Store metrics for potential future use
+            if current_metrics:
+                st.session_state.current_spatial_metrics = current_metrics
             
-            # Display current position
-            current_fen = positions[st.session_state.current_move_index]
+        except Exception as e:
+            st.error(f"Error in enhanced spatial analysis: {e}")
             
-            # Chess board display
+            # Fallback to basic display
+            st.markdown("### 🏁 Position")
             try:
                 import chess_board
                 chess_board.display_chess_board(
                     fen=current_fen, 
                     theme='default',
                     highlight_best_move=False,
-                    top_moves=None,
-                    flipped=False,
-                    board_size=None,
+                    board_size=400,
                     show_coordinates=True,
-                    interactive=False
+                    interactive=False,
+                    flipped=st.session_state.spatial_settings.get('flip_boards', False)
                 )
-            except Exception as e:
-                st.error(f"Error displaying chess board: {e}")
-                st.code(f"Position FEN: {current_fen}", language="text")
+            except:
+                st.code(f"FEN: {current_fen}")
+
+def display_advanced_analysis_page():
+    """Display advanced analysis page with enhanced spatial analysis."""
+    st.title("🔬 Advanced Analysis")
+    
+    # Enhanced spatial analysis
+    display_spatial_analysis()
+
+# Updated function for individual position analysis (used in other parts of the app)
+def display_position_spatial_analysis(fen: str, show_control_board: bool = True, flipped: bool = False):
+    """
+    Display spatial analysis for a single position (for use in other parts of the app).
+    
+    Args:
+        fen: Position FEN string
+        show_control_board: Whether to show the control board visualization
+        flipped: Whether to display boards flipped
+    """
+    try:
+        import spatial_analysis
+        import chess
+        
+        board = chess.Board(fen)
+        metrics = spatial_analysis.calculate_comprehensive_spatial_metrics(board)
+        
+        if show_control_board:
+            # Show dual board view
+            col1, col2 = st.columns(2)
             
-            # Spatial metrics
-            try:
-                board = chess.Board(current_fen)
-                metrics = spatial_analysis.calculate_spatial_metrics(board)
-                
-                if st.session_state.spatial_settings['show_metrics']:
-                    st.markdown("### 📊 Spatial Metrics")
-                    
-                    metric_col1, metric_col2 = st.columns(2)
-                    
-                    with metric_col1:
-                        st.markdown("**⚪ White**")
-                        st.metric("Piece Count", metrics['white']['piece_count'])
-                        st.metric("Area Control", f"{metrics['white']['area']:.1f}")
-                        st.metric("Connectivity", f"{metrics['white']['connectivity_score']:.1f}")
-                    
-                    with metric_col2:
-                        st.markdown("**⚫ Black**")
-                        st.metric("Piece Count", metrics['black']['piece_count'])
-                        st.metric("Area Control", f"{metrics['black']['area']:.1f}")
-                        st.metric("Connectivity", f"{metrics['black']['connectivity_score']:.1f}")
-                
-                # Insights
-                if st.session_state.spatial_settings['show_insights']:
-                    insights = spatial_analysis.get_spatial_insights(metrics)
-                    if insights:
-                        st.markdown("### 💡 Spatial Insights")
-                        for insight in insights:
-                            st.info(f"💡 {insight}")
-                            
-            except Exception as e:
-                st.error(f"Error calculating spatial metrics: {e}")
-    else:
-        st.info("🎲 Select and load a game from the sidebar to start spatial analysis.")
-
-# Add this to your app.py temporarily for debugging
-# Call this function somewhere in your training page to test
-
+            with col1:
+                st.markdown("**🏁 Position**")
+                try:
+                    import chess_board
+                    chess_board.display_chess_board(
+                        fen=fen,
+                        theme='default',
+                        board_size=300,
+                        show_coordinates=True,
+                        interactive=False,
+                        flipped=flipped
+                    )
+                except:
+                    st.code(f"FEN: {fen}")
+            
+            with col2:
+                st.markdown("**🎯 Space Control**")
+                control_fig = spatial_analysis.create_control_board_visualization(metrics, flipped=flipped)
+                st.plotly_chart(control_fig, use_container_width=True)
+        
+        # Show insights
+        insights = spatial_analysis.generate_spatial_insights(metrics)
+        if insights:
+            st.markdown("#### 💡 Position Insights")
+            for insight in insights:
+                if insight['severity'] == 'critical':
+                    st.error(f"🔥 {insight['message']}")
+                elif insight['severity'] == 'high':
+                    st.warning(f"⚠️ {insight['message']}")
+                elif insight['severity'] == 'medium':
+                    st.info(f"📊 {insight['message']}")
+                else:
+                    st.success(f"✅ {insight['message']}")
+        
+        # Show key metrics
+        if st.checkbox("📊 Show Detailed Metrics", key=f"metrics_{fen[:10]}"):
+            metrics_df = spatial_analysis.create_metrics_table(metrics)
+            
+            # Style the dataframe
+            def highlight_advantage(val):
+                if isinstance(val, str) and val.startswith('+'):
+                    return 'background-color: lightgreen'
+                elif isinstance(val, str) and val.startswith('-'):
+                    return 'background-color: lightcoral'
+                return ''
+            
+            styled_df = metrics_df.style.applymap(highlight_advantage, subset=['Difference'])
+            st.dataframe(styled_df, use_container_width=True)
+        
+        return metrics
+        
+    except Exception as e:
+        st.error(f"Error in spatial analysis: {e}")
+        return None
 
 # Add this test function to debug the book generator
 def test_book_generator():
