@@ -1,19 +1,20 @@
 import re
-import streamlit as st
-import pandas as pd
-import numpy as np
+import os
 import json
 import time
-from datetime import datetime
-import os
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import matplotlib.dates as mdates
 import seaborn as sns
 from io import StringIO
 import chess
 import chess.pgn
+import numpy as np
+import pandas as pd
+import streamlit as st
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional
+from plotly.subplots import make_subplots
 
 # Import our modules
 import database
@@ -25,12 +26,7 @@ import settings
 import config
 import pgn_loader
 import spatial_analysis
-
-# Add this import at the top of app.py with the other imports:
 import book_generator
-
-# type check
-from typing import Any, Dict, List
 
 # Initialize the database if it doesn't exist
 database.init_db()
@@ -341,7 +337,6 @@ def display_login_page():
                             st.error("❌ Email already exists")
                 else:
                     st.warning("⚠️ Please fill all fields")
-
 
 
 def get_piece_icon(move_san):
@@ -1073,8 +1068,33 @@ def display_game_details_popup(game):
             
             st.code(move_text, language="text")
 
+def validate_fen_string(fen: str) -> bool:
+    """
+    Validate if a FEN string represents a valid chess position.
+    
+    Args:
+        fen: FEN string to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    try:
+        if not fen or not isinstance(fen, str):
+            return False
+        
+        # Try to create a chess board from the FEN
+        board = chess.Board(fen)
+        
+        # Additional validation checks
+        if not board.is_valid():
+            return False
+            
+        return True
+    except:
+        return False
+
 def display_game_analyzer():
-    """Display the game analysis interface."""
+    """Display the game analysis interface with fixed spatial analysis."""
     if not st.session_state.selected_game:
         st.info("🎯 Select a game from the Browse Games tab to start analysis.")
         return
@@ -1093,6 +1113,11 @@ def display_game_analyzer():
     
     if max_moves == 0:
         st.warning("⚠️ No moves available for this game")
+        return
+    
+    # Ensure positions_data exists and has valid FENs
+    if not positions_data or len(positions_data) == 0:
+        st.error("❌ No position data available for this game")
         return
     
     # Navigation controls
@@ -1132,6 +1157,12 @@ def display_game_analyzer():
     if current_index < len(positions_data):
         current_fen = positions_data[current_index]
         
+        # CRITICAL FIX: Validate FEN before using it
+        if not validate_fen_string(current_fen):
+            st.error(f"❌ Invalid position data at move {current_index}")
+            st.code(f"Invalid FEN: {current_fen}")
+            return
+        
         # Display move info
         if current_index > 0 and current_index <= len(moves_data):
             move_info = moves_data[current_index - 1]
@@ -1140,148 +1171,46 @@ def display_game_analyzer():
             st.markdown("**Starting Position**")
         
         # Display chess board
-        try:
-            import chess_board
-            chess_board.display_chess_board(
-                fen=current_fen, 
-                theme='default',
-                highlight_best_move=False,
-                top_moves=None,
-                flipped=False,
-                board_size=None,
-                show_coordinates=True,
-                interactive=False
-            )
-        except Exception as e:
-            st.error(f"Error displaying chess board: {e}")
-            st.code(f"Position FEN: {current_fen}", language="text")
-
-        # Spatial Analysis Integration
-        if st.checkbox("🗺️ Show Spatial Analysis", key=f"spatial_{current_index}"):
+        board_col1, board_col2 = st.columns(2)
+        
+        with board_col1:
+            st.markdown("#### 🏁 Position")
             try:
-                import spatial_analysis
-                import chess
-                
-                # Calculate spatial metrics for current position
-                board = chess.Board(current_fen)
-                spatial_metrics = spatial_analysis.calculate_spatial_metrics(board)
-                
-                # Display spatial insights
-                insights = spatial_analysis.get_spatial_insights(spatial_metrics)
-                
-                if insights:
-                    st.markdown("#### 🔍 Spatial Insights")
-                    for insight in insights:
-                        st.info(f"💡 {insight}")
-                
-                # Display spatial metrics
-                spatial_col1, spatial_col2 = st.columns(2)
-                
-                with spatial_col1:
-                    st.markdown("**⚪ White Spatial Control**")
-                    white_metrics = spatial_metrics['white']
-                    st.metric("Area Control", f"{white_metrics['area']:.1f}")
-                    st.metric("Piece Count", white_metrics['piece_count'])
-                    st.metric("Connectivity", f"{white_metrics['connectivity_score']:.2f}")
-                    st.metric("Center Control", white_metrics['center_control'])
-                
-                with spatial_col2:
-                    st.markdown("**⚫ Black Spatial Control**")
-                    black_metrics = spatial_metrics['black']
-                    st.metric("Area Control", f"{black_metrics['area']:.1f}")
-                    st.metric("Piece Count", black_metrics['piece_count'])
-                    st.metric("Connectivity", f"{black_metrics['connectivity_score']:.2f}")
-                    st.metric("Center Control", black_metrics['center_control'])
-                
-                # Display comparison
-                comparison = spatial_metrics['comparison']
-                st.markdown("#### ⚖️ Spatial Comparison")
-                comp_col1, comp_col2, comp_col3 = st.columns(3)
-                
-                with comp_col1:
-                    area_diff = comparison['area_ratio']
-                    if area_diff > 1.2:
-                        st.success(f"⚪ White: +{((area_diff-1)*100):.1f}% area")
-                    elif area_diff < 0.8:
-                        st.error(f"⚫ Black: +{((1/area_diff-1)*100):.1f}% area")
-                    else:
-                        st.info("📊 Balanced area control")
-                
-                with comp_col2:
-                    conn_diff = comparison['connectivity_diff']
-                    if conn_diff > 0.5:
-                        st.success(f"⚪ White: +{conn_diff:.1f} connectivity")
-                    elif conn_diff < -0.5:
-                        st.error(f"⚫ Black: +{abs(conn_diff):.1f} connectivity")
-                    else:
-                        st.info("📊 Similar connectivity")
-                
-                with comp_col3:
-                    center_diff = comparison['center_control_diff']
-                    if center_diff > 1:
-                        st.success(f"⚪ White: +{center_diff} center")
-                    elif center_diff < -1:
-                        st.error(f"⚫ Black: +{abs(center_diff)} center")
-                    else:
-                        st.info("📊 Equal center control")
-                
-                # Control heatmap
-                st.markdown("#### 🌡️ Space Control Heatmap")
-                heatmap_data = spatial_analysis.calculate_space_control_heatmap(board)
-                
-                # Create a simple visualization of the heatmap
-                heatmap_col1, heatmap_col2 = st.columns(2)
-                
-                with heatmap_col1:
-                    st.markdown("**⚪ White Control Intensity**")
-                    white_heatmap = heatmap_data['white']
-                    # Convert to display format
-                    white_total = sum(sum(row) for row in white_heatmap)
-                    st.metric("Total Attack Points", int(white_total))
-                
-                with heatmap_col2:
-                    st.markdown("**⚫ Black Control Intensity**")
-                    black_heatmap = heatmap_data['black']
-                    black_total = sum(sum(row) for row in black_heatmap)
-                    st.metric("Total Attack Points", int(black_total))
-                    
+                import chess_board
+                chess_board.display_chess_board(
+                    fen=current_fen, 
+                    theme='default',
+                    highlight_best_move=False,
+                    top_moves=None,
+                    flipped=False,
+                    board_size=300,
+                    show_coordinates=True,
+                    interactive=False
+                )
             except Exception as e:
-                st.error(f"Spatial analysis error: {e}")
-                st.info("💡 Spatial analysis requires valid chess position")
-
-        # Analysis features and save option
-        analysis_col1, analysis_col2, analysis_col3 = st.columns(3)
-
-        with analysis_col1:
-            if st.button("🧠 Analyze Position", use_container_width=True):
-                st.info("🤖 Position analysis would integrate with chess engine here")
-
-        with analysis_col2:
-            if st.button("📝 Add Note", use_container_width=True):
-                note = st.text_area("Enter your note:", key=f"note_{current_index}")
-                if note:
-                    # Save note logic here
-                    st.success("✅ Note saved!")
-
-        with analysis_col3:
-            if current_index == len(positions_data) - 1:  # At the end of the game
-                if st.button("💾 Save Analysis", key="save_complete_analysis", use_container_width=True):
-                    # Mark game as analyzed and save
-                    success = database.update_user_game_analysis_progress(
-                        st.session_state.user_id, 
-                        st.session_state.selected_game, 
-                        current_index, 
-                        0, 
-                        {"analysis_completed": True, "completed_at": datetime.now().isoformat()}
-                    )
-                    if success:
-                        st.success("🎉 Game analysis saved! Check 'Analyzed Games' tab.")
-                        st.balloons()
+                st.error(f"Error displaying chess board: {e}")
+                st.code(f"Position FEN: {current_fen}", language="text")
+        
+        with board_col2:
+            # FIXED: Spatial Analysis Integration with proper error handling
+            if st.checkbox("🗺️ Show Spatial Analysis", key=f"spatial_game_{current_index}"):
+                try:
+                    # Double-check FEN validity before spatial analysis
+                    if validate_fen_string(current_fen):
+                        display_position_spatial_analysis(
+                            fen=current_fen,
+                            show_control_board=True,
+                            flipped=False
+                        )
                     else:
-                        st.error("❌ Failed to save analysis")
-            else:
-                st.button("📊 Complete Analysis", disabled=True, use_container_width=True, 
-                        help="Finish analyzing the entire game to save")
+                        st.error("❌ Spatial analysis error: Invalid chess position")
+                        st.info("💡 Spatial analysis requires valid chess position")
+                        
+                except Exception as e:
+                    st.error(f"Spatial analysis error: {str(e)}")
+                    st.info("💡 Spatial analysis requires valid chess position")
+    else:
+        st.error("❌ Position index out of range")
 
 def display_saved_games():
     """Display user's saved games and analyzed games."""
@@ -2237,7 +2166,7 @@ def get_position_spatial_summary(fen: str) -> Dict[str, Any]:
 
 
 def display_spatial_analysis():
-    """Display enhanced spatial analysis functionality with dual board view."""
+    """Display enhanced spatial analysis functionality with dual board view - FIXED VERSION."""
     st.markdown("## 🗺️ Enhanced Spatial Analysis")
     
     # Initialize session state for spatial analysis - ENSURE this runs first
@@ -2306,79 +2235,85 @@ def display_spatial_analysis():
                         # Load games
                         if st.button("⚡ Load Games", use_container_width=True):
                             with st.spinner("🎯 Loading games..."):
-                                games = pgn_loader.parse_multiple_games(file_content, max_games=10000)
-                                st.session_state.loaded_games = games
-                                st.session_state.games_file_content = file_content
-                                st.success(f"🎉 Loaded {len(games)} games!")
-                                st.rerun()
+                                try:
+                                    # FIXED: Proper game loading with error handling
+                                    games = pgn_loader.parse_multiple_games(file_content, max_games=100)
+                                    
+                                    # Validate loaded games have position data
+                                    valid_games = []
+                                    for game in games:
+                                        if game.get('positions') and len(game['positions']) > 0:
+                                            # Validate first position FEN
+                                            if validate_fen_string(game['positions'][0]):
+                                                valid_games.append(game)
+                                    
+                                    if valid_games:
+                                        st.session_state.loaded_games = valid_games
+                                        st.session_state.games_file_content = file_content
+                                        st.success(f"🎉 Loaded {len(valid_games)} valid games!")
+                                        
+                                        # Auto-select first game
+                                        if len(valid_games) > 0:
+                                            st.session_state.current_game = valid_games[0]
+                                            st.session_state.current_move_index = 0
+                                            st.rerun()
+                                    else:
+                                        st.error("❌ No games with valid position data found")
+                                        
+                                except Exception as e:
+                                    st.error(f"❌ Error loading games: {str(e)}")
                     else:
                         st.error(f"❌ {stats['error']}")
             else:
                 st.error(f"❌ {message}")
-        
-        # Game selection
-        if hasattr(st.session_state, 'loaded_games') and st.session_state.loaded_games:
-            st.markdown("### 🎲 Select Game")
+    
+    # Game selection from loaded games
+    if 'loaded_games' in st.session_state and st.session_state.loaded_games:
+        with st.sidebar:
+            st.markdown("### 🎮 Select Game")
             
             game_options = []
-            for i, game in enumerate(st.session_state.loaded_games[:50]):  # Limit to first 50 games
+            for i, game in enumerate(st.session_state.loaded_games):
                 white = game.get('white', 'Unknown')
                 black = game.get('black', 'Unknown')
                 result = game.get('result', '*')
-                date = game.get('date', 'Unknown')
-                game_options.append(f"Game {i+1}: {white} vs {black} ({result}) - {date}")
+                game_options.append(f"Game {i+1}: {white} vs {black} ({result})")
             
-            selected_index = st.selectbox("Choose a game:", range(len(game_options)), 
-                                        format_func=lambda x: game_options[x])
+            selected_game_index = st.selectbox(
+                "Choose game to analyze:",
+                range(len(game_options)),
+                format_func=lambda x: game_options[x],
+                key="spatial_game_selector"
+            )
             
-            if st.button("🎯 Load Game", use_container_width=True):
-                st.session_state.current_game = st.session_state.loaded_games[selected_index]
+            if st.button("🎯 Load Selected Game", use_container_width=True):
+                st.session_state.current_game = st.session_state.loaded_games[selected_game_index]
                 st.session_state.current_move_index = 0
-                st.success("✅ Game loaded!")
                 st.rerun()
-        
-        st.markdown("""
-        ---
-        
-        ### 📘 About Enhanced Spatial Analysis
-        
-        #### 🆕 New Features:
-        - **🎯 Dual Board View**: Game position + Control visualization
-        - **🔄 Flip Board Option**: One-click flip for both boards
-        - **🔥 Move Highlighting**: Major spatial changes emphasized
-        - **📊 Comprehensive Metrics**: Material, space, center control
-        - **⚡ Live Updates**: Dynamic analysis as you navigate
-        - **🎨 Visual Legend**: Clear color coding for control
-        
-        #### 🗺️ Control Board Legend:
-        - **🔵 Blue Squares**: White controls
-        - **🟤 Brown Squares**: Black controls  
-        - **⚡ Lightning**: Contested squares
-        - **⚪ Light**: Neutral squares
-        
-        Upload a PGN file to start analyzing spatial patterns in chess games.
-        """)
-        return
     
-    # Main content area
+    # Main content area - FIXED VERSION
     if not hasattr(st.session_state, 'current_game') or not st.session_state.current_game:
         st.info("🎲 Select and load a game from the sidebar to start enhanced spatial analysis.")
         
-        # Show demo position
+        # Show demo position with proper validation
         st.markdown("### 🎯 Demo: Enhanced Spatial Analysis")
         st.markdown("Here's how the enhanced spatial analysis works with a sample position:")
         
         # Demo with a middle game position
         demo_fen = "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 4 4"
         
-        try:
-            import spatial_analysis
-            spatial_analysis.display_enhanced_spatial_analysis(
-                demo_fen, 
-                flipped=st.session_state.spatial_settings['flip_boards']
-            )
-        except Exception as e:
-            st.error(f"Demo error: {e}")
+        # FIXED: Validate demo FEN before using
+        if validate_fen_string(demo_fen):
+            try:
+                display_position_spatial_analysis(
+                    fen=demo_fen,
+                    show_control_board=True,
+                    flipped=st.session_state.spatial_settings['flip_boards']
+                )
+            except Exception as e:
+                st.error(f"Demo error: {e}")
+        else:
+            st.error("❌ Demo position is invalid")
         
         return
     
@@ -2391,7 +2326,17 @@ def display_spatial_analysis():
         moves = game.get('moves', [])
         
         if not positions:
-            st.error("No positions found in the selected game.")
+            st.error("❌ No positions found in the selected game.")
+            return
+        
+        # Validate all positions in the game
+        valid_positions = []
+        for i, fen in enumerate(positions):
+            if validate_fen_string(fen):
+                valid_positions.append((i, fen))
+        
+        if not valid_positions:
+            st.error("❌ No valid positions found in the selected game.")
             return
         
         # Game header information
@@ -2436,72 +2381,56 @@ def display_spatial_analysis():
                 st.session_state.current_move_index += 1
                 st.rerun()
         
-        # Additional navigation buttons
-        nav_col5, nav_col6 = st.columns(2)
-        with nav_col5:
-            if st.button("⏭️ Last", use_container_width=True) and st.session_state.current_move_index < max_moves:
-                st.session_state.current_move_index = max_moves
-                st.rerun()
-        
-        with nav_col6:
-            if st.button("🔄 Reset to Start", use_container_width=True):
-                st.session_state.current_move_index = 0
-                st.rerun()
-        
-        # Current position info
+        # Current position analysis - FIXED VERSION
         current_index = st.session_state.current_move_index
-        current_fen = positions[current_index]
         
-        # Move information
-        move_info_col1, move_info_col2 = st.columns(2)
-        with move_info_col1:
-            if current_index > 0 and current_index <= len(moves):
-                move_info = moves[current_index - 1]
-                st.markdown(f"**📍 Move {current_index}:** {move_info['san']} ({move_info['turn']})")
+        if current_index < len(positions):
+            current_fen = positions[current_index]
+            
+            # CRITICAL FIX: Validate FEN before spatial analysis
+            if validate_fen_string(current_fen):
+                # Get previous FEN for comparison
+                previous_fen = positions[current_index - 1] if current_index > 0 else None
+                
+                # Get flip setting from session state
+                flip_boards = st.session_state.spatial_settings.get('flip_boards', False)
+                
+                # Display the enhanced spatial analysis
+                try:
+                    import spatial_analysis
+                    current_metrics = spatial_analysis.display_enhanced_spatial_analysis(
+                        current_fen, 
+                        previous_fen,
+                        flipped=flip_boards
+                    )
+                    
+                    # Store metrics for potential future use
+                    if current_metrics:
+                        st.session_state.current_spatial_metrics = current_metrics
+                        
+                except Exception as e:
+                    st.error(f"Error in enhanced spatial analysis: {e}")
+                    
+                    # Fallback to basic display
+                    st.markdown("### 🏁 Position")
+                    try:
+                        import chess_board
+                        chess_board.display_chess_board(
+                            fen=current_fen, 
+                            theme='default',
+                            highlight_best_move=False,
+                            board_size=400,
+                            show_coordinates=True,
+                            interactive=False,
+                            flipped=st.session_state.spatial_settings.get('flip_boards', False)
+                        )
+                    except:
+                        st.code(f"FEN: {current_fen}")
             else:
-                st.markdown("**📍 Starting Position**")
-        
-        with move_info_col2:
-            st.markdown(f"**🎯 Position {current_index + 1}** of {len(positions)}")
-        
-        # Enhanced Spatial Analysis Display
-        try:
-            # Get previous position for move comparison
-            previous_fen = positions[current_index - 1] if current_index > 0 else None
-            
-            # Get flip setting from session state
-            flip_boards = st.session_state.spatial_settings.get('flip_boards', False)
-            
-            # Display the enhanced spatial analysis
-            import spatial_analysis
-            current_metrics = spatial_analysis.display_enhanced_spatial_analysis(
-                current_fen, 
-                previous_fen,
-                flipped=flip_boards
-            )
-            
-            # Store metrics for potential future use
-            if current_metrics:
-                st.session_state.current_spatial_metrics = current_metrics
-            
-        except Exception as e:
-            st.error(f"Error in enhanced spatial analysis: {e}")
-            
-            # Fallback to basic display
-            st.markdown("### 🏁 Position")
-            try:
-                import chess_board
-                chess_board.display_chess_board(
-                    fen=current_fen, 
-                    theme='default',
-                    highlight_best_move=False,
-                    board_size=400,
-                    show_coordinates=True,
-                    interactive=False,
-                    flipped=st.session_state.spatial_settings.get('flip_boards', False)
-                )
-            except:
-                st.code(f"FEN: {current_fen}")
+                st.error(f"❌ Invalid position at move {current_index}")
+                st.info("💡 Spatial analysis requires valid chess position")
+        else:
+            st.error("❌ Position index out of range")
 
 def display_advanced_analysis_page():
     """Display advanced analysis page with enhanced spatial analysis."""
@@ -2513,7 +2442,7 @@ def display_advanced_analysis_page():
 # Updated function for individual position analysis (used in other parts of the app)
 def display_position_spatial_analysis(fen: str, show_control_board: bool = True, flipped: bool = False):
     """
-    Display spatial analysis for a single position (for use in other parts of the app).
+    Display spatial analysis for a single position (for use in other parts of the app) - FIXED VERSION.
     
     Args:
         fen: Position FEN string
@@ -2521,6 +2450,12 @@ def display_position_spatial_analysis(fen: str, show_control_board: bool = True,
         flipped: Whether to display boards flipped
     """
     try:
+        # CRITICAL FIX: Validate FEN first
+        if not validate_fen_string(fen):
+            st.error("❌ Spatial analysis error: Invalid chess position")
+            st.info("💡 Spatial analysis requires valid chess position")
+            return
+        
         import spatial_analysis
         import chess
         
@@ -2557,34 +2492,324 @@ def display_position_spatial_analysis(fen: str, show_control_board: bool = True,
             st.markdown("#### 💡 Position Insights")
             for insight in insights:
                 if insight['severity'] == 'critical':
-                    st.error(f"🔥 {insight['message']}")
+                    st.error(f"🚨 {insight['message']}")
                 elif insight['severity'] == 'high':
                     st.warning(f"⚠️ {insight['message']}")
-                elif insight['severity'] == 'medium':
-                    st.info(f"📊 {insight['message']}")
                 else:
-                    st.success(f"✅ {insight['message']}")
+                    st.info(f"💡 {insight['message']}")
         
-        # Show key metrics
-        if st.checkbox("📊 Show Detailed Metrics", key=f"metrics_{fen[:10]}"):
-            metrics_df = spatial_analysis.create_metrics_table(metrics)
+        # Show metrics if enabled
+        if st.session_state.spatial_settings.get('show_metrics', True):
+            st.markdown("#### 📊 Spatial Metrics")
             
-            # Style the dataframe
-            def highlight_advantage(val):
-                if isinstance(val, str) and val.startswith('+'):
-                    return 'background-color: lightgreen'
-                elif isinstance(val, str) and val.startswith('-'):
-                    return 'background-color: lightcoral'
-                return ''
+            metric_col1, metric_col2, metric_col3 = st.columns(3)
             
-            styled_df = metrics_df.style.applymap(highlight_advantage, subset=['Difference'])
-            st.dataframe(styled_df, use_container_width=True)
+            with metric_col1:
+                material_diff = metrics['material_balance']['material_difference']
+                st.metric("Material", f"{material_diff:+d}", delta=None)
+            
+            with metric_col2:
+                center_diff = metrics['center_control']['core_control_difference']
+                st.metric("Center Control", f"{center_diff:+d}", delta=None)
+            
+            with metric_col3:
+                space_diff = metrics['comparison'].get('space_control_advantage', 0)
+                st.metric("Space Control", f"{space_diff:+.1f}", delta=None)
         
         return metrics
         
     except Exception as e:
-        st.error(f"Error in spatial analysis: {e}")
+        st.error(f"Spatial analysis error: {str(e)}")
+        st.info("💡 Spatial analysis requires valid chess position")
         return None
+
+# NEW FEATURE: Enhanced Training Tab with Last Move and Move History
+def display_training_page():
+    """Display the enhanced training page with new features."""
+    st.title("🎯 Enhanced Position Training")
+    
+    # Create tabs for training features
+    training_tab1, training_tab2, training_tab3 = st.tabs([
+        "🎯 Training", "📊 Move History", "📈 Statistics"
+    ])
+    
+    with training_tab1:
+        display_main_training()
+    
+    with training_tab2:
+        display_move_history_tab()
+    
+    with training_tab3:
+        display_training_statistics()
+
+def display_main_training():
+    """Display the main training interface with last move information."""
+    if st.session_state.current_position is None:
+        load_random_position()
+    
+    current_position = st.session_state.current_position
+    
+    if current_position:
+        # NEW FEATURE: Display last move and whose turn it is
+        st.markdown("### 🎯 Current Position")
+        
+        # Extract move information from position
+        fen = current_position['position']['fen']
+        move_history = current_position['position'].get('move_history', {})
+        
+        # Display position info with last move
+        info_col1, info_col2, info_col3 = st.columns(3)
+        
+        with info_col1:
+            # Determine whose turn it is from FEN
+            board = chess.Board(fen)
+            turn = "White" if board.turn else "Black"
+            st.metric("Turn to Move", turn)
+        
+        with info_col2:
+            # Display last move if available
+            moves = move_history.get('moves', [])
+            if moves:
+                last_move = moves[-1]
+                last_move_text = f"{last_move.get('move_number', '?')}.{last_move.get('san', '?')}"
+                st.metric("Last Move", last_move_text)
+            else:
+                st.metric("Last Move", "Starting Position")
+        
+        with info_col3:
+            # Display move count
+            move_count = len(moves) if moves else 0
+            st.metric("Moves Played", f"{move_count}")
+        
+        # Display chess board
+        try:
+            import chess_board
+            chess_board.display_chess_board(
+                fen=fen,
+                theme='default',
+                highlight_best_move=False,
+                board_size=400,
+                show_coordinates=True,
+                interactive=False
+            )
+        except Exception as e:
+            st.error(f"Error displaying chess board: {e}")
+            st.code(f"Position FEN: {fen}")
+        
+        # Move input and validation
+        st.markdown("### 🎯 Find the Best Move")
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            user_move = st.text_input(
+                "Enter your move (e.g., Nf3, e4, O-O):",
+                placeholder="Type your move here...",
+                key="move_input"
+            )
+        
+        with col2:
+            submit_button = st.button("✅ Submit Move", use_container_width=True)
+        
+        if submit_button and user_move:
+            handle_move_submission(user_move, current_position)
+        
+        # Training controls
+        st.markdown("---")
+        control_col1, control_col2, control_col3 = st.columns(3)
+        
+        with control_col1:
+            if st.button("🔄 New Position", use_container_width=True):
+                load_random_position()
+                st.rerun()
+        
+        with control_col2:
+            if st.button("💡 Show Hint", use_container_width=True):
+                show_position_hint(current_position)
+        
+        with control_col3:
+            if st.button("📊 Show Solution", use_container_width=True):
+                show_position_solution(current_position)
+
+def display_move_history_tab():
+    """NEW FEATURE: Display move history for the current position."""
+    st.markdown("### 📊 Move History for Current Position")
+    
+    if st.session_state.current_position is None:
+        st.info("🎯 Load a training position to see its move history.")
+        return
+    
+    current_position = st.session_state.current_position
+    move_history = current_position['position'].get('move_history', {})
+    moves = move_history.get('moves', [])
+    
+    if not moves:
+        st.info("📝 This is the starting position - no previous moves.")
+        return
+    
+    st.markdown(f"**Position has {len(moves)} moves leading to it:**")
+    
+    # Display moves in a nice format
+    move_col1, move_col2 = st.columns(2)
+    
+    # Create moves display
+    move_pairs = []
+    for i in range(0, len(moves), 2):
+        white_move = moves[i] if i < len(moves) else None
+        black_move = moves[i + 1] if i + 1 < len(moves) else None
+        move_pairs.append((white_move, black_move))
+    
+    # Display in table format
+    move_data = []
+    for i, (white_move, black_move) in enumerate(move_pairs, 1):
+        white_text = f"{white_move['san']}" if white_move else ""
+        black_text = f"{black_move['san']}" if black_move else ""
+        move_data.append({
+            "Move #": i,
+            "White": white_text,
+            "Black": black_text
+        })
+    
+    if move_data:
+        df = pd.DataFrame(move_data)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    # Show PGN notation
+    with st.expander("📝 View PGN Notation"):
+        pgn_text = move_history.get('pgn', '')
+        if pgn_text:
+            st.code(pgn_text, language="text")
+        else:
+            # Generate PGN from moves
+            pgn_moves = []
+            for i, (white_move, black_move) in enumerate(move_pairs, 1):
+                move_text = f"{i}."
+                if white_move:
+                    move_text += f" {white_move['san']}"
+                if black_move:
+                    move_text += f" {black_move['san']}"
+                pgn_moves.append(move_text)
+            
+            st.code(" ".join(pgn_moves), language="text")
+    
+    # Interactive position replay
+    if st.checkbox("🎮 Interactive Position Replay"):
+        st.markdown("#### 🎮 Replay Position Development")
+        
+        # Position reconstruction from moves would go here
+        # This would require building positions step by step
+        st.info("🔧 Interactive replay feature - would show position development move by move")
+
+def display_training_statistics():
+    """Display enhanced training statistics."""
+    st.markdown("### 📈 Training Performance Statistics")
+    
+    user_id = st.session_state.user_id
+    if not user_id:
+        st.warning("⚠️ Please log in to view statistics.")
+        return
+    
+    # Get training statistics
+    try:
+        stats = database.get_user_statistics(user_id)
+        if stats:
+            # Display key metrics
+            metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+            
+            with metric_col1:
+                st.metric("Positions Solved", stats.get('positions_solved', 0))
+            
+            with metric_col2:
+                accuracy = stats.get('overall_accuracy', 0)
+                st.metric("Overall Accuracy", f"{accuracy:.1f}%")
+            
+            with metric_col3:
+                avg_time = stats.get('average_time', 0)
+                st.metric("Avg Time", f"{avg_time:.1f}s")
+            
+            with metric_col4:
+                total_attempts = stats.get('total_attempts', 0)
+                st.metric("Total Attempts", total_attempts)
+            
+            # Additional statistics display would go here
+            
+        else:
+            st.info("📊 Start training to see your statistics here!")
+            
+    except Exception as e:
+        st.error(f"Error loading statistics: {e}")
+
+# Helper functions for the new features
+def load_random_position():
+    """Load a random training position."""
+    try:
+        position = training.get_random_position()
+        if position:
+            st.session_state.current_position = position
+            reset_timer()
+        else:
+            st.error("❌ No training positions available")
+    except Exception as e:
+        st.error(f"Error loading position: {e}")
+
+def handle_move_submission(user_move: str, current_position: dict):
+    """Handle move submission with enhanced feedback."""
+    try:
+        elapsed_time = get_elapsed_time()
+        
+        # Validate move
+        result = training.validate_move_for_position(
+            position_id=current_position['position']['id'],
+            selected_move=user_move,
+            user_id=st.session_state.user_id
+        )
+        
+        if result['success']:
+            if result['correct']:
+                st.success(f"✅ Correct! {result['message']}")
+                st.balloons()
+                
+                # Load new position after correct answer
+                time.sleep(1)
+                load_random_position()
+                st.rerun()
+            else:
+                st.error(f"❌ Incorrect. {result['message']}")
+        else:
+            st.error(f"❌ Error: {result['message']}")
+            
+    except Exception as e:
+        st.error(f"Error processing move: {e}")
+
+def show_position_hint(current_position: dict):
+    """Show a hint for the current position."""
+    try:
+        # Get best moves for position
+        moves = current_position['position'].get('moves', [])
+        if moves:
+            best_move = moves[0]  # Assuming first move is best
+            hint = f"💡 Hint: Look for a {best_move.get('classification', 'good')} move"
+            st.info(hint)
+        else:
+            st.info("💡 No hints available for this position")
+    except Exception as e:
+        st.error(f"Error showing hint: {e}")
+
+def show_position_solution(current_position: dict):
+    """Show the solution for the current position."""
+    try:
+        moves = current_position['position'].get('moves', [])
+        if moves:
+            best_move = moves[0]
+            solution = f"🎯 Solution: {best_move['move']} - {best_move.get('classification', 'Best move')}"
+            st.success(solution)
+            
+            if 'explanation' in best_move:
+                st.info(f"📝 Explanation: {best_move['explanation']}")
+        else:
+            st.error("❌ No solution available for this position")
+    except Exception as e:
+        st.error(f"Error showing solution: {e}")
 
 # Add this test function to debug the book generator
 def test_book_generator():
