@@ -1,28 +1,16 @@
-"""
-Enhanced Book Generator with Spatial Analysis Template
-- Maintains all existing functionality 
-- Adds 4th template: Spatial Analysis HTML
-- Optimized for PDF generation with proper page fitting
-"""
-import os
 import chess
 import chess.svg
+import json
+import os
 from datetime import datetime
-from typing import Dict, Any, Optional, List, Tuple
-import base64
-import io
+from typing import Dict, List, Any, Optional, Tuple
 
-# Import spatial analysis for the new template
+# Import spatial analysis with fallback
 try:
     import spatial_analysis
-    import plotly.graph_objects as go
-    import plotly.io as pio
-    # Configure plotly for static image generation
-    pio.kaleido.scope.mathjax = None  # Disable MathJax for faster rendering
     SPATIAL_ANALYSIS_AVAILABLE = True
 except ImportError:
     SPATIAL_ANALYSIS_AVAILABLE = False
-    print("⚠️ Spatial analysis or plotly/kaleido not available. Spatial templates will show placeholders.")
 
 def format_centipawn_score(score: int) -> str:
     """Format centipawn score with appropriate sign and formatting."""
@@ -54,35 +42,6 @@ def calculate_educational_value(position_data: Dict[str, Any]) -> int:
         base_value += 1
     
     return min(base_value, 10)
-
-def format_themes(themes: List[str]) -> List[str]:
-    """Format position themes for display."""
-    if not themes:
-        return ['Positional']
-    
-    formatted = []
-    for theme in themes[:5]:  # Limit to 5 themes
-        formatted.append(theme.replace('_', ' ').title())
-    
-    return formatted
-
-def generate_chess_board_svg(fen: str, flipped: bool = False, size: int = 300) -> str:
-    """Generate SVG representation of chess board."""
-    try:
-        board = chess.Board(fen)
-        svg = chess.svg.board(
-            board=board,
-            flipped=flipped,
-            size=size,
-            style="""
-            .square.light { fill: #f0d9b5; }
-            .square.dark { fill: #b58863; }
-            .piece { font-size: 45px; }
-            """
-        )
-        return svg
-    except Exception as e:
-        return f'<div style="border: 2px solid #ddd; padding: 20px; text-align: center;">Chess board generation failed: {str(e)}</div>'
 
 def generate_static_space_control_image(fen: str, flipped: bool = False, output_dir: str = None) -> str:
     """Generate static space control visualization and save as file for PDF - FIXED FILE APPROACH."""
@@ -162,232 +121,6 @@ def generate_static_space_control_image(fen: str, flipped: bool = False, output_
             <h4>🎯 Space Control Error</h4>
             <p>{str(e)}</p>
         </div>'''
-
-def generate_spatial_metrics_table_html(fen: str) -> str:
-    """Generate detailed spatial metrics table as HTML - matches Advanced Analysis tab."""
-    try:
-        if not SPATIAL_ANALYSIS_AVAILABLE:
-            return '<tr><td colspan="6" style="text-align: center; color: #666; padding: 20px;">Spatial metrics require spatial_analysis module</td></tr>'
-        
-        board = chess.Board(fen)
-        metrics = spatial_analysis.calculate_comprehensive_spatial_metrics(board)
-        
-        # Create comprehensive metrics table matching the Advanced Analysis tab
-        table_rows = []
-        
-        # Material metrics
-        material_balance = metrics.get('material_balance', {})
-        table_rows.append(f'''
-        <tr>
-            <td><strong>Material Balance</strong></td>
-            <td>Material Difference</td>
-            <td>+{material_balance.get('white_material', 0)}</td>
-            <td>+{material_balance.get('black_material', 0)}</td>
-            <td>{material_balance.get('material_difference', 0):+.1f}</td>
-            <td>Points ahead/behind</td>
-        </tr>
-        ''')
-        
-        # Space control metrics
-        space_control = metrics.get('space_control', {}).get('summary', {})
-        white_space = space_control.get('total_controlled_white', 0.0)
-        black_space = space_control.get('total_controlled_black', 0.0)
-        table_rows.append(f'''
-        <tr>
-            <td><strong>Space Control</strong></td>
-            <td>Controlled Squares</td>
-            <td>{white_space:.1f}</td>
-            <td>{black_space:.1f}</td>
-            <td>{white_space - black_space:+.1f}</td>
-            <td>Squares under control</td>
-        </tr>
-        ''')
-        
-        # Center control metrics
-        center_control = metrics.get('center_control', {})
-        white_center = center_control.get('white_center_control', 0)
-        black_center = center_control.get('black_center_control', 0)
-        table_rows.append(f'''
-        <tr>
-            <td><strong>Center Control</strong></td>
-            <td>Core Squares</td>
-            <td>{white_center}</td>
-            <td>{black_center}</td>
-            <td>{center_control.get('core_control_difference', 0):+d}</td>
-            <td>Central dominance</td>
-        </tr>
-        ''')
-        
-        # Piece activity metrics
-        white_metrics = metrics.get('white', {})
-        black_metrics = metrics.get('black', {})
-        
-        white_area = white_metrics.get('polygon_area', 0.0)
-        black_area = black_metrics.get('polygon_area', 0.0)
-        table_rows.append(f'''
-        <tr>
-            <td><strong>Piece Activity</strong></td>
-            <td>Territorial Area</td>
-            <td>{white_area:.2f}</td>
-            <td>{black_area:.2f}</td>
-            <td>{white_area - black_area:+.2f}</td>
-            <td>Piece spread/activity</td>
-        </tr>
-        ''')
-        
-        # Connectivity metrics
-        white_connectivity = white_metrics.get('connectivity_score', 0.0)
-        black_connectivity = black_metrics.get('connectivity_score', 0.0)
-        table_rows.append(f'''
-        <tr>
-            <td><strong>Coordination</strong></td>
-            <td>Connectivity Score</td>
-            <td>{white_connectivity:.2f}</td>
-            <td>{black_connectivity:.2f}</td>
-            <td>{white_connectivity - black_connectivity:+.2f}</td>
-            <td>Piece coordination</td>
-        </tr>
-        ''')
-        
-        # Position centroids
-        white_centroid = white_metrics.get('centroid', (0, 0))
-        black_centroid = black_metrics.get('centroid', (0, 0))
-        table_rows.append(f'''
-        <tr>
-            <td><strong>Position Center</strong></td>
-            <td>Army Centroid</td>
-            <td>({white_centroid[0]:.1f}, {white_centroid[1]:.1f})</td>
-            <td>({black_centroid[0]:.1f}, {black_centroid[1]:.1f})</td>
-            <td>—</td>
-            <td>Average piece position</td>
-        </tr>
-        ''')
-        
-        return ''.join(table_rows)
-        
-    except Exception as e:
-        return f'<tr><td colspan="6" style="text-align: center; color: #666; padding: 20px;">Spatial metrics error: {str(e)}</td></tr>'
-
-def generate_position_comparison_table_html(fen: str, previous_fen: Optional[str] = None) -> str:
-    """Generate position comparison table as HTML - matches Advanced Analysis tab."""
-    try:
-        if not SPATIAL_ANALYSIS_AVAILABLE or not previous_fen:
-            return '''<tr><td colspan="5" style="text-align: center; color: #666; padding: 20px; font-style: italic;">
-                Position comparison requires previous position data
-            </td></tr>'''
-        
-        # Calculate current metrics
-        board = chess.Board(fen)
-        current_metrics = spatial_analysis.calculate_comprehensive_spatial_metrics(board)
-        
-        # Calculate previous metrics
-        prev_board = chess.Board(previous_fen)
-        previous_metrics = spatial_analysis.calculate_comprehensive_spatial_metrics(prev_board)
-        
-        table_rows = []
-        
-        # Material comparison
-        prev_material = previous_metrics.get('material_balance', {}).get('material_difference', 0)
-        curr_material = current_metrics.get('material_balance', {}).get('material_difference', 0)
-        material_change = curr_material - prev_material
-        material_trend = "📈" if material_change > 0.1 else "📉" if material_change < -0.1 else "➡️"
-        
-        table_rows.append(f'''
-        <tr>
-            <td><strong>Material Balance</strong></td>
-            <td>{prev_material:+.1f}</td>
-            <td>{curr_material:+.1f}</td>
-            <td>{material_change:+.1f}</td>
-            <td>{material_trend}</td>
-        </tr>
-        ''')
-        
-        # Space control comparison
-        prev_space = previous_metrics.get('comparison', {}).get('space_control_advantage', 0)
-        curr_space = current_metrics.get('comparison', {}).get('space_control_advantage', 0)
-        space_change = curr_space - prev_space
-        space_trend = "📈" if space_change > 0.1 else "📉" if space_change < -0.1 else "➡️"
-        
-        table_rows.append(f'''
-        <tr>
-            <td><strong>Space Control</strong></td>
-            <td>{prev_space:+.1f}</td>
-            <td>{curr_space:+.1f}</td>
-            <td>{space_change:+.1f}</td>
-            <td>{space_trend}</td>
-        </tr>
-        ''')
-        
-        # Center control comparison
-        prev_center = previous_metrics.get('center_control', {}).get('core_control_difference', 0)
-        curr_center = current_metrics.get('center_control', {}).get('core_control_difference', 0)
-        center_change = curr_center - prev_center
-        center_trend = "📈" if center_change > 0.1 else "📉" if center_change < -0.1 else "➡️"
-        
-        table_rows.append(f'''
-        <tr>
-            <td><strong>Center Control</strong></td>
-            <td>{prev_center:+d}</td>
-            <td>{curr_center:+d}</td>
-            <td>{center_change:+d}</td>
-            <td>{center_trend}</td>
-        </tr>
-        ''')
-        
-        # Connectivity comparison
-        prev_connectivity = previous_metrics.get('comparison', {}).get('connectivity_diff', 0)
-        curr_connectivity = current_metrics.get('comparison', {}).get('connectivity_diff', 0)
-        connectivity_change = curr_connectivity - prev_connectivity
-        connectivity_trend = "📈" if connectivity_change > 0.1 else "📉" if connectivity_change < -0.1 else "➡️"
-        
-        table_rows.append(f'''
-        <tr>
-            <td><strong>Connectivity</strong></td>
-            <td>{prev_connectivity:+.2f}</td>
-            <td>{curr_connectivity:+.2f}</td>
-            <td>{connectivity_change:+.2f}</td>
-            <td>{connectivity_trend}</td>
-        </tr>
-        ''')
-        
-        return ''.join(table_rows)
-        
-    except Exception as e:
-        return f'<tr><td colspan="5" style="text-align: center; color: #666; padding: 20px;">Position comparison error: {str(e)}</td></tr>'
-
-def generate_spatial_insights_html(fen: str) -> str:
-    """Generate spatial insights as HTML."""
-    try:
-        if not SPATIAL_ANALYSIS_AVAILABLE:
-            return '<p style="color: #666; text-align: center;">Spatial insights require spatial_analysis module</p>'
-        
-        board = chess.Board(fen)
-        metrics = spatial_analysis.calculate_comprehensive_spatial_metrics(board)
-        insights = spatial_analysis.generate_spatial_insights(metrics)
-        
-        if not insights:
-            return '<p style="color: #666; font-style: italic;">No significant spatial insights detected for this position.</p>'
-        
-        insights_html = []
-        for insight in insights[:4]:  # Limit to 4 insights for PDF
-            severity_colors = {
-                'critical': '#e74c3c',
-                'high': '#f39c12', 
-                'medium': '#3498db',
-                'low': '#95a5a6'
-            }
-            color = severity_colors.get(insight.get('severity', 'low'), '#95a5a6')
-            
-            insights_html.append(f'''
-            <div style="margin: 8px 0; padding: 8px; border-left: 4px solid {color}; background: #f8f9fa;">
-                <span style="color: {color}; font-weight: 600;">●</span> {insight['message']}
-            </div>
-            ''')
-        
-        return ''.join(insights_html)
-        
-    except Exception as e:
-        return f'<p style="color: #666;">Spatial insights error: {str(e)}</p>'
 
 def generate_problem_html(position_data: Dict[str, Any], timestamp: str = None) -> str:
     """Generate enhanced problem HTML with PDF-optimized design."""
@@ -961,351 +694,6 @@ def generate_comprehensive_analysis_html(position_data: Dict[str, Any], timestam
 """
     return template
 
-def generate_spatial_analysis_html(position_data: Dict[str, Any], timestamp: str = None, output_dir: str = None) -> str:
-    """Generate NEW Spatial Analysis HTML template with static visualization and metrics tables."""
-    if timestamp is None:
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    
-    position_id = position_data.get('id', 'unknown')
-    fen = position_data.get('fen', '')
-    turn = position_data.get('turn', 'white').capitalize()
-    move_number = position_data.get('fullmove_number', 1)
-    
-    # Generate static space control image with file-based approach
-    flipped = (turn.lower() == 'black')
-    # space_control_image = generate_static_space_control_image(fen, flipped=flipped, output_dir=output_dir)
-    space_control_image = None
-    
-    # Generate spatial metrics table (matches Advanced Analysis tab)
-    spatial_metrics_table = generate_spatial_metrics_table_html(fen)
-    
-    # Generate position comparison table (if previous position available)
-    # For standalone generation, we'll try to get the previous position from moves
-    previous_fen = None
-    moves = position_data.get('moves', [])
-    if moves and len(moves) > 0:
-        # Try to create previous position by undoing the best move
-        try:
-            board = chess.Board(fen)
-            best_move_uci = moves[0].get('uci', '')
-            if best_move_uci:
-                move = chess.Move.from_uci(best_move_uci)
-                # This is the position after the move, so we need the position before
-                # For now, we'll set previous_fen to None and show a message
-                pass
-        except:
-            pass
-    
-    position_comparison_table = generate_position_comparison_table_html(fen, previous_fen)
-    
-    # Generate spatial insights
-    spatial_insights = generate_spatial_insights_html(fen)
-    
-    template = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Position {position_id} - Spatial Analysis</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600;700&display=swap');
-        
-        @page {{
-            size: A4;
-            margin: 1.5cm;
-        }}
-        
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        
-        body {{
-            font-family: 'Crimson Text', serif;
-            line-height: 1.4;
-            color: #2c3e50;
-            background: white;
-            padding: 20px;
-            max-width: 100%;
-            page-break-inside: avoid;
-        }}
-        
-        .header {{
-            text-align: center;
-            background: linear-gradient(135deg, #8e44ad 0%, #3498db 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 25px;
-        }}
-        
-        .header h1 {{
-            font-size: 1.8rem;
-            margin-bottom: 5px;
-        }}
-        
-        .position-info {{
-            text-align: center;
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #8e44ad;
-        }}
-        
-        .visualization-section {{
-            text-align: center;
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border-left: 4px solid #3498db;
-        }}
-        
-        .table-section {{
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border-left: 4px solid #27ae60;
-        }}
-        
-        .insights-section {{
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border-left: 4px solid #f39c12;
-        }}
-        
-        .section h3 {{
-            color: #2c3e50;
-            margin-bottom: 15px;
-            font-size: 1.3rem;
-        }}
-        
-        .metrics-table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-            font-size: 13px;
-        }}
-        
-        .metrics-table th {{
-            background: #34495e;
-            color: white;
-            padding: 10px 8px;
-            text-align: left;
-            font-weight: 600;
-            font-size: 12px;
-        }}
-        
-        .metrics-table td {{
-            padding: 8px;
-            border-bottom: 1px solid #ddd;
-            vertical-align: top;
-            font-size: 12px;
-        }}
-        
-        .comparison-table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-            font-size: 13px;
-        }}
-        
-        .comparison-table th {{
-            background: #2c3e50;
-            color: white;
-            padding: 10px 8px;
-            text-align: left;
-            font-weight: 600;
-            font-size: 12px;
-        }}
-        
-        .comparison-table td {{
-            padding: 8px;
-            border-bottom: 1px solid #ddd;
-            vertical-align: top;
-            font-size: 12px;
-        }}
-        
-        .legend {{
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            margin: 15px 0;
-            background: #ecf0f1;
-            padding: 15px;
-            border-radius: 6px;
-        }}
-        
-        .legend-item {{
-            text-align: center;
-            font-size: 12px;
-        }}
-        
-        .legend-color {{
-            width: 20px;
-            height: 20px;
-            border-radius: 3px;
-            margin: 0 auto 5px;
-            border: 1px solid #ccc;
-        }}
-        
-        .white-control {{ background: rgba(255, 255, 255, 0.8); }}
-        .black-control {{ background: rgba(0, 0, 0, 0.8); }}
-        .contested {{ background: rgba(255, 255, 0, 0.6); }}
-        .neutral {{ background: rgba(128, 128, 128, 0.3); }}
-        
-        @media print {{
-            body {{ padding: 15px; }}
-            .header h1 {{ font-size: 1.6rem; }}
-            .metrics-table {{ font-size: 11px; }}
-            .comparison-table {{ font-size: 11px; }}
-        }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>🗺️ Spatial Analysis</h1>
-        <p>Advanced Position Evaluation</p>
-    </div>
-    
-    <div class="position-info">
-        <h3>Position #{position_id} - {turn} to Move (Move {move_number})</h3>
-        <p>Comprehensive spatial and territorial analysis</p>
-    </div>
-    
-    <div class="visualization-section">
-        <h3>🎯 Space Control Visualization</h3>
-        {space_control_image}
-        
-        <div class="legend">
-            <div class="legend-item">
-                <div class="legend-color white-control"></div>
-                <div>White Control</div>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color black-control"></div>
-                <div>Black Control</div>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color contested"></div>
-                <div>Contested</div>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color neutral"></div>
-                <div>Neutral</div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="table-section">
-        <h3>📊 Detailed Spatial Metrics</h3>
-        <table class="metrics-table">
-            <thead>
-                <tr>
-                    <th>Category</th>
-                    <th>Metric</th>
-                    <th>White</th>
-                    <th>Black</th>
-                    <th>Advantage</th>
-                    <th>Analysis</th>
-                </tr>
-            </thead>
-            <tbody>
-                {spatial_metrics_table}
-            </tbody>
-        </table>
-    </div>
-    
-    <div class="table-section">
-        <h3>📈 Position Comparison</h3>
-        <table class="comparison-table">
-            <thead>
-                <tr>
-                    <th>Metric</th>
-                    <th>Previous</th>
-                    <th>Current</th>
-                    <th>Change</th>
-                    <th>Trend</th>
-                </tr>
-            </thead>
-            <tbody>
-                {position_comparison_table}
-            </tbody>
-        </table>
-    </div>
-    
-    <div class="insights-section">
-        <h3>💡 Spatial Insights</h3>
-        {spatial_insights}
-    </div>
-    
-    <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; text-align: center; margin-top: 20px; border-left: 4px solid #27ae60;">
-        <h4>📈 Position Summary</h4>
-        <p>This spatial analysis provides insights into piece coordination, territorial control, and strategic imbalances that complement traditional chess evaluation.</p>
-    </div>
-</body>
-</html>
-"""
-    return template
-
-def generate_themes_section(position_data: Dict[str, Any]) -> str:
-    """Generate themes overview section."""
-    metadata = position_data.get('metadata', {})
-    themes = format_themes(position_data.get('position_classification', []))
-    
-    # Basic position characteristics
-    turn = position_data.get('turn', 'white').capitalize()
-    move_number = position_data.get('fullmove_number', 1)
-    
-    # Game phase
-    if move_number <= 15:
-        game_phase = "Opening"
-    elif move_number <= 30:
-        game_phase = "Middlegame"
-    else:
-        game_phase = "Endgame"
-    
-    theme_tags = ''.join([f'<span class="theme-tag">{theme}</span>' for theme in themes])
-    
-    return f"""
-    <p><strong>Game Phase:</strong> {game_phase} (Move {move_number})</p>
-    <p><strong>To Move:</strong> {turn}</p>
-    <p><strong>Position Themes:</strong></p>
-    <div style="margin: 10px 0;">{theme_tags}</div>
-    <p style="margin-top: 15px; font-style: italic;">
-        This position requires understanding of {', '.join(themes[:3]).lower() if themes else 'general chess principles'}.
-    </p>
-    """
-
-def generate_material_section(metadata: Dict[str, Any]) -> str:
-    """Generate material analysis section."""
-    material = metadata.get('material', {})
-    
-    white_total = material.get('white_total', 0)
-    black_total = material.get('black_total', 0)
-    imbalance = material.get('imbalance', 0)
-    
-    material_status = "Balanced material"
-    if imbalance > 1:
-        material_status = f"White ahead by {imbalance} points"
-    elif imbalance < -1:
-        material_status = f"Black ahead by {abs(imbalance)} points"
-    
-    return f"""
-    <p><strong>Material Balance:</strong> {material_status}</p>
-    <p><strong>White Material:</strong> {white_total} points</p>
-    <p><strong>Black Material:</strong> {black_total} points</p>
-    <div style="margin-top: 10px; padding: 10px; background: #ecf0f1; border-radius: 5px;">
-        <strong>Analysis:</strong> {get_material_analysis(material)}
-    </div>
-    """
-
 def generate_strategic_insights_section(position_data: Dict[str, Any]) -> str:
     """Generate strategic insights section."""
     metadata = position_data.get('metadata', {})
@@ -1521,3 +909,871 @@ def generate_book_files(position_data: Dict[str, Any], output_dir: str = None) -
         <body><h1>Error</h1><p>{error_msg}</p></body></html>
         """
         return error_html, error_html, error_html, error_html, f"error_{timestamp}"
+
+def generate_space_control_html_table(fen: str, flipped: bool = False) -> str:
+    """
+    Generate space control visualization as HTML table instead of image.
+    This replaces the problematic image generation approach.
+    """
+    try:
+        import chess
+        from spatial_analysis import calculate_comprehensive_spatial_metrics
+        
+        if not fen:
+            return '''<div style="border: 2px dashed #ddd; padding: 40px; text-align: center; color: #666; background: #f9f9f9;">
+                <h4>🎯 Space Control Visualization</h4>
+                <p>Invalid position</p>
+            </div>'''
+        
+        # Calculate spatial metrics
+        board = chess.Board(fen)
+        metrics = calculate_comprehensive_spatial_metrics(board)
+        
+        space_control = metrics.get('space_control', {})
+        control_matrix = space_control.get('control_matrix', [])
+        
+        if not control_matrix or len(control_matrix) != 8:
+            return '''<div style="border: 2px dashed #orange; padding: 40px; text-align: center; color: #666; background: #fff3cd;">
+                <h4>🎯 Space Control Visualization</h4>
+                <p>Unable to calculate space control</p>
+            </div>'''
+        
+        # Generate HTML table for space control
+        html_parts = []
+        
+        html_parts.append('''
+        <div style="border: 1px solid #ddd; border-radius: 8px; padding: 15px; background: white;">
+            <h4 style="margin: 0 0 15px 0; text-align: center; color: #333;">🎯 Space Control Visualization</h4>
+            <table style="border-collapse: collapse; margin: 0 auto; border: 2px solid #8B4513;">
+        ''')
+        
+        # File labels (a-h)
+        files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+        if flipped:
+            files = files[::-1]
+        
+        # Add column headers
+        html_parts.append('<tr><td style="width: 25px; height: 25px; border: none; background: transparent;"></td>')
+        for file_letter in files:
+            html_parts.append(f'<td style="width: 40px; height: 25px; text-align: center; font-weight: bold; border: none; background: transparent;">{file_letter}</td>')
+        html_parts.append('</tr>')
+        
+        # Add board squares with control visualization
+        for rank in range(8):
+            display_rank = 7 - rank if not flipped else rank
+            rank_number = 8 - rank if not flipped else rank + 1
+            
+            html_parts.append(f'<tr>')
+            # Rank number
+            html_parts.append(f'<td style="width: 25px; height: 40px; text-align: center; font-weight: bold; border: none; background: transparent;">{rank_number}</td>')
+            
+            for file in range(8):
+                display_file = file if not flipped else 7 - file
+                
+                try:
+                    control_value = control_matrix[rank][file]
+                    
+                    # Determine background color based on control
+                    if control_value == 1:  # White control
+                        bg_color = '#e8f4fd'  # Light blue
+                        border_color = '#2196F3'  # Blue
+                        symbol = '⚪'
+                        title = 'White Control'
+                    elif control_value == -1:  # Black control
+                        bg_color = '#f3e5f5'  # Light purple
+                        border_color = '#9C27B0'  # Purple  
+                        symbol = '⚫'
+                        title = 'Black Control'
+                    elif control_value == 2:  # Contested
+                        bg_color = '#fff3e0'  # Light orange
+                        border_color = '#FF9800'  # Orange
+                        symbol = '⚡'
+                        title = 'Contested'
+                    else:  # Neutral
+                        bg_color = '#f5f5f5'  # Light gray
+                        border_color = '#9E9E9E'  # Gray
+                        symbol = '◯'
+                        title = 'Neutral'
+                    
+                    # Alternate square colors for chess board pattern
+                    is_light_square = (rank + file) % 2 == 0
+                    if is_light_square:
+                        base_bg = '#f0d9b5'  # Light square
+                    else:
+                        base_bg = '#b58863'  # Dark square
+                    
+                    # Blend control color with square color
+                    if control_value != 0:
+                        cell_bg = bg_color
+                    else:
+                        cell_bg = base_bg
+                    
+                    html_parts.append(f'''
+                    <td style="
+                        width: 40px; 
+                        height: 40px; 
+                        background: {cell_bg}; 
+                        border: 1px solid {border_color}; 
+                        text-align: center; 
+                        vertical-align: middle;
+                        font-size: 16px;
+                        position: relative;
+                    " title="{title}">
+                        {symbol}
+                    </td>
+                    ''')
+                    
+                except (IndexError, TypeError):
+                    # Fallback for invalid control data
+                    html_parts.append('''
+                    <td style="
+                        width: 40px; 
+                        height: 40px; 
+                        background: #f5f5f5; 
+                        border: 1px solid #ddd; 
+                        text-align: center; 
+                        vertical-align: middle;
+                    ">?</td>
+                    ''')
+            
+            html_parts.append('</tr>')
+        
+        html_parts.append('</table>')
+        
+        # Add legend
+        summary = space_control.get('summary', {})
+        white_controlled = summary.get('white_controlled', 0)
+        black_controlled = summary.get('black_controlled', 0)
+        contested = summary.get('contested', 0)
+        neutral = summary.get('neutral', 0)
+        
+        html_parts.append(f'''
+        <div style="margin-top: 15px; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <div style="width: 16px; height: 16px; background: #e8f4fd; border: 1px solid #2196F3; border-radius: 3px;"></div>
+                <span style="font-size: 12px;">White ({white_controlled})</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <div style="width: 16px; height: 16px; background: #f3e5f5; border: 1px solid #9C27B0; border-radius: 3px;"></div>
+                <span style="font-size: 12px;">Black ({black_controlled})</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <div style="width: 16px; height: 16px; background: #fff3e0; border: 1px solid #FF9800; border-radius: 3px;"></div>
+                <span style="font-size: 12px;">Contested ({contested})</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <div style="width: 16px; height: 16px; background: #f5f5f5; border: 1px solid #9E9E9E; border-radius: 3px;"></div>
+                <span style="font-size: 12px;">Neutral ({neutral})</span>
+            </div>
+        </div>
+        </div>
+        ''')
+        
+        return ''.join(html_parts)
+        
+    except Exception as e:
+        return f'''<div style="border: 2px dashed #red; padding: 40px; text-align: center; color: #666; background: #ffe6e6;">
+            <h4>🎯 Space Control Error</h4>
+            <p>{str(e)}</p>
+        </div>'''
+
+def calculate_previous_position_fen(current_fen: str, best_move_uci: str) -> str:
+    """
+    Calculate the previous position FEN by undoing the best move.
+    This fixes the "Position comparison requires previous position data" error.
+    """
+    try:
+        import chess
+        
+        if not current_fen or not best_move_uci:
+            return None
+        
+        # Create board from current position
+        board = chess.Board(current_fen)
+        
+        # Parse the move
+        try:
+            move = chess.Move.from_uci(best_move_uci)
+        except:
+            return None
+        
+        # Check if this move can be undone (is it the last move played?)
+        # We need to create the previous position by undoing the move
+        
+        # Create a copy of the board to work with
+        temp_board = chess.Board(current_fen)
+        
+        # The tricky part: we need to figure out what the position was BEFORE this move
+        # Since we have the position AFTER the move, we need to "undo" it
+        
+        # This is complex because we need to reverse:
+        # 1. The move itself
+        # 2. Any captures
+        # 3. Castling rights
+        # 4. En passant state
+        # 5. Turn color
+        
+        # For now, let's try a simpler approach:
+        # Create the move and see if it's legal in the current position
+        if move in board.legal_moves:
+            # If the move is legal in current position, then current position 
+            # is actually the position BEFORE the move, not after
+            # So we need to play the move to get the "after" position
+            temp_board.push(move)
+            return current_fen  # Current FEN is actually the "before" position
+        
+        # Alternative approach: try to find the previous position by
+        # analyzing move history if available
+        
+        # For the basic case, let's return None and handle gracefully
+        return None
+        
+    except Exception as e:
+        print(f"Error calculating previous position: {e}")
+        return None
+
+def get_position_for_comparison(position_data: dict) -> tuple:
+    """
+    Get both current and previous positions for comparison.
+    Returns (current_fen, previous_fen) tuple.
+    """
+    try:
+        current_fen = position_data.get('fen', '')
+        
+        # Method 1: Try to get from move_history 
+        move_history = position_data.get('move_history', [])
+        if move_history and len(move_history) > 0:
+            last_move_data = move_history[-1]
+            
+            if isinstance(last_move_data, dict):
+                # Check for explicit previous FEN
+                previous_fen = last_move_data.get('fen_before')
+                if previous_fen:
+                    return current_fen, previous_fen
+                
+                # Try to calculate from move UCI
+                move_uci = last_move_data.get('uci') or last_move_data.get('move')
+                if move_uci:
+                    previous_fen = calculate_previous_position_fen(current_fen, move_uci)
+                    if previous_fen:
+                        return current_fen, previous_fen
+        
+        # Method 2: Try using the best move to calculate previous position
+        moves = position_data.get('moves', [])
+        if moves and len(moves) > 0:
+            best_move = moves[0]
+            move_uci = best_move.get('uci', '')
+            
+            if move_uci:
+                previous_fen = calculate_previous_position_fen(current_fen, move_uci)
+                if previous_fen:
+                    return current_fen, previous_fen
+        
+        # Method 3: Check for explicit previous_fen field
+        previous_fen = position_data.get('previous_fen')
+        if previous_fen:
+            return current_fen, previous_fen
+        
+        # If we can't determine previous position, return current and None
+        return current_fen, None
+        
+    except Exception as e:
+        print(f"Error getting positions for comparison: {e}")
+        return position_data.get('fen', ''), None
+
+def calculate_previous_position_fen(current_fen: str, best_move_uci: str) -> Optional[str]:
+    """
+    Calculate the previous position FEN by undoing the best move.
+    This is a simplified approach for the book generator.
+    """
+    try:
+        if not current_fen or not best_move_uci:
+            return None
+        
+        # Create board from current position
+        board = chess.Board(current_fen)
+        
+        # Parse the move
+        try:
+            move = chess.Move.from_uci(best_move_uci)
+        except:
+            return None
+        
+        # If the move is legal in current position, then current position
+        # is actually the position BEFORE the move
+        if move in board.legal_moves:
+            # Apply the move to get the "after" position
+            temp_board = board.copy()
+            temp_board.push(move)
+            return current_fen  # Current FEN is the "before" position
+        
+        # For a more sophisticated approach, we'd need to reverse the move
+        # but that's complex due to captures, castling rights, etc.
+        # For now, return None and handle gracefully
+        return None
+        
+    except Exception as e:
+        print(f"Error calculating previous position: {e}")
+        return None
+
+def generate_position_comparison_table_html(fen: str, previous_fen: Optional[str] = None) -> str:
+    """Generate position comparison table as HTML - UPDATED VERSION."""
+    try:
+        if not SPATIAL_ANALYSIS_AVAILABLE:
+            return '''<tr><td colspan="5" style="text-align: center; color: #666; padding: 20px; font-style: italic;">
+                Spatial analysis module not available
+            </td></tr>'''
+        
+        if not previous_fen:
+            return '''<tr><td colspan="5" style="text-align: center; color: #666; padding: 20px; font-style: italic;">
+                Position comparison requires previous position data
+            </td></tr>'''
+        
+        # Calculate current metrics
+        board = chess.Board(fen)
+        current_metrics = spatial_analysis.calculate_comprehensive_spatial_metrics(board)
+        
+        # Calculate previous metrics
+        prev_board = chess.Board(previous_fen)
+        previous_metrics = spatial_analysis.calculate_comprehensive_spatial_metrics(prev_board)
+        
+        table_rows = []
+        
+        # Material comparison
+        prev_material = previous_metrics.get('material_balance', {}).get('material_difference', 0)
+        curr_material = current_metrics.get('material_balance', {}).get('material_difference', 0)
+        material_change = round(curr_material - prev_material, 2)
+        material_trend = "📈" if material_change > 0.1 else "📉" if material_change < -0.1 else "➡️"
+        
+        table_rows.append(f'''
+        <tr>
+            <td><strong>Material Balance</strong></td>
+            <td>{prev_material:+.1f}</td>
+            <td>{curr_material:+.1f}</td>
+            <td>{material_change:+.1f}</td>
+            <td>{material_trend}</td>
+        </tr>
+        ''')
+        
+        # Space control comparison
+        prev_space = previous_metrics.get('comparison', {}).get('space_control_advantage', 0)
+        curr_space = current_metrics.get('comparison', {}).get('space_control_advantage', 0)
+        space_change = round(curr_space - prev_space, 2)
+        space_trend = "📈" if space_change > 0.1 else "📉" if space_change < -0.1 else "➡️"
+        
+        table_rows.append(f'''
+        <tr>
+            <td><strong>Space Control</strong></td>
+            <td>{prev_space:+.2f}</td>
+            <td>{curr_space:+.2f}</td>
+            <td>{space_change:+.2f}</td>
+            <td>{space_trend}</td>
+        </tr>
+        ''')
+        
+        # Center control comparison
+        prev_center = previous_metrics.get('center_control', {}).get('core_control_difference', 0)
+        curr_center = current_metrics.get('center_control', {}).get('core_control_difference', 0)
+        center_change = curr_center - prev_center
+        center_trend = "📈" if center_change > 0 else "📉" if center_change < 0 else "➡️"
+        
+        table_rows.append(f'''
+        <tr>
+            <td><strong>Center Control</strong></td>
+            <td>{prev_center:+d}</td>
+            <td>{curr_center:+d}</td>
+            <td>{center_change:+d}</td>
+            <td>{center_trend}</td>
+        </tr>
+        ''')
+        
+        # Connectivity comparison
+        prev_white_conn = previous_metrics.get('white', {}).get('connectivity_score', 0)
+        prev_black_conn = previous_metrics.get('black', {}).get('connectivity_score', 0)
+        prev_connectivity = round(prev_white_conn - prev_black_conn, 3)
+        
+        curr_white_conn = current_metrics.get('white', {}).get('connectivity_score', 0)
+        curr_black_conn = current_metrics.get('black', {}).get('connectivity_score', 0)
+        curr_connectivity = round(curr_white_conn - curr_black_conn, 3)
+        
+        connectivity_change = round(curr_connectivity - prev_connectivity, 3)
+        connectivity_trend = "📈" if connectivity_change > 0.1 else "📉" if connectivity_change < -0.1 else "➡️"
+        
+        table_rows.append(f'''
+        <tr>
+            <td><strong>Connectivity</strong></td>
+            <td>{prev_connectivity:+.2f}</td>
+            <td>{curr_connectivity:+.2f}</td>
+            <td>{connectivity_change:+.2f}</td>
+            <td>{connectivity_trend}</td>
+        </tr>
+        ''')
+        
+        return ''.join(table_rows)
+        
+    except Exception as e:
+        return f'<tr><td colspan="5" style="text-align: center; color: #666; padding: 20px;">Position comparison error: {str(e)}</td></tr>'
+
+def generate_spatial_metrics_table_html(fen: str) -> str:
+    """Generate detailed spatial metrics table as HTML - UPDATED VERSION."""
+    try:
+        if not SPATIAL_ANALYSIS_AVAILABLE:
+            return '<tr><td colspan="6" style="text-align: center; color: #666; padding: 20px;">Spatial analysis module not available</td></tr>'
+        
+        # Calculate metrics
+        board = chess.Board(fen)
+        metrics = spatial_analysis.calculate_comprehensive_spatial_metrics(board)
+        
+        table_rows = []
+        
+        # Extract metrics safely
+        white_metrics = metrics.get('white', {})
+        black_metrics = metrics.get('black', {})
+        material_balance = metrics.get('material_balance', {})
+        center_control = metrics.get('center_control', {})
+        space_control = metrics.get('space_control', {})
+        
+        # Material balance
+        white_material = material_balance.get('white_total', 0)
+        black_material = material_balance.get('black_total', 0)
+        material_diff = material_balance.get('material_difference', 0)
+        
+        table_rows.append(f'''
+        <tr>
+            <td><strong>Material</strong></td>
+            <td>Total Points</td>
+            <td>{white_material:.1f}</td>
+            <td>{black_material:.1f}</td>
+            <td>{material_diff:+.1f}</td>
+            <td>Material advantage</td>
+        </tr>
+        ''')
+        
+        # Space control
+        white_space = space_control.get('summary', {}).get('total_controlled_white', 0)
+        black_space = space_control.get('summary', {}).get('total_controlled_black', 0)
+        space_diff = round(white_space - black_space, 2)
+        
+        table_rows.append(f'''
+        <tr>
+            <td><strong>Territory</strong></td>
+            <td>Controlled Squares</td>
+            <td>{white_space:.1f}</td>
+            <td>{black_space:.1f}</td>
+            <td>{space_diff:+.1f}</td>
+            <td>Territorial control</td>
+        </tr>
+        ''')
+        
+        # Center control
+        white_center = center_control.get('white_core_control', 0)
+        black_center = center_control.get('black_core_control', 0)
+        center_diff = center_control.get('core_control_difference', 0)
+        
+        table_rows.append(f'''
+        <tr>
+            <td><strong>Center</strong></td>
+            <td>Core Squares</td>
+            <td>{white_center}</td>
+            <td>{black_center}</td>
+            <td>{center_diff:+d}</td>
+            <td>Central dominance</td>
+        </tr>
+        ''')
+        
+        # Army coordination
+        white_connectivity = white_metrics.get('connectivity_score', 0.0)
+        black_connectivity = black_metrics.get('connectivity_score', 0.0)
+        connectivity_diff = round(white_connectivity - black_connectivity, 3)
+        
+        table_rows.append(f'''
+        <tr>
+            <td><strong>Coordination</strong></td>
+            <td>Connectivity Score</td>
+            <td>{white_connectivity:.2f}</td>
+            <td>{black_connectivity:.2f}</td>
+            <td>{connectivity_diff:+.2f}</td>
+            <td>Piece coordination</td>
+        </tr>
+        ''')
+        
+        # Position centroids
+        white_centroid = white_metrics.get('centroid', (0, 0))
+        black_centroid = black_metrics.get('centroid', (0, 0))
+        
+        table_rows.append(f'''
+        <tr>
+            <td><strong>Position Center</strong></td>
+            <td>Army Centroid</td>
+            <td>({white_centroid[0]:.1f}, {white_centroid[1]:.1f})</td>
+            <td>({black_centroid[0]:.1f}, {black_centroid[1]:.1f})</td>
+            <td>—</td>
+            <td>Average piece position</td>
+        </tr>
+        ''')
+        
+        return ''.join(table_rows)
+        
+    except Exception as e:
+        return f'<tr><td colspan="6" style="text-align: center; color: #666; padding: 20px;">Spatial metrics error: {str(e)}</td></tr>'
+
+def generate_spatial_insights_html(fen: str) -> str:
+    """Generate spatial insights as HTML - UPDATED VERSION."""
+    try:
+        if not SPATIAL_ANALYSIS_AVAILABLE:
+            return '<div style="padding: 20px; text-align: center; color: #666;">Spatial analysis module not available</div>'
+        
+        # Calculate metrics
+        board = chess.Board(fen)
+        metrics = spatial_analysis.calculate_comprehensive_spatial_metrics(board)
+        
+        insights = []
+        
+        # Material insights
+        material_balance = metrics.get('material_balance', {})
+        material_diff = material_balance.get('material_difference', 0)
+        
+        if material_diff > 3:
+            insights.append("🔥 White has a significant material advantage")
+        elif material_diff < -3:
+            insights.append("🔥 Black has a significant material advantage")
+        elif abs(material_diff) <= 1:
+            insights.append("⚖️ Material is roughly equal")
+        
+        # Space control insights
+        space_control = metrics.get('space_control', {})
+        summary = space_control.get('summary', {})
+        white_space = summary.get('total_controlled_white', 0)
+        black_space = summary.get('total_controlled_black', 0)
+        
+        space_diff = white_space - black_space
+        if space_diff > 3:
+            insights.append("🗺️ White dominates the board territorially")
+        elif space_diff < -3:
+            insights.append("🗺️ Black controls more territory")
+        else:
+            insights.append("🗺️ Territorial control is balanced")
+        
+        # Center control insights
+        center_control = metrics.get('center_control', {})
+        center_diff = center_control.get('core_control_difference', 0)
+        
+        if center_diff > 1:
+            insights.append("🎯 White controls the center effectively")
+        elif center_diff < -1:
+            insights.append("🎯 Black has better central control")
+        else:
+            insights.append("🎯 Center control is contested")
+        
+        # Connectivity insights
+        white_metrics = metrics.get('white', {})
+        black_metrics = metrics.get('black', {})
+        
+        white_connectivity = white_metrics.get('connectivity_score', 0)
+        black_connectivity = black_metrics.get('connectivity_score', 0)
+        
+        if white_connectivity > black_connectivity + 0.2:
+            insights.append("🔗 White's pieces are better coordinated")
+        elif black_connectivity > white_connectivity + 0.2:
+            insights.append("🔗 Black shows superior piece coordination")
+        else:
+            insights.append("🔗 Both sides have decent piece coordination")
+        
+        # Format insights
+        if insights:
+            insights_html = '<ul style="margin: 0; padding-left: 20px;">'
+            for insight in insights:
+                insights_html += f'<li style="margin: 8px 0; font-size: 14px;">{insight}</li>'
+            insights_html += '</ul>'
+        else:
+            insights_html = '<p style="text-align: center; color: #666;">No specific insights available for this position.</p>'
+        
+        return insights_html
+        
+    except Exception as e:
+        return f'<div style="padding: 20px; text-align: center; color: #666;">Insights generation error: {str(e)}</div>'
+
+def generate_spatial_analysis_html(position_data: Dict[str, Any], timestamp: str = None, output_dir: str = None) -> str:
+    """Generate UPDATED Spatial Analysis HTML template with HTML visualization and proper position comparison."""
+    
+    if timestamp is None:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    position_id = position_data.get('id', 'unknown')
+    fen = position_data.get('fen', '')
+    turn = position_data.get('turn', 'white').capitalize()
+    move_number = position_data.get('fullmove_number', 1)
+    
+    # Get current and previous positions for comparison - FIXED
+    current_fen, previous_fen = get_position_for_comparison(position_data)
+    
+    # Generate HTML space control visualization (REPLACES image generation)
+    flipped = (turn.lower() == 'black')
+    space_control_html = generate_space_control_html_table(fen, flipped=flipped)
+    
+    # Generate spatial metrics table
+    spatial_metrics_table = generate_spatial_metrics_table_html(fen)
+    
+    # Generate position comparison table (now with proper previous position handling)
+    position_comparison_table = generate_position_comparison_table_html(current_fen, previous_fen)
+    
+    # Generate spatial insights
+    spatial_insights = generate_spatial_insights_html(fen)
+    
+    # Enhanced position info section
+    last_move = position_data.get('last_move', '')
+    opening_name = position_data.get('opening_name', '')
+    opening_eco = position_data.get('opening_eco', '')
+    complexity_score = position_data.get('complexity_score', 0)
+    
+    position_info = f"""
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+            <div><strong>Position ID:</strong> {position_id}</div>
+            <div><strong>Turn:</strong> {turn}</div>
+            <div><strong>Move Number:</strong> {move_number}</div>
+            <div><strong>Last Move:</strong> {last_move or 'N/A'}</div>
+            {f'<div><strong>Opening:</strong> {opening_name}</div>' if opening_name else ''}
+            {f'<div><strong>ECO:</strong> {opening_eco}</div>' if opening_eco else ''}
+            {f'<div><strong>Complexity:</strong> {complexity_score:.2f}</div>' if complexity_score > 0 else ''}
+        </div>
+    </div>
+    """
+    
+    template = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spatial Analysis Report - Position {position_id}</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }}
+        .header {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }}
+        .section {{
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }}
+        .metrics-table, .comparison-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }}
+        .metrics-table th, .comparison-table th {{
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #dee2e6;
+            font-weight: 600;
+        }}
+        .metrics-table td, .comparison-table td {{
+            padding: 10px 12px;
+            border: 1px solid #dee2e6;
+        }}
+        .metrics-table tr:nth-child(even), .comparison-table tr:nth-child(even) {{
+            background: #f8f9fa;
+        }}
+        .insights-section {{
+            background: #e8f5e8;
+            border-left: 4px solid #27ae60;
+        }}
+        .space-control-container {{
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }}
+        .comparison-note {{
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Spatial Analysis Report</h1>
+        <p>Advanced position analysis with territorial control visualization</p>
+        <p>Generated: {timestamp}</p>
+    </div>
+    
+    <div class="section">
+        <h3>📋 Position Information</h3>
+        {position_info}
+    </div>
+    
+    <div class="section">
+        <h3>🎯 Space Control Visualization</h3>
+        <p style="margin-bottom: 20px; color: #666; font-style: italic;">
+            This visualization shows which squares each side controls or contests on the board.
+        </p>
+        <div class="space-control-container">
+            {space_control_html}
+        </div>
+    </div>
+    
+    <div class="section">
+        <h3>📊 Detailed Spatial Metrics</h3>
+        <table class="metrics-table">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Metric</th>
+                    <th>White</th>
+                    <th>Black</th>
+                    <th>Advantage</th>
+                    <th>Analysis</th>
+                </tr>
+            </thead>
+            <tbody>
+                {spatial_metrics_table}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h3>📈 Position Comparison</h3>
+        {'<div class="comparison-note"><strong>Note:</strong> Comparing current position with the position before the best move was played.</div>' if previous_fen else ''}
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Previous</th>
+                    <th>Current</th>
+                    <th>Change</th>
+                    <th>Trend</th>
+                </tr>
+            </thead>
+            <tbody>
+                {position_comparison_table}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="insights-section section">
+        <h3>💡 Spatial Insights</h3>
+        {spatial_insights}
+    </div>
+    
+    <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; text-align: center; margin-top: 20px; border-left: 4px solid #27ae60;">
+        <h4>📈 Analysis Summary</h4>
+        <p>This spatial analysis provides insights into piece coordination, territorial control, and strategic imbalances that complement traditional chess evaluation. The space control visualization shows the battle for key squares and territorial dominance.</p>
+    </div>
+</body>
+</html>
+"""
+    return template
+
+
+def format_themes(themes_list):
+    """Format position themes for display."""
+    if not themes_list:
+        return ['Positional']
+    
+    formatted = []
+    for theme in themes_list[:5]:  # Limit to 5 themes
+        formatted.append(theme.replace('_', ' ').title())
+    
+    return formatted
+
+def generate_chess_board_svg(fen: str, flipped: bool = False, size: int = 300) -> str:
+    """Generate SVG representation of chess board."""
+    try:
+        board = chess.Board(fen)
+        svg = chess.svg.board(
+            board=board,
+            flipped=flipped,
+            size=size,
+            style="""
+            .square.light { fill: #f0d9b5; }
+            .square.dark { fill: #b58863; }
+            .piece { font-size: 45px; }
+            """
+        )
+        return svg
+    except Exception as e:
+        return f'<div style="border: 2px solid #ddd; padding: 20px; text-align: center;">Chess board generation failed: {str(e)}</div>'
+
+def generate_themes_section(position_data: Dict[str, Any]) -> str:
+    """Generate themes overview section with enhanced metadata."""
+    metadata = position_data.get('metadata', {})
+    themes = format_themes(position_data.get('position_classification', []))
+    
+    # Enhanced themes from new fields
+    position_themes = position_data.get('position_themes', [])
+    tactical_motifs = position_data.get('tactical_motifs', [])
+    strategic_elements = position_data.get('strategic_elements', [])
+    
+    # Combine all themes
+    all_themes = themes + position_themes + tactical_motifs + strategic_elements
+    unique_themes = list(dict.fromkeys(all_themes))[:8]  # Remove duplicates, limit to 8
+    
+    # Basic position characteristics
+    turn = position_data.get('turn', 'white').capitalize()
+    move_number = position_data.get('fullmove_number', 1)
+    
+    # Enhanced game phase detection
+    complexity_score = position_data.get('complexity_score', 0)
+    if move_number <= 15:
+        game_phase = "Opening"
+    elif move_number <= 30:
+        game_phase = "Middlegame"
+    else:
+        game_phase = "Endgame"
+    
+    theme_tags = ''.join([f'<span class="theme-tag">{theme}</span>' for theme in unique_themes])
+    
+    complexity_info = f" (Complexity: {complexity_score:.1f})" if complexity_score > 0 else ""
+    
+    return f"""
+    <p><strong>Game Phase:</strong> {game_phase} (Move {move_number}){complexity_info}</p>
+    <p><strong>To Move:</strong> {turn}</p>
+    <p><strong>Position Themes:</strong></p>
+    <div style="margin: 10px 0;">{theme_tags}</div>
+    <p style="margin-top: 15px; font-style: italic;">
+        This position involves {', '.join(unique_themes[:3]).lower() if unique_themes else 'general chess principles'} and requires careful strategic consideration.
+    </p>
+    """
+
+def generate_material_section(metadata: Dict[str, Any]) -> str:
+    """Generate enhanced material analysis section."""
+    material = metadata.get('material', {})
+    
+    white_total = material.get('white_total', 0)
+    black_total = material.get('black_total', 0)
+    material_diff = white_total - black_total
+    
+    if material_diff > 2:
+        material_status = f"White has a material advantage (+{material_diff:.1f})"
+        material_color = "#4CAF50"
+    elif material_diff < -2:
+        material_status = f"Black has a material advantage ({material_diff:.1f})"
+        material_color = "#F44336"
+    else:
+        material_status = "Material is roughly balanced"
+        material_color = "#FF9800"
+    
+    return f'''
+    <div style="padding: 15px; border-left: 4px solid {material_color}; background: rgba(128,128,128,0.1);">
+        <p><strong>Material Balance:</strong> {material_status}</p>
+        <p><strong>White Total:</strong> {white_total:.1f} points | <strong>Black Total:</strong> {black_total:.1f} points</p>
+    </div>
+    '''
