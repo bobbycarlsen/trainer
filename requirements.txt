@@ -9,3 +9,10 @@ python-dateutil>=2.8.2
 Pillow>=9.0.0
 python-chess>=1.9.0
 scipy>=1.11.0
+# New dependencies for enhanced features
+weasyprint>=61.0
+Pillow>=10.0.0
+kaleido>=0.2.1
+# Optional: Enhanced PDF generation
+cffi>=1.15.0
+pycairo>=1.21.0

@@ -669,7 +669,32 @@ def display_simple_train_page():
                 flipped=flip_training
             )
 
+
+        # Last Move Info Snippet (NEW)
+        if position.get('moves') and len(position['moves']) > 0:
+            best_move = position['moves'][0]
+            last_move_info = f"🎯 **Best Move**: {best_move.get('move', 'N/A')}"
             
+            # Add score if available
+            score = best_move.get('score')
+            if score is not None:
+                if abs(score) >= 100:
+                    score_display = f"{score/100:+.1f}"
+                else:
+                    score_display = f"{score:+d}cp"
+                last_move_info += f" ({score_display})"
+            
+            # Add classification
+            classification = best_move.get('classification', '')
+            if classification:
+                class_emoji = {
+                    'great': '🏆', 'good': '✅', 'inaccuracy': '⚠️', 
+                    'mistake': '❌', 'blunder': '💥'
+                }.get(classification, '📝')
+                last_move_info += f" {class_emoji} {classification.title()}"
+            
+            st.info(last_move_info)
+
         # Book Generation Section
         st.markdown("### 📚 Generate Educational Materials")
 
@@ -687,29 +712,84 @@ def display_simple_train_page():
                 with st.spinner("Generating educational materials..."):
                     try:
                         # Import the enhanced book generator
-                        # if 'book_generator' not in globals():
-                        #     import book_generator
+                        import book_generator
                         
-                        # Generate the three book files
-                        problem_html, solution_html, comprehensive_html, filename_base = book_generator.generate_book_files(position)
+                        # Show progress steps
+                        progress_placeholder = st.empty()
+                        
+                        progress_placeholder.info("🔄 Step 1/4: Generating Problem template...")
+                        
+                        # Create temporary directory for images
+                        import os
+                        from datetime import datetime
 
-                        # Store in session state
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        output_dir = os.path.join(os.getcwd(), "positions", f"position_{current_position_id}_{timestamp}")
+                        temp_dir = os.makedirs(output_dir)
+                        
+                        # Generate all FOUR book files (including new Spatial Analysis) with temp directory
+                        result = book_generator.generate_book_files(position, output_dir=None)
+                        
+                        progress_placeholder.info("🔄 Step 2/4: Generating Solution template...")
+                        
+                        # Handle both old and new versions of generate_book_files
+                        if len(result) == 5:  # New version with spatial analysis
+                            problem_html, solution_html, comprehensive_html, spatial_analysis_html, filename_base = result
+                            progress_placeholder.info("🔄 Step 3/4: Generating Analysis template...")
+                            progress_placeholder.info("🔄 Step 4/4: Generating Spatial Analysis template...")
+                        elif len(result) == 4:  # Old version compatibility
+                            problem_html, solution_html, comprehensive_html, filename_base = result
+                            progress_placeholder.info("🔄 Step 3/4: Generating Analysis template...")
+                            progress_placeholder.info("🔄 Step 4/4: Generating Spatial Analysis template...")
+                            # Generate spatial analysis separately for backward compatibility
+                            spatial_analysis_html = book_generator.generate_spatial_analysis_html(position, output_dir=temp_dir)
+                        else:
+                            raise ValueError(f"Unexpected return value count: {len(result)}")
+
+                        progress_placeholder.success("✅ All templates generated successfully!")
+                        
+                        # Store ALL FOUR files in session state along with temp directory
                         st.session_state.generated_book_files = {
                             'problem_html': problem_html,
                             'solution_html': solution_html,
-                            'comprehensive_html': comprehensive_html,  # Add this line
+                            'comprehensive_html': comprehensive_html,
+                            'spatial_analysis_html': spatial_analysis_html,  # NEW
                             'filename_base': filename_base,
-                            'position_id': current_position_id
+                            'position_id': current_position_id,
+                            'temp_dir': temp_dir  # Store temp directory for cleanup later
                         }
                         
                         st.success("✅ Educational materials generated successfully!")
-                        st.rerun()
+                        st.success("🆕 Now includes Spatial Analysis template!")
+                        
+                        # Clear progress placeholder after success
+                        progress_placeholder.empty()
+                        
+                        # Cleanup old temp directories if any
+                        if 'temp_dir' in st.session_state.get('generated_book_files', {}):
+                            old_temp_dir = st.session_state.generated_book_files['temp_dir']
+                            try:
+                                import shutil
+                                if os.path.exists(old_temp_dir):
+                                    shutil.rmtree(old_temp_dir)
+                            except:
+                                pass  # Ignore cleanup errors
                         
                     except ImportError as e:
                         st.error(f"❌ Book generator module not found: {e}")
-                        st.write("Make sure enhanced_book_generator.py is in your project directory")
+                        st.write("Make sure book_generator.py is in your project directory")
                     except Exception as e:
-                        st.error(f"❌ Error generating materials: {e}")
+                        error_msg = str(e)
+                        st.error(f"❌ Error generating materials: {error_msg}")
+                        
+                        # Specific error handling for common issues
+                        if "kaleido" in error_msg.lower() or "image" in error_msg.lower():
+                            st.warning("⚠️ Image generation issue detected. This might be due to missing kaleido library.")
+                            st.code("pip install kaleido", language="bash")
+                            st.info("💡 Templates will still generate with placeholder images if kaleido is unavailable.")
+                        elif "spatial_analysis" in error_msg.lower():
+                            st.warning("⚠️ Spatial analysis module issue. Spatial Analysis template may show placeholders.")
+                        
                         with st.expander("🔧 Debug Information"):
                             st.exception(e)
 
@@ -717,10 +797,11 @@ def display_simple_train_page():
             if has_files_for_position:
                 files = st.session_state.generated_book_files
                 
-                # Download buttons for all three files
+                # Download buttons for ALL FOUR files
                 problem_filename = f"{files['filename_base']}_problem.html"
                 solution_filename = f"{files['filename_base']}_solution.html"
                 comprehensive_filename = f"{files['filename_base']}_comprehensive.html"
+                spatial_filename = f"{files['filename_base']}_spatial_analysis.html"  # NEW
                 
                 st.download_button(
                     label="⬇️ Download Problem",
@@ -745,11 +826,25 @@ def display_simple_train_page():
                     mime="text/html",
                     use_container_width=True
                 )
+                
+                # NEW: Download button for Spatial Analysis
+                st.download_button(
+                    label="🗺️ Download Spatial Analysis", 
+                    data=files['spatial_analysis_html'],
+                    file_name=spatial_filename,
+                    mime="text/html",
+                    use_container_width=True
+                )
 
-        # Show preview if files exist
+        # Show preview if files exist - UPDATED to include spatial analysis
         if has_files_for_position:
             with st.expander("📖 Preview Generated Materials"):
-                tab1, tab2, tab3 = st.tabs(["Problem Preview", "Solution Preview", "Analysis Preview"])
+                tab1, tab2, tab3, tab4 = st.tabs([
+                    "Problem Preview", 
+                    "Solution Preview", 
+                    "Analysis Preview",
+                    "🆕 Spatial Preview"  # NEW TAB
+                ])
                 
                 with tab1:
                     st.components.v1.html(
@@ -770,7 +865,16 @@ def display_simple_train_page():
                         st.session_state.generated_book_files['comprehensive_html'],
                         height=600,
                         scrolling=True
-                    )        
+                    )
+                
+                # NEW: Spatial Analysis Preview Tab
+                with tab4:
+                    st.components.v1.html(
+                        st.session_state.generated_book_files['spatial_analysis_html'],
+                        height=600,
+                        scrolling=True
+                    )
+        
         # Option to try again with new move
         st.markdown("---")
         if st.button("🔄 Try Another Move", use_container_width=True):
@@ -1733,33 +1837,365 @@ def display_activity_timeline(user_stats):
     else:
         st.info("📈 Your activity timeline will appear here as you train more!")
 
+def display_database_viewer():
+    """Display database tables, columns, and sample data - FIXED VERSION."""
+    st.markdown("### 🗄️ Database Information")
+    
+    try:
+        import database
+        conn = database.get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get all table names - SAFE QUERY
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
+        tables = [row[0] for row in cursor.fetchall()]
+        
+        if not tables:
+            st.warning("No tables found in the database.")
+            conn.close()
+            return
+        
+        # Table selector
+        selected_table = st.selectbox("📋 Select Table", tables, index=0)
+        
+        if selected_table:
+            # Display table information in tabs
+            info_tab1, info_tab2, info_tab3, info_tab4 = st.tabs([
+                "📊 Table Info", "🏛️ Schema", "📝 Sample Data", "📈 Statistics"
+            ])
+            
+            with info_tab1:
+                st.markdown(f"#### 📋 Table: `{selected_table}`")
+                
+                # Get row count - SAFE QUERY
+                try:
+                    cursor.execute(f"SELECT COUNT(*) as count FROM `{selected_table}`;")
+                    row_count = cursor.fetchone()['count']
+                except Exception as e:
+                    row_count = 0
+                    st.warning(f"Could not get row count: {e}")
+                
+                # Get table info - SAFE QUERY
+                try:
+                    cursor.execute(f"PRAGMA table_info(`{selected_table}`);")
+                    table_info = cursor.fetchall()
+                except Exception as e:
+                    table_info = []
+                    st.error(f"Could not get table info: {e}")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Total Rows", f"{row_count:,}")
+                with col2:
+                    st.metric("Total Columns", len(table_info))
+                
+                # Table description based on name
+                table_descriptions = {
+                    'positions': 'Chess training positions with FEN, moves, and metadata',
+                    'moves': 'Individual moves for each position with analysis',
+                    'users': 'User accounts and authentication information',
+                    'user_moves': 'User training attempts and results',
+                    'user_settings': 'User configuration and preferences',
+                    'games': 'Complete chess games from PGN files',
+                    'user_game_analysis': 'User progress on game analysis',
+                    'user_saved_games': 'Games saved by users for later analysis',
+                    'training_sessions': 'Training session groupings and metadata'
+                }
+                
+                description = table_descriptions.get(selected_table, "Database table")
+                st.info(f"📝 **Description**: {description}")
+            
+            with info_tab2:
+                st.markdown(f"#### 🏛️ Schema for `{selected_table}`")
+                
+                if table_info:
+                    # Create schema dataframe
+                    schema_data = []
+                    for column in table_info:
+                        cid, name, data_type, not_null, default_value, pk = column
+                        schema_data.append({
+                            "Column": name,
+                            "Type": data_type,
+                            "Not Null": "✅" if not_null else "❌",
+                            "Default": default_value if default_value else "None",
+                            "Primary Key": "🔑" if pk else ""
+                        })
+                    
+                    import pandas as pd
+                    schema_df = pd.DataFrame(schema_data)
+                    st.dataframe(schema_df, use_container_width=True, hide_index=True)
+                    
+                    # Show foreign keys - SAFE QUERY
+                    try:
+                        cursor.execute(f"PRAGMA foreign_key_list(`{selected_table}`);")
+                        foreign_keys = cursor.fetchall()
+                        
+                        if foreign_keys:
+                            st.markdown("#### 🔗 Foreign Keys")
+                            fk_data = []
+                            for fk in foreign_keys:
+                                fk_data.append({
+                                    "Column": fk[3],
+                                    "References Table": fk[2],
+                                    "References Column": fk[4]
+                                })
+                            fk_df = pd.DataFrame(fk_data)
+                            st.dataframe(fk_df, use_container_width=True, hide_index=True)
+                    except Exception as e:
+                        st.warning(f"Could not get foreign keys: {e}")
+                else:
+                    st.warning("No schema information available.")
+            
+            with info_tab3:
+                st.markdown(f"#### 📝 Sample Data from `{selected_table}`")
+                
+                if row_count == 0:
+                    st.warning("No data available in this table.")
+                else:
+                    # Sample size selector
+                    sample_size = st.slider("Sample Size", 1, min(50, row_count), 5)
+                    
+                    # Get sample data - SAFE QUERY with LIMIT
+                    try:
+                        cursor.execute(f"SELECT * FROM `{selected_table}` LIMIT ?;", (sample_size,))
+                        sample_data = cursor.fetchall()
+                        
+                        if sample_data:
+                            # Get column names
+                            column_names = [desc[0] for desc in cursor.description]
+                            
+                            # Create dataframe
+                            import pandas as pd
+                            sample_df = pd.DataFrame(sample_data, columns=column_names)
+                            
+                            # Display with proper formatting
+                            st.dataframe(sample_df, use_container_width=True)
+                            
+                            # Show data types
+                            with st.expander("🔍 Data Types & Null Counts"):
+                                type_info = []
+                                for col in column_names:
+                                    try:
+                                        non_null_count = sample_df[col].count()
+                                        null_count = len(sample_df) - non_null_count
+                                        
+                                        # Try to determine data type from sample
+                                        if not sample_df[col].empty:
+                                            sample_value = sample_df[col].dropna().iloc[0] if not sample_df[col].dropna().empty else None
+                                            inferred_type = type(sample_value).__name__ if sample_value is not None else "unknown"
+                                        else:
+                                            inferred_type = "unknown"
+                                        
+                                        type_info.append({
+                                            "Column": col,
+                                            "Inferred Type": inferred_type,
+                                            "Non-Null": non_null_count,
+                                            "Null": null_count
+                                        })
+                                    except Exception:
+                                        type_info.append({
+                                            "Column": col,
+                                            "Inferred Type": "error",
+                                            "Non-Null": 0,
+                                            "Null": 0
+                                        })
+                                
+                                type_df = pd.DataFrame(type_info)
+                                st.dataframe(type_df, use_container_width=True, hide_index=True)
+                        else:
+                            st.warning("No sample data retrieved.")
+                    except Exception as e:
+                        st.error(f"Error retrieving sample data: {e}")
+            
+            with info_tab4:
+                st.markdown(f"#### 📈 Statistics for `{selected_table}`")
+                
+                if row_count == 0:
+                    st.warning("No data available for statistics.")
+                else:
+                    # General statistics
+                    stat_col1, stat_col2 = st.columns(2)
+                    
+                    with stat_col1:
+                        st.metric("Total Records", f"{row_count:,}")
+                        
+                        # Get estimated table size
+                        try:
+                            cursor.execute(f"SELECT * FROM `{selected_table}` LIMIT 1;")
+                            sample_row = cursor.fetchone()
+                            if sample_row:
+                                # Rough estimate based on string length
+                                estimated_row_size = len(str(sample_row))
+                                estimated_size_kb = (row_count * estimated_row_size) / 1024
+                                st.metric("Estimated Size", f"{estimated_size_kb:.1f} KB")
+                        except:
+                            st.metric("Estimated Size", "Unknown")
+                    
+                    with stat_col2:
+                        # Get date range for timestamp tables
+                        if selected_table in ['user_moves', 'user_game_analysis']:
+                            try:
+                                # Check if timestamp column exists
+                                cursor.execute(f"PRAGMA table_info(`{selected_table}`);")
+                                columns = [col[1] for col in cursor.fetchall()]
+                                
+                                if 'timestamp' in columns:
+                                    cursor.execute(f"SELECT MIN(timestamp) as min_date, MAX(timestamp) as max_date FROM `{selected_table}` WHERE timestamp IS NOT NULL;")
+                                    date_range = cursor.fetchone()
+                                    if date_range and date_range['min_date'] and date_range['max_date']:
+                                        st.metric("Date Range", f"{date_range['min_date'][:10]} to {date_range['max_date'][:10]}")
+                            except Exception as e:
+                                st.warning(f"Could not get date range: {e}")
+                        
+                        # Show last created for certain tables
+                        if selected_table in ['positions', 'games']:
+                            try:
+                                cursor.execute(f"PRAGMA table_info(`{selected_table}`);")
+                                columns = [col[1] for col in cursor.fetchall()]
+                                
+                                if 'created_at' in columns:
+                                    cursor.execute(f"SELECT MAX(created_at) as last_created FROM `{selected_table}` WHERE created_at IS NOT NULL;")
+                                    last_created = cursor.fetchone()
+                                    if last_created and last_created['last_created']:
+                                        st.metric("Last Created", last_created['last_created'][:10])
+                            except Exception as e:
+                                st.warning(f"Could not get creation date: {e}")
+                    
+                    # Table-specific statistics with safe queries
+                    if selected_table == 'user_moves':
+                        try:
+                            # Check if result column exists
+                            cursor.execute(f"PRAGMA table_info(`{selected_table}`);")
+                            columns = [col[1] for col in cursor.fetchall()]
+                            
+                            if 'result' in columns:
+                                cursor.execute(f"SELECT result, COUNT(*) as count FROM `{selected_table}` GROUP BY result;")
+                                results = cursor.fetchall()
+                                
+                                if results:
+                                    st.markdown("#### 🎯 Training Results Distribution")
+                                    import pandas as pd
+                                    result_data = pd.DataFrame(results, columns=['Result', 'Count'])
+                                    
+                                    import plotly.express as px
+                                    fig = px.pie(result_data, values='Count', names='Result', 
+                                               title='Training Results Distribution')
+                                    st.plotly_chart(fig, use_container_width=True)
+                        except Exception as e:
+                            st.warning(f"Could not generate result statistics: {e}")
+                    
+                    elif selected_table == 'positions':
+                        try:
+                            # Check if turn column exists
+                            cursor.execute(f"PRAGMA table_info(`{selected_table}`);")
+                            columns = [col[1] for col in cursor.fetchall()]
+                            
+                            if 'turn' in columns:
+                                cursor.execute(f"SELECT turn, COUNT(*) as count FROM `{selected_table}` GROUP BY turn;")
+                                turn_data = cursor.fetchall()
+                                
+                                if turn_data:
+                                    st.markdown("#### ♟️ Positions by Turn")
+                                    import pandas as pd
+                                    turn_df = pd.DataFrame(turn_data, columns=['Turn', 'Count'])
+                                    
+                                    import plotly.express as px
+                                    fig = px.bar(turn_df, x='Turn', y='Count', 
+                                               title='Positions by Side to Move')
+                                    st.plotly_chart(fig, use_container_width=True)
+                        except Exception as e:
+                            st.warning(f"Could not generate position statistics: {e}")
+                    
+                    elif selected_table == 'games':
+                        try:
+                            # Check if result column exists
+                            cursor.execute(f"PRAGMA table_info(`{selected_table}`);")
+                            columns = [col[1] for col in cursor.fetchall()]
+                            
+                            if 'result' in columns:
+                                cursor.execute(f"SELECT result, COUNT(*) as count FROM `{selected_table}` WHERE result IS NOT NULL GROUP BY result;")
+                                game_results = cursor.fetchall()
+                                
+                                if game_results:
+                                    st.markdown("#### 🏆 Game Results Distribution")
+                                    import pandas as pd
+                                    game_df = pd.DataFrame(game_results, columns=['Result', 'Count'])
+                                    
+                                    import plotly.express as px
+                                    fig = px.pie(game_df, values='Count', names='Result', 
+                                               title='Game Results Distribution')
+                                    st.plotly_chart(fig, use_container_width=True)
+                        except Exception as e:
+                            st.warning(f"Could not generate game statistics: {e}")
+        
+        conn.close()
+        
+    except Exception as e:
+        st.error(f"❌ Error accessing database: {e}")
+        st.info("💡 Make sure the database file exists and is accessible.")
+        
+        # Debug information
+        with st.expander("🔧 Debug Information"):
+            st.write("Error details:", str(e))
+            try:
+                import database
+                st.write("Database module loaded successfully")
+            except ImportError:
+                st.write("Database module not found")
+
 def display_enhanced_settings_page():
-    """Display enhanced settings page with database export."""
+    """Display enhanced settings page with database viewer."""
     st.title("⚙️ Enhanced Settings")
     
-    user_settings = auth.get_user_settings(st.session_state.user_id)
-    if not user_settings:
-        user_settings = settings.initialize_default_settings()
+    try:
+        import auth
+        user_settings = auth.get_user_settings(st.session_state.user_id)
+        if not user_settings:
+            try:
+                import settings
+                user_settings = settings.initialize_default_settings()
+            except:
+                user_settings = {}
+    except:
+        user_settings = {}
     
-    # Enhanced settings tabs
-    settings_tab1, settings_tab2, settings_tab3, settings_tab4, settings_tab5 = st.tabs([
-        "🎯 Training", "🎨 Display", "📂 Data Management", "💾 Export/Backup", "🗑️ Reset"
+    # Enhanced settings tabs - ADD the new Database tab
+    settings_tab1, settings_tab2, settings_tab3, settings_tab4, settings_tab5, settings_tab6 = st.tabs([
+        "🎯 Training", "🎨 Display", "📂 Data Management", "💾 Export/Backup", "🗄️ Database", "🗑️ Reset"
     ])
     
     with settings_tab1:
-        display_training_settings(user_settings)
+        try:
+            display_training_settings(user_settings)
+        except Exception as e:
+            st.error(f"Error in training settings: {e}")
     
     with settings_tab2:
-        display_display_settings(user_settings)
+        try:
+            display_display_settings(user_settings)
+        except Exception as e:
+            st.error(f"Error in display settings: {e}")
     
     with settings_tab3:
-        display_data_management()
+        try:
+            display_data_management()
+        except Exception as e:
+            st.error(f"Error in data management: {e}")
     
     with settings_tab4:
-        display_export_backup()
+        try:
+            display_export_backup()
+        except Exception as e:
+            st.error(f"Error in export/backup: {e}")
     
-    with settings_tab5:
-        display_reset_options()
+    with settings_tab5:  # NEW DATABASE TAB
+        display_database_viewer()
+    
+    with settings_tab6:
+        try:
+            display_reset_options()
+        except Exception as e:
+            st.error(f"Error in reset options: {e}")
 
 def display_training_settings(user_settings):
     """Display training configuration settings."""
@@ -2701,49 +3137,6 @@ def display_saved_games():
         if st.button("🔍 Browse Games Now", use_container_width=True, type="primary"):
             st.session_state.active_tab = "Game Analysis"
             st.rerun()
-
-# Add this test function to debug the book generator
-def test_book_generator():
-    """Test function to debug book generation"""
-    st.markdown("### 🔧 Debug Book Generator")
-    
-    if st.button("Test Book Generator"):
-        try:
-            # Test with current position
-            position = st.session_state.current_position
-            
-            st.write("Position data:", position.get('id', 'No ID'))
-            st.write("Position keys:", list(position.keys()) if position else "No position")
-            
-            # Test imports
-            import book_generator
-            st.write("✅ book_generator module imported successfully")
-            
-            # Test function exists
-            if hasattr(book_generator, 'generate_book_files'):
-                st.write("✅ generate_book_files function exists")
-                
-                # Test generation
-                question_html, solution_html, filename_base = book_generator.generate_book_files(position)
-                
-                st.write("✅ Book files generated successfully")
-                st.write(f"Filename base: {filename_base}")
-                st.write(f"Question HTML length: {len(question_html)} characters")
-                st.write(f"Solution HTML length: {len(solution_html)} characters")
-                
-                # Show first 500 characters of question
-                st.code(question_html[:500])
-                
-            else:
-                st.error("❌ generate_book_files function not found")
-                
-        except ImportError as e:
-            st.error(f"❌ Import error: {e}")
-            st.write("Make sure book_generator.py is in the same directory as app.py")
-            
-        except Exception as e:
-            st.error(f"❌ Error: {e}")
-            st.exception(e)
 
 def display_enhanced_analytics():
     """Display enhanced analytics with proper error handling."""
