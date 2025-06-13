@@ -276,6 +276,9 @@ def init_session_state():
             'show_centroids': True,
             'show_metrics': True,
             'show_insights': True,
+            'show_control_board': True,
+            'highlight_moves': True,
+            'flip_boards': False,
             'polygon_opacity': 0.3
         },
         'games_filter_range': None,

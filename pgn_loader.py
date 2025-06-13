@@ -534,108 +534,6 @@ def create_game_navigation_data(game_info: Dict[str, Any]) -> Dict[str, Any]:
     
     return navigation
 
-def parse_multiple_games(file_content: str, max_games: int = None, include_analysis: bool = True) -> List[Dict[str, Any]]:
-    """
-    Enhanced parsing of multiple games with optional analysis and better performance.
-    
-    Args:
-        file_content: String content of the PGN file
-        max_games: Maximum number of games to parse (None for no limit)
-        include_analysis: Whether to include game analysis (faster without)
-        
-    Returns:
-        List of basic game information dictionaries
-    """
-    games_info = []
-    pgn_io = io.StringIO(file_content)
-    
-    game_index = 0
-    error_count = 0
-    max_errors = 10  # Stop if too many errors
-    
-    while (max_games is None or game_index < max_games) and error_count < max_errors:
-        try:
-            game = chess.pgn.read_game(pgn_io)
-            if game is None:
-                break
-            
-            headers = dict(game.headers)
-            
-            # Count moves efficiently
-            move_count = 0
-            try:
-                for _ in game.mainline_moves():
-                    move_count += 1
-                    if move_count > 500:  # Safety limit
-                        break
-            except Exception:
-                # Continue with partial data
-                pass
-            
-            # Create basic game summary
-            game_summary = {
-                'index': game_index,
-                'white': headers.get('White', 'Unknown').strip(),
-                'black': headers.get('Black', 'Unknown').strip(),
-                'result': headers.get('Result', '*').strip(),
-                'date': parse_game_date(headers.get('Date', '')),
-                'event': headers.get('Event', 'Unknown').strip(),
-                'opening': headers.get('Opening', '').strip() or 'Unknown',
-                'move_count': move_count,
-                'eco_code': headers.get('ECO', '').strip()
-            }
-            
-            # Parse ELO ratings
-            try:
-                white_elo_str = headers.get('WhiteElo', '').strip()
-                game_summary['white_elo'] = int(white_elo_str) if white_elo_str.isdigit() else '?'
-            except (ValueError, TypeError):
-                game_summary['white_elo'] = '?'
-            
-            try:
-                black_elo_str = headers.get('BlackElo', '').strip()
-                game_summary['black_elo'] = int(black_elo_str) if black_elo_str.isdigit() else '?'
-            except (ValueError, TypeError):
-                game_summary['black_elo'] = '?'
-            
-            # Add analysis if requested
-            if include_analysis:
-                # Quick analysis without full position extraction
-                if move_count < 20:
-                    game_summary['length_category'] = 'short'
-                elif move_count < 40:
-                    game_summary['length_category'] = 'normal'
-                elif move_count < 60:
-                    game_summary['length_category'] = 'long'
-                else:
-                    game_summary['length_category'] = 'very_long'
-                
-                # ELO-based skill assessment
-                if isinstance(game_summary['white_elo'], int) and isinstance(game_summary['black_elo'], int):
-                    avg_elo = (game_summary['white_elo'] + game_summary['black_elo']) / 2
-                    if avg_elo >= 2400:
-                        game_summary['skill_level'] = 'master'
-                    elif avg_elo >= 2200:
-                        game_summary['skill_level'] = 'expert'
-                    elif avg_elo >= 2000:
-                        game_summary['skill_level'] = 'advanced'
-                    elif avg_elo >= 1800:
-                        game_summary['skill_level'] = 'intermediate'
-                    else:
-                        game_summary['skill_level'] = 'beginner'
-                else:
-                    game_summary['skill_level'] = 'unknown'
-            
-            games_info.append(game_summary)
-            game_index += 1
-            
-        except Exception as e:
-            error_count += 1
-            print(f"Error parsing game {game_index}: {str(e)}")
-            game_index += 1
-            continue
-    
-    return games_info
 
 def get_position_at_move(game_info: Dict[str, Any], move_number: int) -> Optional[str]:
     """
@@ -933,3 +831,139 @@ def load_games_in_batches(file_content: str, batch_size: int = 1000) -> List[Lis
         batches.append(batch_info)
     
     return batches
+
+def parse_multiple_games(file_content: str, max_games: int = None, include_analysis: bool = True) -> List[Dict[str, Any]]:
+    """
+    Enhanced parsing of multiple games with proper position extraction for spatial analysis.
+    """
+    games = []
+    pgn_io = io.StringIO(file_content)
+    
+    game_count = 0
+    while max_games is None or game_count < max_games:
+        try:
+            game = chess.pgn.read_game(pgn_io)
+            if game is None:
+                break
+            
+            # Extract game data with enhanced position tracking
+            game_info = extract_game_data_with_positions(game, game_count + 1)
+            
+            if game_info and game_info.get('positions'):  # Ensure positions exist
+                games.append(game_info)
+                game_count += 1
+                
+        except Exception as e:
+            print(f"Error parsing game {game_count + 1}: {str(e)}")
+            game_count += 1
+            continue
+    
+    return games
+
+def extract_game_data_with_positions(game, game_index: int) -> Optional[Dict[str, Any]]:
+    """
+    Extract game data with guaranteed position extraction for spatial analysis.
+    """
+    try:
+        headers = dict(game.headers)
+        
+        # Initialize game info
+        game_info = {
+            'id': game_index,
+            'white': headers.get('White', 'Unknown'),
+            'black': headers.get('Black', 'Unknown'),
+            'result': headers.get('Result', '*'),
+            'date': headers.get('Date', '????.??.??'),
+            'event': headers.get('Event', 'Unknown'),
+            'round': headers.get('Round', '-'),
+            'opening': headers.get('Opening', 'Unknown'),
+            'moves': [],
+            'positions': [],
+            'game_index': game_index,
+            'headers': headers
+        }
+        
+        # Extract ELO ratings safely
+        try:
+            white_elo = headers.get('WhiteElo', '')
+            game_info['white_elo'] = int(white_elo) if white_elo.isdigit() else None
+        except:
+            game_info['white_elo'] = None
+            
+        try:
+            black_elo = headers.get('BlackElo', '')
+            game_info['black_elo'] = int(black_elo) if black_elo.isdigit() else None
+        except:
+            game_info['black_elo'] = None
+        
+        # CRITICAL: Extract positions for spatial analysis
+        board = game.board()
+        
+        # Always include starting position
+        game_info['positions'].append(board.fen())
+        
+        move_count = 0
+        max_moves = 200  # Reasonable limit for spatial analysis
+        
+        try:
+            for move in game.mainline_moves():
+                if move_count >= max_moves:
+                    break
+                
+                # Store move data
+                san_move = board.san(move)
+                uci_move = move.uci()
+                
+                move_data = {
+                    'san': san_move,
+                    'uci': uci_move,
+                    'move_number': board.fullmove_number,
+                    'turn': 'white' if board.turn else 'black',
+                    'ply': move_count + 1
+                }
+                
+                game_info['moves'].append(move_data)
+                
+                # Make move and store resulting position
+                board.push(move)
+                position_fen = board.fen()
+                
+                # CRITICAL: Validate FEN before adding
+                try:
+                    test_board = chess.Board(position_fen)
+                    if test_board.is_valid():
+                        game_info['positions'].append(position_fen)
+                    else:
+                        continue
+                except:
+                    continue
+                
+                move_count += 1
+                
+        except Exception as e:
+            print(f"Error extracting moves for game {game_index}: {str(e)}")
+        
+        # Ensure we have at least one valid position
+        if len(game_info['positions']) == 0:
+            return None
+        
+        # Store final statistics
+        game_info['total_moves'] = len(game_info['moves'])
+        game_info['total_positions'] = len(game_info['positions'])
+        
+        return game_info
+        
+    except Exception as e:
+        print(f"Critical error extracting game {game_index}: {str(e)}")
+        return None
+
+def validate_fen_string(fen: str) -> bool:
+    """Validate if a FEN string represents a valid chess position."""
+    try:
+        if not fen or not isinstance(fen, str):
+            return False
+        
+        board = chess.Board(fen)
+        return board.is_valid()
+    except:
+        return False

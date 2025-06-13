@@ -207,7 +207,6 @@ def create_metrics_table(metrics: Dict[str, Any]) -> pd.DataFrame:
     
     return pd.DataFrame(data)
 
-
 def validate_board_state(board: chess.Board) -> bool:
     """
     Validate if a chess board is in a valid state for analysis.
