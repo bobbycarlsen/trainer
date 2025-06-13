@@ -6,6 +6,7 @@ import chess
 import chess.svg
 import json
 from datetime import datetime
+from utils import convert_to_piece_icons
 from typing import Dict, Any, List, Optional, Tuple
 
 def generate_chess_board_svg(fen: str, size: int = 320, flipped: bool = False) -> str:
@@ -927,6 +928,13 @@ def generate_moves_table_html(moves: List[Dict[str, Any]], move_number: int, tur
             is_white_move = (turn.lower() == 'white')
             if not is_white_move:
                 pv_formatted = str(current_move) + " ... " + pv_formatted
+
+            # replace string with piece icon
+            try:
+                pv_formatted = convert_to_piece_icons(pv_formatted)
+            except Exception as e:
+                print("Error converting string to piece notation: ", e)
+                pass
 
         else:
             pv_formatted = "No continuation available"

@@ -244,7 +244,7 @@ def calculate_center_control(board: chess.Board) -> Dict[str, Any]:
         Dictionary with center control metrics
     """
     try:
-        # CRITICAL FIX: Validate board first
+        # Validate board first
         if not validate_board_state(board):
             return {
                 'white_core_control': 0,
@@ -272,14 +272,14 @@ def calculate_center_control(board: chess.Board) -> Dict[str, Any]:
         white_extended_control = 0
         black_extended_control = 0
         
-        # FIXED: Add error handling for square analysis
+        # Add error handling for square analysis
         for square in chess.SQUARES:
             try:
                 file = chess.square_file(square)
                 rank = chess.square_rank(square)
                 pos = (file, rank)
                 
-                # FIXED: Safe attacker counting with error handling
+                # Safe attacker counting with error handling
                 try:
                     white_attackers = len(board.attackers(chess.WHITE, square))
                     black_attackers = len(board.attackers(chess.BLACK, square))
@@ -299,7 +299,7 @@ def calculate_center_control(board: chess.Board) -> Dict[str, Any]:
                 # Skip problematic squares
                 continue
         
-        # FIXED: Safe ratio calculation
+        # Safe ratio calculation
         core_ratio = 1.0
         extended_ratio = 1.0
         
@@ -355,7 +355,7 @@ def calculate_comprehensive_spatial_metrics(board: chess.Board) -> Dict[str, Any
         Dictionary with comprehensive spatial analysis data
     """
     try:
-        # CRITICAL FIX: Validate board first
+        # Validate board first
         if not validate_board_state(board):
             return {
                 'error': 'Invalid board state for spatial analysis',
@@ -511,7 +511,7 @@ def display_enhanced_spatial_analysis(current_fen: str, previous_fen: Optional[s
         flipped: Whether to display boards flipped by default
     """
     try:
-        # CRITICAL FIX: Validate FEN before creating board
+        # Validate FEN before creating board
         if not current_fen or not isinstance(current_fen, str):
             st.error("❌ Spatial analysis error: Invalid FEN string")
             st.info("💡 Spatial analysis requires valid chess position")
@@ -560,26 +560,9 @@ def display_enhanced_spatial_analysis(current_fen: str, previous_fen: Optional[s
         with flip_col1:
             board_flipped = st.checkbox("🔄 Flip Boards", value=flipped, key=f"flip_boards_{current_fen[:10]}")
         
-        # Create two columns for boards
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("### 🏁 Game Position")
-            try:
-                import chess_board
-                chess_board.display_chess_board(
-                    fen=current_fen,
-                    theme='default',
-                    highlight_best_move=False,
-                    board_size=400,
-                    show_coordinates=True,
-                    interactive=False,
-                    flipped=board_flipped
-                )
-            except:
-                st.code(f"FEN: {current_fen}")
-        
-        with col2:
+        # Only show space control board, not position board again
+        # The position is already shown in the main Game Analysis tab
+        if st.session_state.spatial_settings.get('show_control_board', True):
             st.markdown("### 🎯 Space Control Visualization")
             try:
                 control_fig = create_control_board_visualization(metrics, flipped=board_flipped)
@@ -613,19 +596,20 @@ def display_enhanced_spatial_analysis(current_fen: str, previous_fen: Optional[s
             st.metric("Connectivity", f"{connectivity_diff:+.1f}", delta=None)
         
         # Show insights
-        try:
-            insights = generate_spatial_insights(metrics)
-            if insights:
-                st.markdown("### 💡 Position Insights")
-                for insight in insights:
-                    if insight['severity'] == 'critical':
-                        st.error(f"🚨 {insight['message']}")
-                    elif insight['severity'] == 'high':
-                        st.warning(f"⚠️ {insight['message']}")
-                    else:
-                        st.info(f"💡 {insight['message']}")
-        except Exception as e:
-            st.warning(f"⚠️ Could not generate insights: {str(e)}")
+        if st.session_state.spatial_settings.get('show_insights', True):
+            try:
+                insights = generate_spatial_insights(metrics)
+                if insights:
+                    st.markdown("### 💡 Position Insights")
+                    for insight in insights:
+                        if insight['severity'] == 'critical':
+                            st.error(f"🚨 {insight['message']}")
+                        elif insight['severity'] == 'high':
+                            st.warning(f"⚠️ {insight['message']}")
+                        else:
+                            st.info(f"💡 {insight['message']}")
+            except Exception as e:
+                st.warning(f"⚠️ Could not generate insights: {str(e)}")
         
         # Detailed metrics table
         if st.session_state.spatial_settings.get('show_metrics', True):
@@ -944,3 +928,163 @@ def get_spatial_insights(metrics: Dict[str, Any]) -> List[str]:
     """Legacy compatibility function."""
     insights = generate_spatial_insights(metrics)
     return [insight['message'] for insight in insights]
+
+def display_detailed_metrics_table(metrics: Dict[str, Any], previous_metrics: Optional[Dict[str, Any]] = None):
+    """
+    Display detailed spatial metrics in a comprehensive table format.
+    
+    Args:
+        metrics: Current spatial metrics
+        previous_metrics: Previous metrics for comparison (optional)
+    """
+    try:
+        st.markdown("#### 📊 Detailed Spatial Metrics")
+        
+        # Create comprehensive metrics table
+        table_data = []
+        
+        # Material metrics
+        material_balance = metrics.get('material_balance', {})
+        table_data.append({
+            "Category": "Material Balance",
+            "Metric": "Material Difference",
+            "White": f"+{material_balance.get('white_material', 0)}",
+            "Black": f"+{material_balance.get('black_material', 0)}",
+            "Advantage": f"{material_balance.get('material_difference', 0):+.1f}",
+            "Analysis": "Points ahead/behind"
+        })
+        
+        # Space control metrics
+        space_control = metrics.get('space_control', {}).get('summary', {})
+        white_space = space_control.get('total_controlled_white', 0.0)
+        black_space = space_control.get('total_controlled_black', 0.0)
+        table_data.append({
+            "Category": "Space Control",
+            "Metric": "Controlled Squares",
+            "White": f"{white_space:.1f}",
+            "Black": f"{black_space:.1f}",
+            "Advantage": f"{white_space - black_space:+.1f}",
+            "Analysis": "Squares under control"
+        })
+        
+        # Center control metrics
+        center_control = metrics.get('center_control', {})
+        white_center = center_control.get('white_center_control', 0)
+        black_center = center_control.get('black_center_control', 0)
+        table_data.append({
+            "Category": "Center Control",
+            "Metric": "Core Squares",
+            "White": f"{white_center}",
+            "Black": f"{black_center}",
+            "Advantage": f"{center_control.get('core_control_difference', 0):+d}",
+            "Analysis": "Central square control"
+        })
+        
+        # Piece activity metrics
+        white_metrics = metrics.get('white', {})
+        black_metrics = metrics.get('black', {})
+        
+        white_area = white_metrics.get('polygon_area', 0.0)
+        black_area = black_metrics.get('polygon_area', 0.0)
+        table_data.append({
+            "Category": "Piece Activity",
+            "Metric": "Territorial Area",
+            "White": f"{white_area:.2f}",
+            "Black": f"{black_area:.2f}",
+            "Advantage": f"{white_area - black_area:+.2f}",
+            "Analysis": "Piece spread/activity"
+        })
+        
+        # Connectivity metrics
+        white_connectivity = white_metrics.get('connectivity_score', 0.0)
+        black_connectivity = black_metrics.get('connectivity_score', 0.0)
+        table_data.append({
+            "Category": "Coordination",
+            "Metric": "Connectivity Score",
+            "White": f"{white_connectivity:.2f}",
+            "Black": f"{black_connectivity:.2f}",
+            "Advantage": f"{white_connectivity - black_connectivity:+.2f}",
+            "Analysis": "Piece coordination"
+        })
+        
+        # Position centroids
+        white_centroid = white_metrics.get('centroid', (0, 0))
+        black_centroid = black_metrics.get('centroid', (0, 0))
+        table_data.append({
+            "Category": "Position Center",
+            "Metric": "Army Centroid",
+            "White": f"({white_centroid[0]:.1f}, {white_centroid[1]:.1f})",
+            "Black": f"({black_centroid[0]:.1f}, {black_centroid[1]:.1f})",
+            "Advantage": "—",
+            "Analysis": "Average piece position"
+        })
+        
+        # Create and display dataframe
+        import pandas as pd
+        df = pd.DataFrame(table_data)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        # Show comparison with previous position if available
+        if previous_metrics:
+            st.markdown("#### 📈 Position Comparison")
+            
+            comparison_data = []
+            
+            # Material change
+            prev_material = previous_metrics.get('material_balance', {}).get('material_difference', 0)
+            curr_material = material_balance.get('material_difference', 0)
+            material_change = curr_material - prev_material
+            
+            comparison_data.append({
+                "Metric": "Material Balance",
+                "Previous": f"{prev_material:+.1f}",
+                "Current": f"{curr_material:+.1f}",
+                "Change": f"{material_change:+.1f}",
+                "Trend": "📈" if material_change > 0.1 else "📉" if material_change < -0.1 else "➡️"
+            })
+            
+            # Space control change
+            prev_space = previous_metrics.get('comparison', {}).get('space_control_advantage', 0)
+            curr_space = metrics.get('comparison', {}).get('space_control_advantage', 0)
+            space_change = curr_space - prev_space
+            
+            comparison_data.append({
+                "Metric": "Space Control",
+                "Previous": f"{prev_space:+.1f}",
+                "Current": f"{curr_space:+.1f}",
+                "Change": f"{space_change:+.1f}",
+                "Trend": "📈" if space_change > 0.1 else "📉" if space_change < -0.1 else "➡️"
+            })
+            
+            comparison_df = pd.DataFrame(comparison_data)
+            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+        
+    except Exception as e:
+        st.error(f"⚠️ Error displaying detailed metrics: {str(e)}")
+        st.info("💡 Some metrics may not be available for this position")
+
+def validate_fen_string(fen: str) -> bool:
+    """
+    Validate if a FEN string represents a valid chess position.
+    
+    Args:
+        fen: FEN string to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    try:
+        if not fen or not isinstance(fen, str):
+            return False
+        
+        # Try to create a chess board from the FEN
+        board = chess.Board(fen)
+        
+        # Additional validation checks
+        if not board.is_valid():
+            return False
+            
+        return True
+    except:
+        return False
+

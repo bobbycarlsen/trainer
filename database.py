@@ -1095,6 +1095,68 @@ def get_database_stats():
     conn.close()
     return stats
 
+def remove_saved_game(user_id: int, game_id: int) -> bool:
+    """
+    Remove a saved game for a user.
+    
+    Args:
+        user_id: User ID
+        game_id: Game ID to remove
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            DELETE FROM user_saved_games 
+            WHERE user_id = ? AND game_id = ?
+        ''', (user_id, game_id))
+        
+        conn.commit()
+        success = cursor.rowcount > 0
+        conn.close()
+        return success
+        
+    except Exception as e:
+        print(f"Error removing saved game: {e}")
+        conn.close()
+        return False
+
+def update_saved_game_notes(user_id: int, game_id: int, notes: str) -> bool:
+    """
+    Update notes for a saved game.
+    
+    Args:
+        user_id: User ID
+        game_id: Game ID
+        notes: Updated notes
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            UPDATE user_saved_games 
+            SET notes = ?, saved_at = CURRENT_TIMESTAMP
+            WHERE user_id = ? AND game_id = ?
+        ''', (notes, user_id, game_id))
+        
+        conn.commit()
+        success = cursor.rowcount > 0
+        conn.close()
+        return success
+        
+    except Exception as e:
+        print(f"Error updating saved game notes: {e}")
+        conn.close()
+        return False
+
 if __name__ == "__main__":
     # Initialize the database with enhanced tables
     init_db()
