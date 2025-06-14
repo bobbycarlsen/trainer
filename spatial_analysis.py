@@ -1,8 +1,4 @@
-
-# =============================================================================
-# spatial_analysis.py - Spatial Analysis Module for Kuikma  
-# =============================================================================
-
+# spatial_analysis.py - Spatial Analysis Module for Kuikma
 import chess
 import numpy as np
 import pandas as pd
@@ -11,868 +7,481 @@ from typing import Dict, List, Tuple, Any, Optional
 import plotly.graph_objects as go
 import plotly.express as px
 
-
 def display_spatial_analysis():
-    """Display spatial analysis interface."""
+    """Display comprehensive spatial analysis interface."""
     st.markdown("## 🔍 Spatial Analysis")
     
-    st.info("🚧 Spatial analysis features coming soon!")
+    # Analysis mode selection
+    analysis_mode = st.selectbox(
+        "Choose Analysis Mode:",
+        ["🎯 Position Analysis", "🎮 Game Analysis", "📊 Batch Analysis"]
+    )
     
-    st.markdown("""
-    ### Planned Features:
-    - **Piece Distribution Analysis**: Visualize how pieces are distributed across the board
-    - **Space Control Metrics**: Analyze territory control and influence
-    - **Convex Hull Analysis**: Advanced geometric analysis of piece positioning
-    - **Heat Maps**: Visual representation of piece activity and threats
-    - **Interactive Controls**: Customize visualization parameters
-    """)
+    if analysis_mode == "🎯 Position Analysis":
+        display_position_spatial_analysis()
+    elif analysis_mode == "🎮 Game Analysis":
+        display_game_spatial_analysis()
+    else:
+        display_batch_spatial_analysis()
 
-
-
-def validate_fen_string(fen: str) -> bool:
-    """
-    Validate if a FEN string represents a valid chess position.
+def display_position_spatial_analysis():
+    """Display spatial analysis for a single position."""
+    st.markdown("### 🎯 Position Spatial Analysis")
     
-    Args:
-        fen: FEN string to validate
-        
-    Returns:
-        True if valid, False otherwise
-    """
+    # Position input methods
+    input_method = st.radio(
+        "Position Input Method:",
+        ["📋 FEN Input", "🗄️ Database Position", "📁 Current Training Position"]
+    )
+    
+    position_data = None
+    fen = None
+    
+    if input_method == "📋 FEN Input":
+        fen = st.text_input(
+            "Enter FEN:", 
+            value="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            help="Enter a valid FEN string"
+        )
+        if fen and validate_fen_string(fen):
+            position_data = {'fen': fen, 'turn': 'white' if 'w' in fen else 'black'}
+    
+    elif input_method == "🗄️ Database Position":
+        position_id = st.number_input("Position ID:", min_value=1, value=1)
+        if st.button("Load Position"):
+            position_data = load_position_from_database(position_id)
+            if position_data:
+                fen = position_data.get('fen')
+    
+    else:  # Current training position
+        if 'current_position' in st.session_state:
+            position_data = st.session_state.current_position
+            fen = position_data.get('fen')
+            st.success("✅ Using current training position")
+        else:
+            st.warning("⚠️ No current training position available")
+    
+    if position_data and fen:
+        display_comprehensive_spatial_analysis(fen, position_data)
+
+def display_game_spatial_analysis():
+    """Display spatial analysis for game progression."""
+    st.markdown("### 🎮 Game Spatial Analysis")
+    
+    # PGN input
+    pgn_input = st.text_area(
+        "Enter PGN:",
+        height=150,
+        help="Paste a complete PGN game"
+    )
+    
+    if pgn_input:
+        try:
+            import chess.pgn
+            import io
+            
+            pgn_game = chess.pgn.read_game(io.StringIO(pgn_input))
+            if pgn_game:
+                analyze_game_spatial_progression(pgn_game)
+            else:
+                st.error("❌ Invalid PGN format")
+        except Exception as e:
+            st.error(f"❌ Error parsing PGN: {e}")
+
+def display_batch_spatial_analysis():
+    """Display batch spatial analysis for multiple positions."""
+    st.markdown("### 📊 Batch Spatial Analysis")
+    
+    st.info("🚧 Batch analysis coming soon! This will analyze multiple positions for patterns.")
+
+def display_comprehensive_spatial_analysis(fen: str, position_data: Dict[str, Any]):
+    """Display comprehensive spatial analysis for a position."""
     try:
-        if not fen or not isinstance(fen, str):
-            return False
-        
-        # Try to create a chess board from the FEN
         board = chess.Board(fen)
         
-        # Additional validation checks
-        if not board.is_valid():
-            return False
+        if not validate_board_state(board):
+            st.error("❌ Invalid board state for analysis")
+            return
+        
+        # Calculate comprehensive metrics
+        with st.spinner("🔄 Calculating spatial metrics..."):
+            metrics = calculate_comprehensive_spatial_metrics(board)
+        
+        # Display analysis in tabs
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "🗺️ Space Control", "📊 Metrics", "🎯 Tactical", "🏰 Positional", "💡 Insights"
+        ])
+        
+        with tab1:
+            display_space_control_visualization(board, metrics)
+        
+        with tab2:
+            display_spatial_metrics_dashboard(metrics, position_data)
+        
+        with tab3:
+            display_tactical_analysis(board, metrics)
+        
+        with tab4:
+            display_positional_analysis(board, metrics)
+        
+        with tab5:
+            display_spatial_insights(board, metrics, position_data)
             
-        return True
-    except:
-        return False
-
-def validate_board_state(board: chess.Board) -> bool:
-    """
-    Validate board state for spatial analysis.
-    
-    Args:
-        board: Chess board object
-        
-    Returns:
-        True if valid for analysis, False otherwise
-    """
-    try:
-        # Check if board is valid
-        if not board.is_valid():
-            return False
-        
-        # Check if kings are present
-        white_king = board.king(chess.WHITE)
-        black_king = board.king(chess.BLACK)
-        
-        if white_king is None or black_king is None:
-            return False
-        
-        # Check if position is legal
-        if board.is_check() and board.is_checkmate():
-            return False  # Invalid state
-        
-        return True
-        
-    except Exception:
-        return False
-
-def calculate_previous_position_from_move(current_fen: str, move_data: dict) -> Optional[str]:
-    """
-    Calculate the previous position FEN by analyzing move data.
-    This addresses the "Position comparison requires previous position data" error.
-    
-    Args:
-        current_fen: Current position FEN
-        move_data: Move data containing the move that led to current position
-        
-    Returns:
-        Previous position FEN or None if cannot be calculated
-    """
-    try:
-        # Extract move information
-        move_uci = move_data.get('uci', '')
-        move_san = move_data.get('move', '')
-        
-        if not move_uci and not move_san:
-            return None
-        
-        # Parse the current board
-        current_board = chess.Board(current_fen)
-        
-        # Method 1: Try to use move history if the move is "undoable"
-        if move_uci:
-            try:
-                move = chess.Move.from_uci(move_uci)
-                
-                # Check if this move leads FROM the current position
-                # (meaning current position is actually BEFORE the move)
-                if move in current_board.legal_moves:
-                    # Current position is the "before" position
-                    temp_board = current_board.copy()
-                    temp_board.push(move)
-                    return current_fen  # Current is actually "before"
-                
-                # Otherwise, we need to try to reverse the move
-                # This is complex due to captures, castling, etc.
-                
-            except Exception:
-                pass
-        
-        # Method 2: Try with SAN notation
-        if move_san:
-            try:
-                # Parse SAN move
-                move = current_board.parse_san(move_san)
-                
-                # If parsing succeeds, current position is "before"
-                temp_board = current_board.copy()
-                temp_board.push(move)
-                return current_fen
-                
-            except Exception:
-                pass
-        
-        # Method 3: If we have additional context in move_data
-        if 'fen_before' in move_data:
-            return move_data['fen_before']
-        
-        if 'previous_fen' in move_data:
-            return move_data['previous_fen']
-        
-        # If all methods fail, return None
-        return None
-        
     except Exception as e:
-        print(f"Error calculating previous position: {e}")
-        return None
-
-def get_position_comparison_data(position_data: dict) -> Tuple[str, Optional[str]]:
-    """
-    Get current and previous position FENs for comparison.
-    This fixes the position comparison error by properly extracting positions.
-    
-    Args:
-        position_data: Position data dictionary
-        
-    Returns:
-        Tuple of (current_fen, previous_fen)
-    """
-    current_fen = position_data.get('fen', '')
-    
-    # Method 1: Check move_history for previous position
-    move_history = position_data.get('move_history', [])
-    if move_history and len(move_history) > 0:
-        try:
-            # Get the last move in history
-            last_move = move_history[-1]
-            
-            if isinstance(last_move, dict):
-                # Check for explicit previous FEN
-                previous_fen = last_move.get('fen_before')
-                if previous_fen and validate_fen_string(previous_fen):
-                    return current_fen, previous_fen
-                
-                # Try to calculate from move data
-                calculated_fen = calculate_previous_position_from_move(current_fen, last_move)
-                if calculated_fen:
-                    return current_fen, calculated_fen
-        except Exception:
-            pass
-    
-    # Method 2: Use best move to infer previous position
-    moves = position_data.get('moves', [])
-    if moves and len(moves) > 0:
-        best_move = moves[0]  # Best move
-        
-        try:
-            calculated_fen = calculate_previous_position_from_move(current_fen, best_move)
-            if calculated_fen:
-                return current_fen, calculated_fen
-        except Exception:
-            pass
-    
-    # Method 3: Check if position has explicit previous_fen field
-    previous_fen = position_data.get('previous_fen')
-    if previous_fen and validate_fen_string(previous_fen):
-        return current_fen, previous_fen
-    
-    # Method 4: Try to construct from game context
-    game_metadata = position_data.get('game_metadata', {})
-    if isinstance(game_metadata, dict):
-        previous_fen = game_metadata.get('previous_position')
-        if previous_fen and validate_fen_string(previous_fen):
-            return current_fen, previous_fen
-    
-    # If no previous position can be determined, return None
-    return current_fen, None
+        st.error(f"Error in spatial analysis: {e}")
 
 def calculate_comprehensive_spatial_metrics(board: chess.Board) -> Dict[str, Any]:
-    """
-    Calculate comprehensive spatial metrics with enhanced error handling.
-    Updated to provide better fallbacks and rounding.
+    """Calculate comprehensive spatial metrics for a chess position."""
+    metrics = {}
     
-    Args:
-        board: Chess board object
-        
-    Returns:
-        Dictionary containing spatial metrics
-    """
-    try:
-        if not validate_board_state(board):
-            return get_fallback_metrics()
-        
-        metrics = {}
-        
-        # Material balance calculation with error handling
-        try:
-            material_balance = calculate_material_balance(board)
-            # Round material values
-            if 'material_difference' in material_balance:
-                material_balance['material_difference'] = round(material_balance['material_difference'], 2)
-            if 'white_total' in material_balance:
-                material_balance['white_total'] = round(material_balance['white_total'], 1)
-            if 'black_total' in material_balance:
-                material_balance['black_total'] = round(material_balance['black_total'], 1)
-            
-            metrics['material_balance'] = material_balance
-        except Exception as e:
-            metrics['material_balance'] = {
-                'material_difference': 0,
-                'white_total': 0,
-                'black_total': 0,
-                'error': f'Material calculation failed: {str(e)}'
-            }
-        
-        # Center control calculation
-        try:
-            center_control = calculate_center_control(board)
-            metrics['center_control'] = center_control
-        except Exception as e:
-            metrics['center_control'] = {
-                'core_control_difference': 0,
-                'white_core_control': 0,
-                'black_core_control': 0,
-                'error': f'Center control calculation failed: {str(e)}'
-            }
-        
-        # Space control matrix - Enhanced with error handling
-        try:
-            space_control = calculate_space_control_matrix(board)
-            # Round space control values
-            summary = space_control.get('summary', {})
-            if 'total_controlled_white' in summary:
-                summary['total_controlled_white'] = round(summary['total_controlled_white'], 2)
-            if 'total_controlled_black' in summary:
-                summary['total_controlled_black'] = round(summary['total_controlled_black'], 2)
-            
-            metrics['space_control'] = space_control
-        except Exception as e:
-            metrics['space_control'] = {
-                'control_matrix': [[0 for _ in range(8)] for _ in range(8)],
-                'summary': {
-                    'total_controlled_white': 0.0,
-                    'total_controlled_black': 0.0,
-                    'white_controlled': 0,
-                    'black_controlled': 0,
-                    'contested': 0,
-                    'neutral': 64
-                },
-                'error': f'Space control calculation failed: {str(e)}'
-            }
-        
-        # Calculate metrics for each color with enhanced error handling
-        for color in [chess.WHITE, chess.BLACK]:
-            color_name = 'white' if color == chess.WHITE else 'black'
-            
-            try:
-                positions = get_piece_positions(board, color)
-                controlled_squares = get_controlled_squares(board, color)
-                
-                if not positions:
-                    metrics[color_name] = {
-                        'positions': [],
-                        'controlled_squares': [],
-                        'polygon_area': 0.0,
-                        'centroid': (0.0, 0.0),
-                        'connectivity_score': 0.0,
-                        'error': f'No pieces found for {color_name}'
-                    }
-                    continue
-                
-                # Calculate polygon and metrics safely
-                try:
-                    polygon_vertices = calculate_convex_hull(positions)
-                    polygon_area = round(calculate_polygon_area(polygon_vertices), 2)
-                    centroid = calculate_centroid(polygon_vertices)
-                    centroid = (round(centroid[0], 2), round(centroid[1], 2))
-                    connectivity_score = round(calculate_connectivity_score(positions), 3)
-                    
-                    metrics[color_name] = {
-                        'positions': positions,
-                        'controlled_squares': controlled_squares,
-                        'polygon_area': polygon_area,
-                        'centroid': centroid,
-                        'connectivity_score': connectivity_score
-                    }
-                except Exception as e:
-                    metrics[color_name] = {
-                        'positions': positions,
-                        'controlled_squares': controlled_squares,
-                        'polygon_area': 0.0,
-                        'centroid': (0.0, 0.0),
-                        'connectivity_score': 0.0,
-                        'error': f'Polygon calculation failed for {color_name}: {str(e)}'
-                    }
-                    
-            except Exception as e:
-                metrics[color_name] = {
-                    'positions': [],
-                    'controlled_squares': [],
-                    'polygon_area': 0.0,
-                    'centroid': (0.0, 0.0),
-                    'connectivity_score': 0.0,
-                    'error': f'Color analysis failed for {color_name}: {str(e)}'
-                }
-        
-        # Calculate comparison metrics with rounding
-        try:
-            white_area = metrics['white'].get('polygon_area', 0)
-            black_area = metrics['black'].get('polygon_area', 0)
-            white_control = metrics['space_control'].get('summary', {}).get('total_controlled_white', 0)
-            black_control = metrics['space_control'].get('summary', {}).get('total_controlled_black', 0)
-            white_connectivity = metrics['white'].get('connectivity_score', 0)
-            black_connectivity = metrics['black'].get('connectivity_score', 0)
-            
-            metrics['comparison'] = {
-                'area_advantage': round(white_area - black_area, 2),
-                'space_control_advantage': round(white_control - black_control, 2),
-                'connectivity_diff': round(white_connectivity - black_connectivity, 3)
-            }
-        except Exception as e:
-            metrics['comparison'] = {
-                'area_advantage': 0.0,
-                'space_control_advantage': 0.0,
-                'connectivity_diff': 0.0,
-                'error': f'Comparison calculation failed: {str(e)}'
-            }
-        
-        return metrics
-        
-    except Exception as e:
-        # Return safe fallback on complete failure
-        return get_fallback_metrics(f'Comprehensive spatial analysis failed: {str(e)}')
+    # Basic material analysis
+    metrics['material_balance'] = calculate_material_balance(board)
+    
+    # Space control analysis
+    metrics['space_control'] = calculate_space_control_advanced(board)
+    
+    # Center control
+    metrics['center_control'] = calculate_center_control_detailed(board)
+    
+    # Piece activity
+    metrics['piece_activity'] = calculate_piece_activity(board)
+    
+    # King safety
+    metrics['king_safety'] = calculate_king_safety_metrics(board)
+    
+    # Pawn structure
+    metrics['pawn_structure'] = calculate_pawn_structure_metrics(board)
+    
+    # Tactical threats
+    metrics['tactical_threats'] = calculate_tactical_threats(board)
+    
+    # Positional factors
+    metrics['positional_factors'] = calculate_positional_factors(board)
+    
+    return metrics
 
-def get_fallback_metrics(error_msg: str = 'Analysis failed') -> Dict[str, Any]:
-    """
-    Return safe fallback metrics when analysis fails.
+def calculate_space_control_advanced(board: chess.Board) -> Dict[str, Any]:
+    """Calculate advanced space control metrics."""
+    control_matrix = np.zeros((8, 8), dtype=int)
+    white_attacks = np.zeros((8, 8), dtype=int)
+    black_attacks = np.zeros((8, 8), dtype=int)
     
-    Args:
-        error_msg: Error message to include
+    # Calculate attacks for each square
+    for square in chess.SQUARES:
+        # White attacks
+        white_attackers = board.attackers(chess.WHITE, square)
+        white_attacks[square // 8][square % 8] = len(white_attackers)
         
-    Returns:
-        Safe fallback metrics dictionary
-    """
+        # Black attacks
+        black_attackers = board.attackers(chess.BLACK, square)
+        black_attacks[square // 8][square % 8] = len(black_attackers)
+        
+        # Determine control
+        if white_attacks[square // 8][square % 8] > black_attacks[square // 8][square % 8]:
+            control_matrix[square // 8][square % 8] = 1  # White control
+        elif black_attacks[square // 8][square % 8] > white_attacks[square // 8][square % 8]:
+            control_matrix[square // 8][square % 8] = -1  # Black control
+        elif white_attacks[square // 8][square % 8] > 0 and black_attacks[square // 8][square % 8] > 0:
+            control_matrix[square // 8][square % 8] = 2  # Contested
+        else:
+            control_matrix[square // 8][square % 8] = 0  # Neutral
+    
+    # Calculate space percentages
+    total_squares = 64
+    white_controlled = np.sum(control_matrix == 1)
+    black_controlled = np.sum(control_matrix == -1)
+    contested = np.sum(control_matrix == 2)
+    neutral = np.sum(control_matrix == 0)
+    
     return {
-        'error': error_msg,
-        'white': {
-            'polygon_area': 0.0,
-            'connectivity_score': 0.0,
-            'centroid': (0.0, 0.0),
-            'positions': [],
-            'controlled_squares': []
-        },
-        'black': {
-            'polygon_area': 0.0,
-            'connectivity_score': 0.0,
-            'centroid': (0.0, 0.0),
-            'positions': [],
-            'controlled_squares': []
-        },
-        'comparison': {
-            'area_advantage': 0.0,
-            'space_control_advantage': 0.0,
-            'connectivity_diff': 0.0
-        },
-        'material_balance': {
-            'material_difference': 0,
-            'white_total': 0,
-            'black_total': 0
-        },
-        'center_control': {
-            'core_control_difference': 0,
-            'white_core_control': 0,
-            'black_core_control': 0
-        },
-        'space_control': {
-            'control_matrix': [[0 for _ in range(8)] for _ in range(8)],
-            'summary': {
-                'total_controlled_white': 0.0,
-                'total_controlled_black': 0.0,
-                'white_controlled': 0,
-                'black_controlled': 0,
-                'contested': 0,
-                'neutral': 64
-            }
-        }
+        'control_matrix': control_matrix.tolist(),
+        'white_attacks': white_attacks.tolist(),
+        'black_attacks': black_attacks.tolist(),
+        'white_space_percentage': round((white_controlled / total_squares) * 100, 2),
+        'black_space_percentage': round((black_controlled / total_squares) * 100, 2),
+        'contested_percentage': round((contested / total_squares) * 100, 2),
+        'neutral_percentage': round((neutral / total_squares) * 100, 2),
+        'space_advantage': round(white_controlled - black_controlled, 2)
     }
 
-
-def generate_spatial_insights(metrics: Dict[str, Any]) -> List[Dict[str, str]]:
-    """
-    Generate spatial insights with safe error handling.
-    """
-    try:
-        insights = []
-        
-        # Material advantage insights
-        material_diff = metrics.get('material_balance', {}).get('material_difference', 0)
-        if material_diff > 3:
-            insights.append({
-                'severity': 'high',
-                'message': f"White has a significant material advantage (+{material_diff})"
-            })
-        elif material_diff < -3:
-            insights.append({
-                'severity': 'high',
-                'message': f"Black has a significant material advantage ({material_diff})"
-            })
-        
-        # Center control insights
-        center_diff = metrics.get('center_control', {}).get('core_control_difference', 0)
-        if center_diff > 2:
-            insights.append({
-                'severity': 'medium',
-                'message': f"White dominates the center (+{center_diff} control)"
-            })
-        elif center_diff < -2:
-            insights.append({
-                'severity': 'medium',
-                'message': f"Black dominates the center ({center_diff} control)"
-            })
-        
-        # Space control insights
-        space_diff = metrics.get('comparison', {}).get('space_control_advantage', 0)
-        if space_diff > 5:
-            insights.append({
-                'severity': 'medium',
-                'message': f"White has a space advantage (+{space_diff:.1f} squares)"
-            })
-        elif space_diff < -5:
-            insights.append({
-                'severity': 'medium',
-                'message': f"Black has a space advantage ({space_diff:.1f} squares)"
-            })
-        
-        return insights
-        
-    except Exception as e:
-        return [{
-            'severity': 'low',
-            'message': f"Could not generate insights: {str(e)}"
-        }]
-
-
-def display_enhanced_spatial_analysis(current_fen: str, previous_fen: Optional[str] = None, flipped: bool = False) -> Optional[Dict[str, Any]]:
-    """
-    Display enhanced spatial analysis with comprehensive metrics and visualization - FIXED VERSION.
-    This addresses the position comparison error by properly handling previous positions.
+def calculate_center_control_detailed(board: chess.Board) -> Dict[str, Any]:
+    """Calculate detailed center control metrics."""
+    center_squares = [chess.D4, chess.D5, chess.E4, chess.E5]
+    extended_center = [chess.C3, chess.C4, chess.C5, chess.C6, 
+                      chess.D3, chess.D4, chess.D5, chess.D6,
+                      chess.E3, chess.E4, chess.E5, chess.E6,
+                      chess.F3, chess.F4, chess.F5, chess.F6]
     
-    Args:
-        current_fen: Current position FEN
-        previous_fen: Previous position FEN for move comparison
-        flipped: Whether to display boards flipped by default
-    """
-    try:
-        # Validate FEN before creating board
-        if not current_fen or not isinstance(current_fen, str):
-            st.error("❌ Spatial analysis error: Invalid FEN string")
-            st.info("💡 Spatial analysis requires valid chess position")
-            return None
-            
-        try:
-            board = chess.Board(current_fen)
-        except Exception as e:
-            st.error(f"❌ Spatial analysis error: Cannot parse FEN - {str(e)}")
-            st.info("💡 Spatial analysis requires valid chess position")
-            return None
+    center_control = {'white': 0, 'black': 0}
+    extended_control = {'white': 0, 'black': 0}
+    center_occupation = {'white': 0, 'black': 0}
+    
+    # Check center square control and occupation
+    for square in center_squares:
+        white_attackers = len(board.attackers(chess.WHITE, square))
+        black_attackers = len(board.attackers(chess.BLACK, square))
         
-        # Validate board state
-        if not validate_board_state(board):
-            st.error("❌ Spatial analysis error: Invalid board state")
-            st.info("💡 Spatial analysis requires valid chess position")
-            return None
+        center_control['white'] += white_attackers
+        center_control['black'] += black_attackers
         
-        # Calculate metrics safely
-        try:
-            metrics = calculate_comprehensive_spatial_metrics(board)
-            
-            # Check if metrics calculation failed
-            if 'error' in metrics:
-                st.error(f"❌ Spatial analysis error: {metrics['error']}")
-                return None
-                
-        except Exception as e:
-            st.error(f"❌ Spatial analysis error: Metrics calculation failed - {str(e)}")
-            st.info("💡 Spatial analysis requires valid chess position")
-            return None
+        piece = board.piece_at(square)
+        if piece:
+            if piece.color == chess.WHITE:
+                center_occupation['white'] += 1
+            else:
+                center_occupation['black'] += 1
+    
+    # Check extended center control
+    for square in extended_center:
+        white_attackers = len(board.attackers(chess.WHITE, square))
+        black_attackers = len(board.attackers(chess.BLACK, square))
         
-        # Calculate previous metrics if available
-        previous_metrics = None
-        if previous_fen and validate_fen_string(previous_fen):
-            try:
-                prev_board = chess.Board(previous_fen)
-                if validate_board_state(prev_board):
-                    previous_metrics = calculate_comprehensive_spatial_metrics(prev_board)
-                    if 'error' in previous_metrics:
-                        previous_metrics = None
-            except Exception as e:
-                st.warning(f"⚠️ Could not analyze previous position: {str(e)}")
-                previous_metrics = None
-        
-        # Display main metrics
-        display_key_metrics(metrics)
-        
-        # Display space control visualization
-        display_space_control_board(metrics, flipped)
-        
-        # Display detailed metrics
-        display_detailed_single_metrics_table(metrics)
-        
-        # Display position comparison if available
-        if previous_metrics:
-            display_position_comparison(metrics, previous_metrics)
-        else:
-            st.info("💡 Position comparison requires previous position data")
-        
-        return metrics
-        
-    except Exception as e:
-        st.error(f"⚠️ Error displaying spatial analysis: {str(e)}")
-        st.info("💡 Some metrics may not be available for this position")
-        return None
+        extended_control['white'] += white_attackers
+        extended_control['black'] += black_attackers
+    
+    return {
+        'center_control': center_control,
+        'extended_control': extended_control,
+        'center_occupation': center_occupation,
+        'center_advantage': center_control['white'] - center_control['black'],
+        'extended_advantage': extended_control['white'] - extended_control['black'],
+        'occupation_advantage': center_occupation['white'] - center_occupation['black']
+    }
 
-def display_key_metrics(metrics: Dict[str, Any]):
-    """Display key spatial metrics in columns."""
-    st.markdown("#### 📊 Key Spatial Metrics")
+def calculate_piece_activity(board: chess.Board) -> Dict[str, Any]:
+    """Calculate piece activity metrics."""
+    activity = {'white': {}, 'black': {}}
+    
+    piece_types = [chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN, chess.KING]
+    
+    for color in [chess.WHITE, chess.BLACK]:
+        color_key = 'white' if color == chess.WHITE else 'black'
+        
+        for piece_type in piece_types:
+            pieces = board.pieces(piece_type, color)
+            piece_name = chess.piece_name(piece_type)
+            
+            total_mobility = 0
+            total_attacks = 0
+            
+            for square in pieces:
+                # Calculate mobility (number of legal moves)
+                if piece_type != chess.KING:  # Skip king for mobility
+                    piece_moves = len([move for move in board.legal_moves 
+                                     if move.from_square == square])
+                    total_mobility += piece_moves
+                
+                # Calculate attacks
+                attacks = len(board.attacks(square))
+                total_attacks += attacks
+            
+            activity[color_key][piece_name] = {
+                'count': len(pieces),
+                'total_mobility': total_mobility,
+                'total_attacks': total_attacks,
+                'avg_mobility': round(total_mobility / max(1, len(pieces)), 2),
+                'avg_attacks': round(total_attacks / max(1, len(pieces)), 2)
+            }
+    
+    return activity
+
+def calculate_king_safety_metrics(board: chess.Board) -> Dict[str, Any]:
+    """Calculate king safety metrics."""
+    safety = {}
+    
+    for color in [chess.WHITE, chess.BLACK]:
+        color_key = 'white' if color == chess.WHITE else 'black'
+        king_square = board.king(color)
+        
+        if king_square is None:
+            safety[color_key] = {'safe': False, 'threats': 0, 'shelter': 0}
+            continue
+        
+        # Count enemy attacks on king square
+        enemy_color = not color
+        enemy_attacks = len(board.attackers(enemy_color, king_square))
+        
+        # Check pawn shelter (for non-endgame positions)
+        shelter_score = 0
+        if color == chess.WHITE:
+            # Check squares in front of white king
+            shelter_squares = [king_square + 8, king_square + 7, king_square + 9]
+        else:
+            # Check squares in front of black king
+            shelter_squares = [king_square - 8, king_square - 7, king_square - 9]
+        
+        for square in shelter_squares:
+            if 0 <= square <= 63:
+                piece = board.piece_at(square)
+                if piece and piece.piece_type == chess.PAWN and piece.color == color:
+                    shelter_score += 1
+        
+        safety[color_key] = {
+            'threats': enemy_attacks,
+            'shelter': shelter_score,
+            'safe': enemy_attacks == 0,
+            'king_square': chess.square_name(king_square)
+        }
+    
+    return safety
+
+def calculate_pawn_structure_metrics(board: chess.Board) -> Dict[str, Any]:
+    """Calculate pawn structure metrics."""
+    structure = {'white': {}, 'black': {}}
+    
+    for color in [chess.WHITE, chess.BLACK]:
+        color_key = 'white' if color == chess.WHITE else 'black'
+        pawns = board.pieces(chess.PAWN, color)
+        
+        isolated = 0
+        doubled = 0
+        backward = 0
+        passed = 0
+        
+        pawn_files = {}
+        for pawn in pawns:
+            file = chess.square_file(pawn)
+            if file not in pawn_files:
+                pawn_files[file] = []
+            pawn_files[file].append(pawn)
+        
+        # Count doubled pawns
+        for file, file_pawns in pawn_files.items():
+            if len(file_pawns) > 1:
+                doubled += len(file_pawns) - 1
+        
+        # Check for isolated and passed pawns
+        for pawn in pawns:
+            file = chess.square_file(pawn)
+            
+            # Check isolated (no friendly pawns on adjacent files)
+            adjacent_files = [file - 1, file + 1]
+            has_adjacent_pawn = any(adj_file in pawn_files for adj_file in adjacent_files if 0 <= adj_file <= 7)
+            
+            if not has_adjacent_pawn:
+                isolated += 1
+            
+            # Check passed (simplified - no enemy pawns ahead)
+            rank = chess.square_rank(pawn)
+            if color == chess.WHITE:
+                ahead_squares = [chess.square(file, r) for r in range(rank + 1, 8)]
+            else:
+                ahead_squares = [chess.square(file, r) for r in range(0, rank)]
+            
+            enemy_pawns_ahead = any(board.piece_at(sq) and 
+                                  board.piece_at(sq).piece_type == chess.PAWN and 
+                                  board.piece_at(sq).color != color 
+                                  for sq in ahead_squares)
+            
+            if not enemy_pawns_ahead:
+                passed += 1
+        
+        structure[color_key] = {
+            'total': len(pawns),
+            'isolated': isolated,
+            'doubled': doubled,
+            'backward': backward,
+            'passed': passed,
+            'files_occupied': len(pawn_files)
+        }
+    
+    return structure
+
+def calculate_tactical_threats(board: chess.Board) -> Dict[str, Any]:
+    """Calculate tactical threats and hanging pieces."""
+    threats = {'white': [], 'black': [], 'hanging_pieces': []}
+    
+    # Check for hanging pieces (pieces attacked by less valuable pieces)
+    piece_values = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, 
+                   chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0}
+    
+    for square in chess.SQUARES:
+        piece = board.piece_at(square)
+        if not piece:
+            continue
+        
+        attackers = board.attackers(not piece.color, square)
+        defenders = board.attackers(piece.color, square)
+        
+        if attackers:
+            # Find weakest attacker
+            weakest_attacker_value = min(piece_values[board.piece_at(att).piece_type] 
+                                       for att in attackers if board.piece_at(att))
+            
+            if not defenders or weakest_attacker_value < piece_values[piece.piece_type]:
+                threats['hanging_pieces'].append({
+                    'square': chess.square_name(square),
+                    'piece': piece.symbol(),
+                    'value': piece_values[piece.piece_type],
+                    'attacker_value': weakest_attacker_value
+                })
+    
+    return threats
+
+def calculate_positional_factors(board: chess.Board) -> Dict[str, Any]:
+    """Calculate various positional factors."""
+    factors = {}
+    
+    # Development (pieces off starting squares)
+    development = {'white': 0, 'black': 0}
+    
+    # White development
+    starting_squares_white = {chess.B1, chess.C1, chess.D1, chess.F1, chess.G1}
+    for square in starting_squares_white:
+        if not board.piece_at(square) or board.piece_at(square).color != chess.WHITE:
+            development['white'] += 1
+    
+    # Black development
+    starting_squares_black = {chess.B8, chess.C8, chess.D8, chess.F8, chess.G8}
+    for square in starting_squares_black:
+        if not board.piece_at(square) or board.piece_at(square).color != chess.BLACK:
+            development['black'] += 1
+    
+    factors['development'] = development
+    
+    # Castling rights
+    factors['castling_rights'] = {
+        'white_kingside': board.has_kingside_castling_rights(chess.WHITE),
+        'white_queenside': board.has_queenside_castling_rights(chess.WHITE),
+        'black_kingside': board.has_kingside_castling_rights(chess.BLACK),
+        'black_queenside': board.has_queenside_castling_rights(chess.BLACK)
+    }
+    
+    return factors
+
+def display_space_control_visualization(board: chess.Board, metrics: Dict[str, Any]):
+    """Display space control visualization."""
+    st.markdown("#### 🗺️ Space Control Analysis")
+    
+    # Create visualization
+    fig = create_space_control_board_plotly(metrics, flipped=(not board.turn))
+    
+    if fig:
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Space control summary
+    space_control = metrics.get('space_control', {})
     
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        material_diff = metrics.get('material_balance', {}).get('material_difference', 0)
-        st.metric("Material", f"{material_diff:+.1f}")
+        white_space = space_control.get('white_space_percentage', 0)
+        st.metric("White Space", f"{white_space}%")
     
     with col2:
-        center_diff = metrics.get('center_control', {}).get('core_control_difference', 0)
-        st.metric("Center Control", f"{center_diff:+d}")
+        black_space = space_control.get('black_space_percentage', 0)
+        st.metric("Black Space", f"{black_space}%")
     
     with col3:
-        space_diff = metrics.get('comparison', {}).get('space_control_advantage', 0.0)
-        st.metric("Space Control", f"{space_diff:+.1f}")
+        contested = space_control.get('contested_percentage', 0)
+        st.metric("Contested", f"{contested}%")
     
     with col4:
-        connectivity_diff = metrics.get('comparison', {}).get('connectivity_diff', 0.0)
-        st.metric("Connectivity", f"{connectivity_diff:+.2f}")
+        advantage = space_control.get('space_advantage', 0)
+        st.metric("Space Advantage", f"{advantage:+.0f}")
 
-def display_space_control_board(metrics: Dict[str, Any], flipped: bool = False):
-    """Display space control visualization using Plotly."""
-    st.markdown("#### 🎯 Space Control Visualization")
-    
-    try:
-        control_fig = create_control_board_visualization(metrics, flipped=flipped)
-        if control_fig:
-            st.plotly_chart(control_fig, use_container_width=True)
-        else:
-            st.warning("⚠️ Could not generate control board visualization")
-    except Exception as e:
-        st.warning(f"⚠️ Control board visualization failed: {str(e)}")
-        st.info("📊 Basic metrics still available below")
-
-def display_detailed_single_metrics_table(metrics: Dict[str, Any]):
-    """Display detailed metrics in a table format."""
-    st.markdown("#### 📋 Detailed Spatial Analysis")
-    
-    try:
-        # Create metrics table
-        table_data = []
-        
-        # Material metrics
-        material_balance = metrics.get('material_balance', {})
-        white_material = material_balance.get('white_total', 0)
-        black_material = material_balance.get('black_total', 0)
-        material_diff = material_balance.get('material_difference', 0)
-        
-        table_data.append({
-            "Category": "Material",
-            "White": f"{white_material:.1f}",
-            "Black": f"{black_material:.1f}",
-            "Advantage": f"{material_diff:+.1f}",
-            "Description": "Total material value"
-        })
-        
-        # Space control metrics
-        space_control = metrics.get('space_control', {})
-        summary = space_control.get('summary', {})
-        white_space = summary.get('total_controlled_white', 0)
-        black_space = summary.get('total_controlled_black', 0)
-        space_diff = white_space - black_space
-        
-        table_data.append({
-            "Category": "Territory",
-            "White": f"{white_space:.1f}",
-            "Black": f"{black_space:.1f}",
-            "Advantage": f"{space_diff:+.1f}",
-            "Description": "Controlled squares"
-        })
-        
-        # Center control metrics
-        center_control = metrics.get('center_control', {})
-        white_center = center_control.get('white_core_control', 0)
-        black_center = center_control.get('black_core_control', 0)
-        center_diff = center_control.get('core_control_difference', 0)
-        
-        table_data.append({
-            "Category": "Center",
-            "White": str(white_center),
-            "Black": str(black_center),
-            "Advantage": f"{center_diff:+d}",
-            "Description": "Central squares"
-        })
-        
-        # Connectivity metrics
-        white_metrics = metrics.get('white', {})
-        black_metrics = metrics.get('black', {})
-        white_connectivity = white_metrics.get('connectivity_score', 0)
-        black_connectivity = black_metrics.get('connectivity_score', 0)
-        connectivity_diff = white_connectivity - black_connectivity
-        
-        table_data.append({
-            "Category": "Coordination",
-            "White": f"{white_connectivity:.2f}",
-            "Black": f"{black_connectivity:.2f}",
-            "Advantage": f"{connectivity_diff:+.2f}",
-            "Description": "Piece coordination"
-        })
-        
-        # Display as dataframe
-        df = pd.DataFrame(table_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        
-    except Exception as e:
-        st.error(f"⚠️ Error displaying detailed metrics: {str(e)}")
-
-def display_detailed_metrics_table(metrics: Dict[str, Any], previous_metrics: Optional[Dict[str, Any]] = None):
-    """
-    Display detailed spatial metrics in a comprehensive table format.
-    
-    Args:
-        metrics: Current spatial metrics
-        previous_metrics: Previous metrics for comparison (optional)
-    """
-    try:
-        st.markdown("#### 📊 Detailed Spatial Metrics")
-        
-        # Create comprehensive metrics table
-        table_data = []
-        
-        # Material metrics
-        material_balance = metrics.get('material_balance', {})
-        table_data.append({
-            "Category": "Material Balance",
-            "Metric": "Material Difference",
-            "White": f"+{material_balance.get('white_material', 0)}",
-            "Black": f"+{material_balance.get('black_material', 0)}",
-            "Advantage": f"{material_balance.get('material_difference', 0):+.1f}",
-            "Analysis": "Points ahead/behind"
-        })
-        
-        # Space control metrics
-        space_control = metrics.get('space_control', {}).get('summary', {})
-        white_space = space_control.get('total_controlled_white', 0.0)
-        black_space = space_control.get('total_controlled_black', 0.0)
-        table_data.append({
-            "Category": "Space Control",
-            "Metric": "Controlled Squares",
-            "White": f"{white_space:.1f}",
-            "Black": f"{black_space:.1f}",
-            "Advantage": f"{white_space - black_space:+.1f}",
-            "Analysis": "Squares under control"
-        })
-        
-        # Center control metrics
-        center_control = metrics.get('center_control', {})
-        white_center = center_control.get('white_center_control', 0)
-        black_center = center_control.get('black_center_control', 0)
-        table_data.append({
-            "Category": "Center Control",
-            "Metric": "Core Squares",
-            "White": f"{white_center}",
-            "Black": f"{black_center}",
-            "Advantage": f"{center_control.get('core_control_difference', 0):+d}",
-            "Analysis": "Central square control"
-        })
-        
-        # Piece activity metrics
-        white_metrics = metrics.get('white', {})
-        black_metrics = metrics.get('black', {})
-        
-        white_area = white_metrics.get('polygon_area', 0.0)
-        black_area = black_metrics.get('polygon_area', 0.0)
-        table_data.append({
-            "Category": "Piece Activity",
-            "Metric": "Territorial Area",
-            "White": f"{white_area:.2f}",
-            "Black": f"{black_area:.2f}",
-            "Advantage": f"{white_area - black_area:+.2f}",
-            "Analysis": "Piece spread/activity"
-        })
-        
-        # Connectivity metrics
-        white_connectivity = white_metrics.get('connectivity_score', 0.0)
-        black_connectivity = black_metrics.get('connectivity_score', 0.0)
-        table_data.append({
-            "Category": "Coordination",
-            "Metric": "Connectivity Score",
-            "White": f"{white_connectivity:.2f}",
-            "Black": f"{black_connectivity:.2f}",
-            "Advantage": f"{white_connectivity - black_connectivity:+.2f}",
-            "Analysis": "Piece coordination"
-        })
-        
-        # Position centroids
-        white_centroid = white_metrics.get('centroid', (0, 0))
-        black_centroid = black_metrics.get('centroid', (0, 0))
-        table_data.append({
-            "Category": "Position Center",
-            "Metric": "Army Centroid",
-            "White": f"({white_centroid[0]:.1f}, {white_centroid[1]:.1f})",
-            "Black": f"({black_centroid[0]:.1f}, {black_centroid[1]:.1f})",
-            "Advantage": "—",
-            "Analysis": "Average piece position"
-        })
-        
-        # Create and display dataframe
-        import pandas as pd
-        df = pd.DataFrame(table_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        
-        # Show comparison with previous position if available
-        if previous_metrics:
-            st.markdown("#### 📈 Position Comparison")
-            
-            comparison_data = []
-            
-            # Material change
-            prev_material = previous_metrics.get('material_balance', {}).get('material_difference', 0)
-            curr_material = material_balance.get('material_difference', 0)
-            material_change = curr_material - prev_material
-            
-            comparison_data.append({
-                "Metric": "Material Balance",
-                "Previous": f"{prev_material:+.1f}",
-                "Current": f"{curr_material:+.1f}",
-                "Change": f"{material_change:+.1f}",
-                "Trend": "📈" if material_change > 0.1 else "📉" if material_change < -0.1 else "➡️"
-            })
-            
-            # Space control change
-            prev_space = previous_metrics.get('comparison', {}).get('space_control_advantage', 0)
-            curr_space = metrics.get('comparison', {}).get('space_control_advantage', 0)
-            space_change = curr_space - prev_space
-            
-            comparison_data.append({
-                "Metric": "Space Control",
-                "Previous": f"{prev_space:+.1f}",
-                "Current": f"{curr_space:+.1f}",
-                "Change": f"{space_change:+.1f}",
-                "Trend": "📈" if space_change > 0.1 else "📉" if space_change < -0.1 else "➡️"
-            })
-            
-            comparison_df = pd.DataFrame(comparison_data)
-            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
-        
-    except Exception as e:
-        st.error(f"⚠️ Error displaying detailed metrics: {str(e)}")
-        st.info("💡 Some metrics may not be available for this position")
-
-
-def display_position_comparison(current_metrics: Dict[str, Any], previous_metrics: Dict[str, Any]):
-    """Display position comparison table - FIXED VERSION."""
-    st.markdown("#### 📈 Position Comparison")
-    
-    try:
-        comparison_data = []
-        
-        # Material change
-        prev_material = previous_metrics.get('material_balance', {}).get('material_difference', 0)
-        curr_material = current_metrics.get('material_balance', {}).get('material_difference', 0)
-        material_change = curr_material - prev_material
-        
-        comparison_data.append({
-            "Metric": "Material Balance",
-            "Previous": f"{prev_material:+.1f}",
-            "Current": f"{curr_material:+.1f}",
-            "Change": f"{material_change:+.1f}",
-            "Trend": "📈" if material_change > 0.1 else "📉" if material_change < -0.1 else "➡️"
-        })
-        
-        # Space control change
-        prev_space = previous_metrics.get('comparison', {}).get('space_control_advantage', 0)
-        curr_space = current_metrics.get('comparison', {}).get('space_control_advantage', 0)
-        space_change = round(curr_space - prev_space, 2)
-        
-        comparison_data.append({
-            "Metric": "Space Control",
-            "Previous": f"{prev_space:+.1f}",
-            "Current": f"{curr_space:+.1f}",
-            "Change": f"{space_change:+.1f}",
-            "Trend": "📈" if space_change > 0.1 else "📉" if space_change < -0.1 else "➡️"
-        })
-        
-        # Center control change
-        prev_center = previous_metrics.get('center_control', {}).get('core_control_difference', 0)
-        curr_center = current_metrics.get('center_control', {}).get('core_control_difference', 0)
-        center_change = curr_center - prev_center
-        
-        comparison_data.append({
-            "Metric": "Center Control",
-            "Previous": f"{prev_center:+d}",
-            "Current": f"{curr_center:+d}",
-            "Change": f"{center_change:+d}",
-            "Trend": "📈" if center_change > 0 else "📉" if center_change < 0 else "➡️"
-        })
-        
-        # Connectivity change
-        prev_connectivity = previous_metrics.get('comparison', {}).get('connectivity_diff', 0)
-        curr_connectivity = current_metrics.get('comparison', {}).get('connectivity_diff', 0)
-        connectivity_change = round(curr_connectivity - prev_connectivity, 2)
-        
-        comparison_data.append({
-            "Metric": "Connectivity",
-            "Previous": f"{prev_connectivity:+.2f}",
-            "Current": f"{curr_connectivity:+.2f}",
-            "Change": f"{connectivity_change:+.2f}",
-            "Trend": "📈" if connectivity_change > 0.1 else "📉" if connectivity_change < -0.1 else "➡️"
-        })
-        
-        comparison_df = pd.DataFrame(comparison_data)
-        st.dataframe(comparison_df, use_container_width=True, hide_index=True)
-        
-    except Exception as e:
-        st.error(f"⚠️ Error displaying position comparison: {str(e)}")
-
-def create_control_board_visualization(metrics: Dict[str, Any], flipped: bool = False) -> Optional[go.Figure]:
-    """
-    Create control board visualization - ENHANCED VERSION with better error handling.
-    """
+def create_space_control_board_plotly(metrics: Dict[str, Any], flipped: bool = False) -> Optional[go.Figure]:
+    """Create space control board visualization using Plotly."""
     try:
         space_control = metrics.get('space_control', {})
         control_matrix = space_control.get('control_matrix', [])
@@ -880,7 +489,6 @@ def create_control_board_visualization(metrics: Dict[str, Any], flipped: bool = 
         if not control_matrix or len(control_matrix) != 8:
             return None
         
-        # Create the visualization safely
         fig = go.Figure()
         
         # Add board squares with control coloring
@@ -909,18 +517,18 @@ def create_control_board_visualization(metrics: Dict[str, Any], flipped: bool = 
                         text_color = 'gray'
                         symbol = ''
                     
-                    # Add square
-                    display_rank = 7 - rank if not flipped else rank
-                    display_file = file if not flipped else 7 - file
+                    # Adjust coordinates for flipping
+                    display_rank = 7 - rank if flipped else rank
+                    display_file = 7 - file if flipped else file
                     
+                    # Add square
                     fig.add_shape(
                         type="rect",
-                        x0=display_file,
-                        y0=display_rank,
-                        x1=display_file + 1,
-                        y1=display_rank + 1,
+                        x0=display_file, y0=display_rank,
+                        x1=display_file + 1, y1=display_rank + 1,
                         fillcolor=color,
-                        line=dict(color="rgba(0,0,0,0.3)", width=1)
+                        line=dict(color="black", width=1),
+                        layer="below"
                     )
                     
                     # Add symbol
@@ -934,14 +542,12 @@ def create_control_board_visualization(metrics: Dict[str, Any], flipped: bool = 
                             showlegend=False,
                             hoverinfo='skip'
                         ))
-                except Exception:
-                    continue  # Skip problematic squares
+                
+                except (IndexError, TypeError):
+                    continue
         
         # Add file labels (a-h)
-        files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-        if flipped:
-            files = files[::-1]
-        
+        files = list('abcdefgh') if not flipped else list('hgfedcba')
         for i, file_label in enumerate(files):
             fig.add_trace(go.Scatter(
                 x=[i + 0.5],
@@ -996,12 +602,346 @@ def create_control_board_visualization(metrics: Dict[str, Any], flipped: bool = 
         return fig
         
     except Exception as e:
-        print(f"Error creating control board visualization: {e}")
+        st.error(f"Error creating space control visualization: {e}")
         return None
 
-# Keep all other existing functions unchanged (calculate_material_balance, etc.)
-# These are the core spatial analysis functions that work correctly
+def display_spatial_metrics_dashboard(metrics: Dict[str, Any], position_data: Dict[str, Any]):
+    """Display comprehensive spatial metrics dashboard."""
+    st.markdown("#### 📊 Spatial Metrics Dashboard")
+    
+    # Material balance
+    material = metrics.get('material_balance', {})
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        white_material = material.get('white_total', 0)
+        st.metric("White Material", white_material)
+    
+    with col2:
+        black_material = material.get('black_total', 0)
+        st.metric("Black Material", black_material)
+    
+    with col3:
+        material_diff = material.get('material_difference', 0)
+        st.metric("Material Balance", f"{material_diff:+.1f}")
+    
+    # Center control
+    st.markdown("##### 🎯 Center Control")
+    center = metrics.get('center_control', {})
+    
+    center_col1, center_col2, center_col3 = st.columns(3)
+    
+    with center_col1:
+        center_adv = center.get('center_advantage', 0)
+        st.metric("Center Advantage", f"{center_adv:+}")
+    
+    with center_col2:
+        extended_adv = center.get('extended_advantage', 0)
+        st.metric("Extended Center", f"{extended_adv:+}")
+    
+    with center_col3:
+        occupation_adv = center.get('occupation_advantage', 0)
+        st.metric("Center Occupation", f"{occupation_adv:+}")
+    
+    # Piece activity
+    st.markdown("##### ⚡ Piece Activity")
+    activity = metrics.get('piece_activity', {})
+    
+    if activity:
+        activity_data = []
+        for color in ['white', 'black']:
+            for piece, data in activity[color].items():
+                activity_data.append({
+                    'Color': color.title(),
+                    'Piece': piece.title(),
+                    'Count': data['count'],
+                    'Avg Mobility': data['avg_mobility'],
+                    'Avg Attacks': data['avg_attacks']
+                })
+        
+        if activity_data:
+            st.dataframe(activity_data, use_container_width=True)
 
+def display_tactical_analysis(board: chess.Board, metrics: Dict[str, Any]):
+    """Display tactical analysis."""
+    st.markdown("#### 🎯 Tactical Analysis")
+    
+    # Hanging pieces
+    threats = metrics.get('tactical_threats', {})
+    hanging = threats.get('hanging_pieces', [])
+    
+    if hanging:
+        st.warning(f"⚠️ Found {len(hanging)} hanging pieces:")
+        
+        for piece_info in hanging:
+            st.markdown(f"- **{piece_info['piece']}** on {piece_info['square']} "
+                       f"(value: {piece_info['value']}, attacked by: {piece_info['attacker_value']})")
+    else:
+        st.success("✅ No hanging pieces detected")
+    
+    # King safety
+    king_safety = metrics.get('king_safety', {})
+    
+    st.markdown("##### 🏰 King Safety")
+    
+    safety_col1, safety_col2 = st.columns(2)
+    
+    with safety_col1:
+        white_safety = king_safety.get('white', {})
+        white_threats = white_safety.get('threats', 0)
+        white_shelter = white_safety.get('shelter', 0)
+        
+        st.markdown("**White King:**")
+        st.markdown(f"- Position: {white_safety.get('king_square', 'Unknown')}")
+        st.markdown(f"- Threats: {white_threats}")
+        st.markdown(f"- Pawn Shelter: {white_shelter}")
+        
+        if white_threats == 0:
+            st.success("✅ Safe")
+        else:
+            st.warning(f"⚠️ {white_threats} threats")
+    
+    with safety_col2:
+        black_safety = king_safety.get('black', {})
+        black_threats = black_safety.get('threats', 0)
+        black_shelter = black_safety.get('shelter', 0)
+        
+        st.markdown("**Black King:**")
+        st.markdown(f"- Position: {black_safety.get('king_square', 'Unknown')}")
+        st.markdown(f"- Threats: {black_threats}")
+        st.markdown(f"- Pawn Shelter: {black_shelter}")
+        
+        if black_threats == 0:
+            st.success("✅ Safe")
+        else:
+            st.warning(f"⚠️ {black_threats} threats")
+
+def display_positional_analysis(board: chess.Board, metrics: Dict[str, Any]):
+    """Display positional analysis."""
+    st.markdown("#### 🏰 Positional Analysis")
+    
+    # Pawn structure
+    pawn_structure = metrics.get('pawn_structure', {})
+    
+    st.markdown("##### ♟️ Pawn Structure")
+    
+    pawn_col1, pawn_col2 = st.columns(2)
+    
+    with pawn_col1:
+        st.markdown("**White Pawns:**")
+        white_pawns = pawn_structure.get('white', {})
+        st.markdown(f"- Total: {white_pawns.get('total', 0)}")
+        st.markdown(f"- Isolated: {white_pawns.get('isolated', 0)}")
+        st.markdown(f"- Doubled: {white_pawns.get('doubled', 0)}")
+        st.markdown(f"- Passed: {white_pawns.get('passed', 0)}")
+    
+    with pawn_col2:
+        st.markdown("**Black Pawns:**")
+        black_pawns = pawn_structure.get('black', {})
+        st.markdown(f"- Total: {black_pawns.get('total', 0)}")
+        st.markdown(f"- Isolated: {black_pawns.get('isolated', 0)}")
+        st.markdown(f"- Doubled: {black_pawns.get('doubled', 0)}")
+        st.markdown(f"- Passed: {black_pawns.get('passed', 0)}")
+    
+    # Development
+    positional = metrics.get('positional_factors', {})
+    development = positional.get('development', {})
+    
+    st.markdown("##### 🚀 Development")
+    
+    dev_col1, dev_col2 = st.columns(2)
+    
+    with dev_col1:
+        white_dev = development.get('white', 0)
+        st.metric("White Development", f"{white_dev}/5")
+    
+    with dev_col2:
+        black_dev = development.get('black', 0)
+        st.metric("Black Development", f"{black_dev}/5")
+    
+    # Castling rights
+    castling = positional.get('castling_rights', {})
+    
+    st.markdown("##### 🏰 Castling Rights")
+    
+    castling_info = []
+    castling_info.append(f"White: {'O-O' if castling.get('white_kingside') else ''} {'O-O-O' if castling.get('white_queenside') else ''}")
+    castling_info.append(f"Black: {'O-O' if castling.get('black_kingside') else ''} {'O-O-O' if castling.get('black_queenside') else ''}")
+    
+    for info in castling_info:
+        st.markdown(f"- {info}")
+
+def display_spatial_insights(board: chess.Board, metrics: Dict[str, Any], position_data: Dict[str, Any]):
+    """Display AI-generated spatial insights."""
+    st.markdown("#### 💡 Spatial Insights")
+    
+    insights = generate_spatial_insights(metrics, position_data)
+    
+    for insight_category, insight_list in insights.items():
+        with st.expander(f"🔍 {insight_category.replace('_', ' ').title()}"):
+            for insight in insight_list:
+                st.markdown(f"• {insight}")
+
+def generate_spatial_insights(metrics: Dict[str, Any], position_data: Dict[str, Any]) -> Dict[str, List[str]]:
+    """Generate strategic insights based on spatial analysis."""
+    insights = {
+        'space_control': [],
+        'tactical_threats': [],
+        'positional_factors': [],
+        'strategic_recommendations': []
+    }
+    
+    # Space control insights
+    space_control = metrics.get('space_control', {})
+    white_space = space_control.get('white_space_percentage', 0)
+    black_space = space_control.get('black_space_percentage', 0)
+    
+    if white_space > black_space + 10:
+        insights['space_control'].append("White has a significant space advantage, controlling key squares.")
+    elif black_space > white_space + 10:
+        insights['space_control'].append("Black has a significant space advantage, restricting White's pieces.")
+    else:
+        insights['space_control'].append("Space control is relatively balanced between both sides.")
+    
+    # Center control insights
+    center = metrics.get('center_control', {})
+    center_adv = center.get('center_advantage', 0)
+    
+    if center_adv > 3:
+        insights['positional_factors'].append("White has strong central control, providing better piece coordination.")
+    elif center_adv < -3:
+        insights['positional_factors'].append("Black dominates the center, limiting White's options.")
+    
+    # Tactical insights
+    threats = metrics.get('tactical_threats', {})
+    hanging = threats.get('hanging_pieces', [])
+    
+    if hanging:
+        insights['tactical_threats'].append(f"Immediate tactical opportunities available with {len(hanging)} hanging pieces.")
+    
+    # King safety insights
+    king_safety = metrics.get('king_safety', {})
+    white_threats = king_safety.get('white', {}).get('threats', 0)
+    black_threats = king_safety.get('black', {}).get('threats', 0)
+    
+    if white_threats > 2:
+        insights['tactical_threats'].append("White king is under significant pressure and needs immediate attention.")
+    if black_threats > 2:
+        insights['tactical_threats'].append("Black king is exposed and vulnerable to attack.")
+    
+    # Strategic recommendations
+    if not insights['tactical_threats']:
+        insights['strategic_recommendations'].append("Focus on improving piece coordination and long-term positional advantages.")
+    else:
+        insights['strategic_recommendations'].append("Prioritize tactical calculations due to immediate threats on the board.")
+    
+    return insights
+
+def analyze_game_spatial_progression(pgn_game):
+    """Analyze spatial progression throughout a game."""
+    st.markdown("#### 🎮 Game Spatial Progression")
+    
+    board = pgn_game.board()
+    move_number = 1
+    positions = []
+    
+    # Collect positions
+    for move in pgn_game.mainline_moves():
+        if move_number <= 20:  # Limit analysis to first 20 moves
+            metrics = calculate_comprehensive_spatial_metrics(board)
+            positions.append({
+                'move_number': move_number,
+                'fen': board.fen(),
+                'move': str(move),
+                'space_control': metrics['space_control'],
+                'center_control': metrics['center_control']
+            })
+        
+        board.push(move)
+        move_number += 1
+    
+    if positions:
+        # Create progression charts
+        move_nums = [pos['move_number'] for pos in positions]
+        white_space = [pos['space_control']['white_space_percentage'] for pos in positions]
+        black_space = [pos['space_control']['black_space_percentage'] for pos in positions]
+        
+        # Space control progression
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=move_nums, y=white_space, name='White Space', line=dict(color='blue')))
+        fig.add_trace(go.Scatter(x=move_nums, y=black_space, name='Black Space', line=dict(color='red')))
+        
+        fig.update_layout(
+            title='Space Control Progression',
+            xaxis_title='Move Number',
+            yaxis_title='Space Control %',
+            hovermode='x unified'
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Move-by-move analysis
+        with st.expander("📋 Move-by-Move Analysis"):
+            for pos in positions[:10]:  # Show first 10 moves
+                st.markdown(f"**Move {pos['move_number']}:** {pos['move']}")
+                st.markdown(f"- White space: {pos['space_control']['white_space_percentage']:.1f}%")
+                st.markdown(f"- Black space: {pos['space_control']['black_space_percentage']:.1f}%")
+                st.markdown("---")
+
+# Utility functions
+def validate_fen_string(fen: str) -> bool:
+    """Validate if a FEN string represents a valid chess position."""
+    try:
+        if not fen or not isinstance(fen, str):
+            return False
+        
+        board = chess.Board(fen)
+        return board.is_valid()
+    except:
+        return False
+
+def validate_board_state(board: chess.Board) -> bool:
+    """Validate board state for spatial analysis."""
+    try:
+        if not board.is_valid():
+            return False
+        
+        # Check if kings are present
+        white_king = board.king(chess.WHITE)
+        black_king = board.king(chess.BLACK)
+        
+        if white_king is None or black_king is None:
+            return False
+        
+        return True
+        
+    except Exception:
+        return False
+
+def load_position_from_database(position_id: int) -> Optional[Dict[str, Any]]:
+    """Load position data from database."""
+    try:
+        import database
+        
+        conn = database.get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM positions WHERE id = ?', (position_id,))
+        position_row = cursor.fetchone()
+        
+        if position_row:
+            position_data = dict(position_row)
+            # Parse JSON fields if needed
+            return position_data
+        
+        conn.close()
+        return None
+        
+    except Exception as e:
+        st.error(f"Error loading position from database: {e}")
+        return None
+
+# Legacy functions for backward compatibility
 def calculate_material_balance(board: chess.Board) -> Dict[str, float]:
     """Calculate material balance between sides."""
     piece_values = {
@@ -1026,301 +966,28 @@ def calculate_material_balance(board: chess.Board) -> Dict[str, float]:
                 black_total += value
     
     return {
-        'white_total': white_total,
-        'black_total': black_total,
-        'material_difference': white_total - black_total
+        'white_total': float(white_total),
+        'black_total': float(black_total),
+        'material_difference': round(float(white_total - black_total), 2)
     }
 
 def calculate_center_control(board: chess.Board) -> Dict[str, int]:
     """Calculate center control metrics."""
     center_squares = [chess.D4, chess.D5, chess.E4, chess.E5]
-    extended_center = [
-        chess.C3, chess.C4, chess.C5, chess.C6,
-        chess.D3, chess.D4, chess.D5, chess.D6,
-        chess.E3, chess.E4, chess.E5, chess.E6,
-        chess.F3, chess.F4, chess.F5, chess.F6
-    ]
     
-    white_core_control = 0
-    black_core_control = 0
-    white_extended_control = 0
-    black_extended_control = 0
-    
-    white_attackers = board.attackers(chess.WHITE, chess.E4) | board.attackers(chess.WHITE, chess.E5) | \
-                     board.attackers(chess.WHITE, chess.D4) | board.attackers(chess.WHITE, chess.D5)
-    black_attackers = board.attackers(chess.BLACK, chess.E4) | board.attackers(chess.BLACK, chess.E5) | \
-                     board.attackers(chess.BLACK, chess.D4) | board.attackers(chess.BLACK, chess.D5)
+    white_control = 0
+    black_control = 0
     
     for square in center_squares:
-        if board.is_attacked_by(chess.WHITE, square):
-            white_core_control += 1
-        if board.is_attacked_by(chess.BLACK, square):
-            black_core_control += 1
-    
-    for square in extended_center:
-        if board.is_attacked_by(chess.WHITE, square):
-            white_extended_control += 1
-        if board.is_attacked_by(chess.BLACK, square):
-            black_extended_control += 1
+        white_attackers = len(board.attackers(chess.WHITE, square))
+        black_attackers = len(board.attackers(chess.BLACK, square))
+        
+        white_control += white_attackers
+        black_control += black_attackers
     
     return {
-        'white_core_control': white_core_control,
-        'black_core_control': black_core_control,
-        'core_control_difference': white_core_control - black_core_control,
-        'white_extended_control': white_extended_control,
-        'black_extended_control': black_extended_control,
-        'extended_control_difference': white_extended_control - black_extended_control
+        'white_control': white_control,
+        'black_control': black_control,
+        'advantage': white_control - black_control
     }
-
-def calculate_space_control_matrix(board: chess.Board) -> Dict[str, Any]:
-    """Calculate space control matrix for the entire board."""
-    try:
-        control_matrix = []
-        white_controlled = 0
-        black_controlled = 0
-        contested = 0
-        neutral = 0
-        
-        for rank in range(8):
-            row = []
-            for file in range(8):
-                square = chess.square(file, rank)
-                
-                white_attacks = board.is_attacked_by(chess.WHITE, square)
-                black_attacks = board.is_attacked_by(chess.BLACK, square)
-                
-                if white_attacks and black_attacks:
-                    control_value = 2  # Contested
-                    contested += 1
-                elif white_attacks:
-                    control_value = 1  # White control
-                    white_controlled += 1
-                elif black_attacks:
-                    control_value = -1  # Black control
-                    black_controlled += 1
-                else:
-                    control_value = 0  # Neutral
-                    neutral += 1
-                
-                row.append(control_value)
-            control_matrix.append(row)
-        
-        # Calculate control counts
-        white_control_count = sum(row.count(1) for row in control_matrix)
-        black_control_count = sum(row.count(-1) for row in control_matrix)
-        contested_count = sum(row.count(2) for row in control_matrix)
-        
-        return {
-            'control_matrix': control_matrix,
-            'white_control_count': white_control_count,
-            'black_control_count': black_control_count,
-            'contested_count': contested_count,
-            'summary': {
-                'white_controlled': white_controlled,
-                'black_controlled': black_controlled,
-                'contested': contested,
-                'neutral': neutral,
-                'total_controlled_white': float(white_controlled + contested / 2),
-                'total_controlled_black': float(black_controlled + contested / 2)
-            }
-        }
-        
-    except Exception as e:
-        return {
-            'control_matrix': [[0 for _ in range(8)] for _ in range(8)],
-            'summary': {
-                'white_controlled': 0,
-                'black_controlled': 0,
-                'contested': 0,
-                'neutral': 64,
-                'total_controlled_white': 0.0,
-                'total_controlled_black': 0.0
-            },
-            'error': f'Space control calculation failed: {str(e)}'
-        }
-
-# Additional helper functions remain unchanged...
-def get_piece_positions(board: chess.Board, color: chess.Color) -> List[Tuple[int, int]]:
-    """Get positions of all pieces for a given color."""
-    positions = []
-    for square in chess.SQUARES:
-        piece = board.piece_at(square)
-        if piece and piece.color == color:
-            file = chess.square_file(square)
-            rank = chess.square_rank(square)
-            positions.append((file, rank))
-    return positions
-
-def get_controlled_squares(board: chess.Board, color: chess.Color) -> List[Tuple[int, int]]:
-    """Get all squares controlled by a given color."""
-    controlled = []
-    for square in chess.SQUARES:
-        if board.is_attacked_by(color, square):
-            file = chess.square_file(square)
-            rank = chess.square_rank(square)
-            controlled.append((file, rank))
-    return controlled
-
-def calculate_convex_hull(points: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
-    """Calculate convex hull of given points using Graham scan."""
-    if len(points) < 3:
-        return points
-    
-    def cross_product(o, a, b):
-        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
-    
-    points = sorted(set(points))
-    if len(points) <= 1:
-        return points
-    
-    # Build lower hull
-    lower = []
-    for p in points:
-        while len(lower) >= 2 and cross_product(lower[-2], lower[-1], p) <= 0:
-            lower.pop()
-        lower.append(p)
-    
-    # Build upper hull
-    upper = []
-    for p in reversed(points):
-        while len(upper) >= 2 and cross_product(upper[-2], upper[-1], p) <= 0:
-            upper.pop()
-        upper.append(p)
-    
-    return lower[:-1] + upper[:-1]
-
-def calculate_polygon_area(vertices: List[Tuple[int, int]]) -> float:
-    """Calculate area of polygon using shoelace formula."""
-    if len(vertices) < 3:
-        return 0.0
-    
-    area = 0.0
-    for i in range(len(vertices)):
-        j = (i + 1) % len(vertices)
-        area += vertices[i][0] * vertices[j][1]
-        area -= vertices[j][0] * vertices[i][1]
-    
-    return abs(area) / 2.0
-
-def calculate_centroid(vertices: List[Tuple[int, int]]) -> Tuple[float, float]:
-    """Calculate centroid of polygon."""
-    if not vertices:
-        return (0.0, 0.0)
-    
-    x = sum(v[0] for v in vertices) / len(vertices)
-    y = sum(v[1] for v in vertices) / len(vertices)
-    return (x, y)
-
-def calculate_connectivity_score(positions: List[Tuple[int, int]]) -> float:
-    """Calculate connectivity score based on piece distances."""
-    if len(positions) < 2:
-        return 0.0
-    
-    total_distance = 0.0
-    count = 0
-    
-    for i in range(len(positions)):
-        for j in range(i + 1, len(positions)):
-            x1, y1 = positions[i]
-            x2, y2 = positions[j]
-            distance = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
-            total_distance += distance
-            count += 1
-    
-    avg_distance = total_distance / count if count > 0 else 0
-    # Invert so higher score means better connectivity
-    return max(0, 10 - avg_distance)
-
-def display_spatial_analysis_safe(current_fen: str, previous_fen: str = None):
-    """Safe spatial analysis display with error handling."""
-    
-    try:
-        if not current_fen:
-            st.error("❌ No position data available")
-            return
-        
-        # Validate FEN
-        try:
-            board = chess.Board(current_fen)
-        except:
-            st.error("❌ Invalid position data")
-            return
-        
-        st.markdown("#### 📊 Spatial Analysis")
-        
-        # Basic material calculation
-        piece_values = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, 
-                       chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0}
-        
-        white_material = sum(piece_values.get(piece.piece_type, 0) 
-                           for piece in board.piece_map().values() 
-                           if piece.color == chess.WHITE)
-        
-        black_material = sum(piece_values.get(piece.piece_type, 0) 
-                           for piece in board.piece_map().values() 
-                           if piece.color == chess.BLACK)
-        
-        material_diff = white_material - black_material
-        
-        # Display basic metrics
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Material Balance", f"{material_diff:+d}")
-        
-        with col2:
-            # Count center control
-            center_squares = [chess.D4, chess.D5, chess.E4, chess.E5]
-            white_center = sum(1 for sq in center_squares if board.is_attacked_by(chess.WHITE, sq))
-            black_center = sum(1 for sq in center_squares if board.is_attacked_by(chess.BLACK, sq))
-            center_diff = white_center - black_center
-            st.metric("Center Control", f"{center_diff:+d}")
-        
-        with col3:
-            # Basic space control
-            total_squares = 64
-            white_attacks = sum(1 for sq in chess.SQUARES if board.is_attacked_by(chess.WHITE, sq))
-            black_attacks = sum(1 for sq in chess.SQUARES if board.is_attacked_by(chess.BLACK, sq))
-            space_diff = white_attacks - black_attacks
-            st.metric("Space Control", f"{space_diff:+d}")
-        
-        # Show space control visualization
-        st.markdown("---")
-        display_space_control_html_in_streamlit(current_fen)
-        
-        # Position comparison if available
-        if previous_fen:
-            st.markdown("#### 📈 Position Comparison")
-            st.success("✅ Comparing with previous position")
-            
-            try:
-                prev_board = chess.Board(previous_fen)
-                
-                # Calculate previous metrics
-                prev_white_material = sum(piece_values.get(piece.piece_type, 0) 
-                                        for piece in prev_board.piece_map().values() 
-                                        if piece.color == chess.WHITE)
-                prev_black_material = sum(piece_values.get(piece.piece_type, 0) 
-                                        for piece in prev_board.piece_map().values() 
-                                        if piece.color == chess.BLACK)
-                prev_material_diff = prev_white_material - prev_black_material
-                
-                # Show comparison
-                material_change = material_diff - prev_material_diff
-                trend = "📈" if material_change > 0 else "📉" if material_change < 0 else "➡️"
-                
-                st.markdown(f"**Material Change:** {material_change:+d} {trend}")
-                
-            except Exception as e:
-                st.warning(f"⚠️ Previous position analysis failed: {e}")
-        else:
-            st.info("💡 Position comparison requires previous position data")
-        
-    except Exception as e:
-        st.error(f"⚠️ Spatial analysis error: {e}")
-        st.info("💡 Basic position information still available")
-
-
-if __name__ == "__main__":
-    print("Essential Kuikma modules loaded successfully.")
 

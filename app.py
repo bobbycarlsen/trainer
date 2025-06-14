@@ -14,6 +14,7 @@ import training
 import insights
 import analysis
 import pgn_loader
+import game_analysis
 import spatial_analysis
 import chess_board
 import settings
@@ -649,10 +650,10 @@ def main():
         
         elif selected_page == "📈 Analysis":
             analysis.display_analysis()
-        
+
         elif selected_page == "🎮 Game Analysis":
-            display_game_analysis()
-        
+            game_analysis.display_game_analysis()        
+
         elif selected_page == "🔍 Spatial Analysis":
             spatial_analysis.display_spatial_analysis()
         
