@@ -4,7 +4,7 @@
 streamlit>=1.32.0
 pandas>=2.2.0
 numpy>=1.24.0
-python-chess>=1.999
+python-chess
 
 # Database
 sqlite3  # Built-in with Python
@@ -19,7 +19,7 @@ scipy>=1.12.0
 python-dateutil>=2.8.2
 
 # Web and File Processing
-requests>=2.31.0
+requests
 weasyprint>=61.0  # For PDF generation (optional)
 
 # Enhanced Features
