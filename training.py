@@ -90,36 +90,35 @@ def display_training_controls():
     control_col1, control_col2, control_col3, control_col4 = st.columns(4)
     
     with control_col1:
-        if st.button("🎲 Random Position", use_container_width=True):
+        if st.button("🎲 Random Position", use_container_width=True, key="ctrl_random_pos"):
             load_random_position()
             st.rerun()
     
     with control_col2:
-        if st.button("➡️ Next Position", use_container_width=True):
+        if st.button("➡️ Next Position", use_container_width=True, key="ctrl_next_pos"):
             load_next_position()
             st.rerun()
     
     with control_col3:
-        # FIX: Use current position ID as default value instead of always showing 1
         current_pos_id = st.session_state.get('current_position', {}).get('id', 1)
-        position_id = st.number_input("Position ID", min_value=1, value=current_pos_id, key="load_by_id")
-        if st.button("🔍 Load by ID", use_container_width=True):
+        position_id = st.number_input("Position ID", min_value=1, value=current_pos_id, key="ctrl_load_by_id")
+        if st.button("🔍 Load by ID", use_container_width=True, key="ctrl_load_id_btn"):
             load_position_by_id(position_id)
             st.rerun()
     
     with control_col4:
         # Timer controls
         if st.session_state.timer_start is None:
-            if st.button("⏱️ Start Timer", use_container_width=True):
+            if st.button("⏱️ Start Timer", use_container_width=True, key="ctrl_start_timer"):
                 start_position_timer()
                 st.rerun()
         else:
             if st.session_state.timer_paused:
-                if st.button("▶️ Resume Timer", use_container_width=True):
+                if st.button("▶️ Resume Timer", use_container_width=True, key="ctrl_resume_timer"):
                     resume_position_timer()
                     st.rerun()
             else:
-                if st.button("⏸️ Pause Timer", use_container_width=True):
+                if st.button("⏸️ Pause Timer", use_container_width=True, key="ctrl_pause_timer"):
                     pause_position_timer()
                     st.rerun()
     
@@ -128,169 +127,23 @@ def display_training_controls():
         current_time = get_current_position_time()
         st.info(f"⏱️ Position Time: {current_time:.1f}s")
 
-def display_position_interface():
-    """Display the current position with board and move analysis."""
-    position_data = st.session_state.current_position
-    
-    # Position header with enhanced info display
-    st.markdown(
-        "### {}".format(
-            position_data.get(
-                'title',
-                "Position {}".format(position_data.get('id', 'Unknown'))
-            )
-        )
-    )
-    
-    if position_data.get('description'):
-        st.markdown(f"*{position_data['description']}*")
-    
-    # Enhanced position info badges - showing only basic info before move submission
-    info_col1, info_col2, info_col3, info_col4, info_col5 = st.columns(5)
-    
-    with info_col1:
-        difficulty = position_data.get('difficulty_rating', 1200)
-        st.markdown(f"**Difficulty:** {difficulty}")
-    
-    with info_col2:
-        game_phase = position_data.get('game_phase', 'middlegame').title()
-        st.markdown(f"**Phase:** {game_phase}")
-    
-    with info_col3:
-        turn = position_data.get('turn', 'white').title()
-        st.markdown(f"**Turn:** {turn}")
-    
-    with info_col4:
-        # FIX: Show actual position ID instead of always 1
-        position_id = position_data.get('id', 'Unknown')
-        st.markdown(f"**Position ID:** {position_id}")
-    
-    with info_col5:
-        move_number = position_data.get('fullmove_number', 1)
-        st.markdown(f"**Move Number:** {move_number}")
-    
-    st.markdown("---")
-    
-    # Show detailed analysis only after move submission
-    if st.session_state.get('show_analysis_after_move'):
-        display_detailed_analysis(position_data)
-        st.markdown("---")
-    
-    # Main interface layout
-    if st.session_state.get('show_side_by_side_boards'):
-        display_side_by_side_boards(position_data)
-    else:
-        board_col, moves_col = st.columns([1, 1])
-        
-        with board_col:
-            display_chess_board(position_data)
-        
-        with moves_col:
-            display_legal_move_selection(position_data)  # FIX: Use legal moves instead of best moves
-
-def display_detailed_analysis(position_data: Dict[str, Any]):
-    """Display detailed analysis after move submission."""
-    st.markdown("### 📊 Position Analysis")
-    
-    # Enhanced position info
-    detail_col1, detail_col2 = st.columns(2)
-    
-    with detail_col1:
-        position_type = position_data.get('position_type', 'tactical').title()
-        st.markdown(f"**Type:** {position_type}")
-        
-        # Show themes
-        themes = position_data.get('themes', [])
-        if themes:
-            theme_tags = ' '.join([f'`{theme}`' for theme in themes])
-            st.markdown(f"**Themes:** {theme_tags}")
-    
-    with detail_col2:
-        # Show additional insights
-        if position_data.get('material_analysis'):
-            material = position_data['material_analysis']
-            st.markdown(f"**Material Balance:** {material.get('balance', 'Equal')}")
-        
-        # Show key strategic elements
-        strategic_elements = position_data.get('strategic_elements', [])
-        if strategic_elements:
-            elements = ' '.join([f'`{elem}`' for elem in strategic_elements[:3]])
-            st.markdown(f"**Key Elements:** {elements}")
-
-def display_side_by_side_boards(position_data: Dict[str, Any]):
-    """Display side-by-side board comparison: current position vs position after best move."""
-    st.markdown("### 🎯 Position Comparison: Current vs Best Move Result")
-    
-    board_col1, board_col2 = st.columns(2)
-    
-    with board_col1:
-        st.markdown("#### Current Position")
-        display_chess_board(position_data)
-    
-    with board_col2:
-        st.markdown("#### After Best Move")
-        display_best_move_result_board(position_data)
-    
-    # Move selection below the boards
-    st.markdown("---")
-    display_legal_move_selection(position_data)
-
-def display_best_move_result_board(position_data: Dict[str, Any]):
-    """Display the board after the best move is played."""
-    try:
-        fen = position_data.get('fen', '')
-        board = chess.Board(fen)
-        
-        # Get best move
-        top_moves = position_data.get('top_moves', [])
-        if top_moves:
-            best_move_uci = top_moves[0].get('uci', '')
-            if best_move_uci:
-                try:
-                    move = chess.Move.from_uci(best_move_uci)
-                    if move in board.legal_moves:
-                        board.push(move)
-                except:
-                    pass
-        
-        # FIX: Apply consistent board flipping
-        turn = position_data.get('turn', 'white')
-        flipped = (turn.lower() == 'black')
-        
-        board_svg = chess.svg.board(
-            board=board,
-            flipped=flipped,
-            size=400,
-            style="""
-            .square.light { fill: #f0d9b5; }
-            .square.dark { fill: #b58863; }
-            .square.light.lastmove { fill: #cdd26a; }
-            .square.dark.lastmove { fill: #aaa23a; }
-            """
-        )
-        
-        st.markdown(board_svg, unsafe_allow_html=True)
-        
-        # Show best move notation
-        if top_moves:
-            best_move_notation = top_moves[0].get('move', 'N/A')
-            formatted_move = convert_to_piece_icons(best_move_notation)
-            st.markdown(f"**Best Move:** {formatted_move}")
-        
-    except Exception as e:
-        st.error(f"Error displaying best move result: {e}")
-
 def display_chess_board(position_data: Dict[str, Any]):
-    """Display the chess board for the current position with consistent flipping."""
+    """Display chess board with flip functionality."""
     try:
         fen = position_data.get('fen', '')
         board = chess.Board(fen)
         
-        # FIX: Apply consistent board flipping based on turn
+        # Determine board orientation
         turn = position_data.get('turn', 'white')
-        flipped = (turn.lower() == 'black')
+        force_flip = st.session_state.get('force_flip', False)
         
-        # Generate board SVG with proper orientation
+        # Apply flipping logic
+        if force_flip:
+            flipped = not (turn.lower() == 'black')  # Invert normal flipping
+        else:
+            flipped = (turn.lower() == 'black')  # Normal flipping
+        
+        # Generate board SVG
         board_svg = chess.svg.board(
             board=board,
             flipped=flipped,
@@ -298,32 +151,32 @@ def display_chess_board(position_data: Dict[str, Any]):
             style="""
             .square.light { fill: #f0d9b5; }
             .square.dark { fill: #b58863; }
-            .square.light.lastmove { fill: #cdd26a; }
-            .square.dark.lastmove { fill: #aaa23a; }
             """
         )
         
         st.markdown(board_svg, unsafe_allow_html=True)
         
-        # Board orientation indicator
-        orientation = "White to move (White at bottom)" if turn.lower() == 'white' else "Black to move (Black at bottom)"
-        st.caption(f"📋 {orientation}")
+        # Board controls
+        board_control_col1, board_control_col2 = st.columns(2)
+        
+        with board_control_col1:
+            orientation = "Black at bottom" if flipped else "White at bottom"
+            st.caption(f"📋 {orientation}")
+        
+        with board_control_col2:
+            if st.button("🔄 Flip Board", key="board_flip_btn"):
+                st.session_state.force_flip = not st.session_state.get('force_flip', False)
+                st.rerun()
         
         # FEN display
         with st.expander("📋 FEN Notation"):
             st.code(fen)
         
-        # Board flip toggle
-        if st.button("🔄 Flip Board"):
-            # Toggle the board orientation
-            st.session_state['force_flip'] = not st.session_state.get('force_flip', False)
-            st.rerun()
-        
     except Exception as e:
         st.error(f"Error displaying board: {e}")
 
 def display_legal_move_selection(position_data: Dict[str, Any]):
-    """CRITICAL FIX: Display legal moves instead of best moves for proper training."""
+    """Display legal moves for proper training."""
     st.markdown("#### 🎯 Select Your Move")
     
     try:
@@ -381,12 +234,12 @@ def display_legal_move_selection(position_data: Dict[str, Any]):
             submit_col1, submit_col2 = st.columns(2)
             
             with submit_col1:
-                if st.button("🚀 Submit Move", use_container_width=True, type="primary"):
+                if st.button("🚀 Submit Move", use_container_width=True, type="primary", key="legal_submit_move"):
                     submit_legal_move(selected_move_data, generate_html=False)
                     st.rerun()
             
             with submit_col2:
-                if st.button("📚 Submit + Generate Analysis", use_container_width=True):
+                if st.button("📚 Submit + Generate Analysis", use_container_width=True, key="legal_submit_html"):
                     submit_legal_move(selected_move_data, generate_html=True)
                     st.rerun()
         
@@ -461,51 +314,79 @@ def display_fallback_move_selection(position_data: Dict[str, Any]):
         submit_col1, submit_col2 = st.columns(2)
         
         with submit_col1:
-            if st.button("🚀 Submit Move", use_container_width=True, type="primary"):
-                submit_move(selected_move_data, generate_html=False)
+            if st.button("🚀 Submit Move", use_container_width=True, type="primary", key="fallback_submit_move"):
+                submit_legal_move(selected_move_data, generate_html=False)
                 st.rerun()
         
         with submit_col2:
-            if st.button("📚 Submit + Generate Analysis", use_container_width=True):
-                submit_move(selected_move_data, generate_html=True)
+            if st.button("📚 Submit + Generate Analysis", use_container_width=True, key="fallback_submit_html"):
+                submit_legal_move(selected_move_data, generate_html=True)
                 st.rerun()
 
-def convert_to_piece_icons(move_string: str) -> str:
-    """Convert move notation to use piece icons instead of letters."""
-    piece_icons = {
-        'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘'
-    }
+def display_position_interface():
+    """Display the current position with board and move analysis."""
+    position_data = st.session_state.current_position
     
-    if not move_string:
-        return move_string
+    # Position header
+    st.markdown(f"### Position {position_data.get('id', 'Unknown')}")
     
-    # Handle different move formats
-    result = move_string
+    if position_data.get('description'):
+        st.markdown(f"*{position_data['description']}*")
     
-    # Replace piece letters with icons (but not pawns)
-    for piece, icon in piece_icons.items():
-        result = result.replace(piece, icon)
+    # Position info
+    info_col1, info_col2, info_col3, info_col4, info_col5 = st.columns(5)
     
-    return result
-
-def format_principal_variation(pv_string: str, turn_color: str, starting_move_number: int = 1) -> str:
-    """Format principal variation with correct PGN numbering and piece icons."""
-    if not pv_string:
-        return ""
+    with info_col1:
+        difficulty = position_data.get('difficulty_rating', 1200)
+        st.markdown(f"**Difficulty:** {difficulty}")
     
-    current_move_num = starting_move_number
-    is_white_turn = (turn_color.lower() == 'white')
+    with info_col2:
+        game_phase = position_data.get('game_phase', 'middlegame').title()
+        st.markdown(f"**Phase:** {game_phase}")
     
-    if not is_white_turn:
-        pv_string = f"{current_move_num}... {pv_string}"
+    with info_col3:
+        turn = position_data.get('turn', 'white').title()
+        st.markdown(f"**Turn:** {turn}")
     
-    # Replace piece letters with icons
-    try:
-        pv_string = convert_to_piece_icons(pv_string)
-    except Exception as e:
-        print(f"Error converting string to piece notation: {e}")
+    with info_col4:
+        position_id = position_data.get('id', 'Unknown')
+        st.markdown(f"**Position ID:** {position_id}")
     
-    return pv_string
+    with info_col5:
+        move_number = position_data.get('fullmove_number', 1)
+        st.markdown(f"**Move:** {move_number}")
+    
+    st.markdown("---")
+    
+    # Main interface layout
+    board_col, moves_col = st.columns([1, 1])
+    
+    with board_col:
+        display_chess_board(position_data)
+    
+    with moves_col:
+        if not st.session_state.get('move_submitted'):
+            display_legal_move_selection(position_data)
+        else:
+            st.success("✅ Move submitted! Check analysis below.")
+            
+            # Continue buttons
+            cont_col1, cont_col2 = st.columns(2)
+            
+            with cont_col1:
+                if st.button("➡️ Get Analysis", use_container_width=True, type="primary", key="legal_submit_move"):
+                    submit_move(position_data, generate_html=False)
+                    st.rerun()
+            
+            with cont_col2:
+                if st.button("🎲 Generate HTML", use_container_width=True, key="legal_submit_html"):
+                    submit_move(position_data, generate_html=True)
+                    st.rerun()
+    
+    # CRITICAL FIX: Display move analysis AFTER the main interface
+    if st.session_state.get('move_submitted') and st.session_state.get('last_move_analysis'):
+        st.markdown("---")
+        display_move_analysis_results()
 
 def submit_legal_move(selected_move_data: Dict[str, Any], generate_html: bool = False):
     """Submit a legal move and evaluate it against the best moves."""
@@ -513,7 +394,7 @@ def submit_legal_move(selected_move_data: Dict[str, Any], generate_html: bool = 
         st.error("Missing required session data.")
         return
     
-    # Stop timer
+    # Stop timer and get time
     time_taken = get_current_position_time()
     stop_position_timer()
     
@@ -537,9 +418,9 @@ def submit_legal_move(selected_move_data: Dict[str, Any], generate_html: bool = 
         found_move_data = {
             'move': selected_move_notation,
             'uci': selected_move_data.get('uci', ''),
-            'rank': 999,  # Low rank for moves not in engine analysis
+            'rank': 999,
             'score': 0,
-            'centipawn_loss': 50,  # Assign moderate centipawn loss
+            'centipawn_loss': 50,
             'classification': 'inaccuracy',
             'depth': 0,
             'pv': ''
@@ -548,7 +429,7 @@ def submit_legal_move(selected_move_data: Dict[str, Any], generate_html: bool = 
     # Enhanced scoring logic
     result = determine_enhanced_move_result(found_move_data, position_data)
     
-    # Record the move in database with proper rounding
+    # Record the move in database
     success = record_enhanced_user_move(
         user_id=user_id,
         position_data=position_data,
@@ -563,27 +444,309 @@ def submit_legal_move(selected_move_data: Dict[str, Any], generate_html: bool = 
         if result in ['correct', 'excellent']:
             st.session_state.correct_in_session += 1
         
-        # Show analysis and results
-        st.session_state.show_analysis_after_move = True
-        st.session_state.show_side_by_side_boards = True
-        
-        # Display enhanced move result
-        display_enhanced_move_result(result, found_move_data, time_taken, top_moves)
-        
-        # Generate comprehensive HTML analysis if requested
+        # Generate HTML if requested
+        html_path = None
         if generate_html:
-            generate_enhanced_position_analysis(position_data, found_move_data)
-        # add delay
-        time.sleep(300)
+            html_path = generate_enhanced_position_analysis(position_data, found_move_data)
+        
+        # Store analysis results in session state BEFORE setting flags
+        st.session_state.last_move_analysis = {
+            'result': result,
+            'move_data': found_move_data,
+            'time_taken': round(time_taken, 2),
+            'top_moves': top_moves,
+            'position_data': position_data,
+            'generated_html': html_path is not None,
+            'html_path': html_path if html_path else None
+        }
+        
+        # Set flags for UI updates
+        st.session_state.move_submitted = True
+        st.session_state.show_analysis_after_move = True
+        
+        # Show immediate success message
+        st.success(f"✅ Move '{convert_to_piece_icons(selected_move_notation)}' submitted successfully!")
+        
+        # Force rerun to show results
+        st.rerun()
+    else:
+        st.error("❌ Failed to record move. Please try again.")
 
-        # Auto-advance to next position after delay
-        if st.button("➡️ Continue to Next Position", type="primary"):
-            st.session_state.show_analysis_after_move = False
-            st.session_state.show_side_by_side_boards = False
+def display_move_analysis_results():
+    """Display comprehensive move analysis results."""
+    if 'last_move_analysis' not in st.session_state:
+        st.warning("⚠️ No move analysis data available.")
+        return
+    
+    analysis = st.session_state.last_move_analysis
+    result = analysis.get('result', 'unknown')
+    found_move_data = analysis.get('move_data', {})
+    time_taken = analysis.get('time_taken', 0)
+    top_moves = analysis.get('top_moves', [])
+    
+    st.markdown("## 🎯 Move Analysis Results")
+    
+    # Result display with enhanced formatting
+    result_config = {
+        'excellent': {
+            'icon': '🌟',
+            'color': 'success',
+            'message': 'Excellent move! Perfect execution.',
+            'bg_color': '#d4edda'
+        },
+        'correct': {
+            'icon': '✅',
+            'color': 'success', 
+            'message': 'Good move! Well played.',
+            'bg_color': '#d4edda'
+        },
+        'inaccuracy': {
+            'icon': '⚠️',
+            'color': 'warning',
+            'message': 'Inaccurate move. Could be better.',
+            'bg_color': '#fff3cd'
+        },
+        'blunder': {
+            'icon': '❌',
+            'color': 'error',
+            'message': 'Blunder! This loses material or position.',
+            'bg_color': '#f8d7da'
+        },
+        'incorrect': {
+            'icon': '❌',
+            'color': 'error',
+            'message': 'Incorrect move. Try to find a better option.',
+            'bg_color': '#f8d7da'
+        }
+    }
+    
+    config = result_config.get(result, result_config['incorrect'])
+    
+    # Display result with proper formatting
+    st.markdown(f"""
+    <div style="
+        padding: 15px; 
+        border-radius: 10px; 
+        background-color: {config['bg_color']}; 
+        border-left: 5px solid {'#28a745' if config['color'] == 'success' else '#ffc107' if config['color'] == 'warning' else '#dc3545'};
+        margin: 20px 0;
+    ">
+        <h3 style="margin: 0; color: #333;">
+            {config['icon']} {config['message']}
+        </h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Move details metrics
+    st.markdown("### 📊 Move Statistics")
+    
+    detail_col1, detail_col2, detail_col3, detail_col4 = st.columns(4)
+    
+    with detail_col1:
+        selected_move = found_move_data.get('move', 'Unknown')
+        formatted_move = convert_to_piece_icons(selected_move)
+        st.metric("Your Move", formatted_move)
+    
+    with detail_col2:
+        rank = found_move_data.get('rank', 999)
+        rank_display = f"#{rank}" if rank < 999 else "Not in top moves"
+        st.metric("Engine Rank", rank_display)
+    
+    with detail_col3:
+        cp_loss = found_move_data.get('centipawn_loss', 0)
+        st.metric("Centipawn Loss", f"{cp_loss}")
+    
+    with detail_col4:
+        st.metric("Time Taken", f"{time_taken:.1f}s")
+    
+    # Top engine moves analysis
+    if top_moves:
+        st.markdown("### 🏆 Top Engine Moves")
+        
+        # Create a nice table for top moves
+        moves_data = []
+        for i, move in enumerate(top_moves[:5], 1):
+            formatted_move = convert_to_piece_icons(move.get('move', ''))
+            score = move.get('score', 0)
+            cp_loss = move.get('centipawn_loss', 0)
+            classification = move.get('classification', '').title()
+            
+            # Highlight user's move
+            is_user_move = move.get('move') == found_move_data.get('move')
+            
+            moves_data.append({
+                'Rank': f"{'👑' if i == 1 else '🥈' if i == 2 else '🥉' if i == 3 else str(i)}",
+                'Move': f"**{formatted_move}**" + (" ← Your move" if is_user_move else ""),
+                'Score': f"{score}",
+                'CP Loss': f"{cp_loss}",
+                'Quality': classification
+            })
+        
+        # Display as formatted table
+        for move_info in moves_data:
+            cols = st.columns([1, 3, 2, 2, 2])
+            with cols[0]:
+                st.markdown(move_info['Rank'])
+            with cols[1]:
+                st.markdown(move_info['Move'])
+            with cols[2]:
+                st.markdown(move_info['Score'])
+            with cols[3]:
+                st.markdown(move_info['CP Loss'])
+            with cols[4]:
+                st.markdown(move_info['Quality'])
+    
+    # Performance insights
+    st.markdown("### 💡 Performance Insights")
+    
+    insights = generate_move_insights(result, found_move_data, time_taken, top_moves)
+    for insight in insights:
+        st.info(f"💡 {insight}")
+    
+    # HTML download if generated
+    if analysis.get('generated_html') and analysis.get('html_path'):
+        st.markdown("### 📥 Download Analysis")
+        
+        try:
+            with open(analysis['html_path'], 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            
+            download_col1, download_col2 = st.columns(2)
+            
+            with download_col1:
+                st.download_button(
+                    label="📥 Download HTML Analysis",
+                    data=html_content,
+                    file_name=f"position_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+                    mime="text/html",
+                    use_container_width=True,
+                    key="download_html_analysis"
+                )
+            
+            with download_col2:
+                st.info(f"✅ Analysis file generated: {analysis['html_path']}")
+                
+        except Exception as e:
+            st.warning(f"⚠️ HTML file not accessible: {e}")
+    
+    # Training recommendations
+    st.markdown("### 🎯 Training Recommendations")
+    
+    recommendations = generate_training_recommendations(result, found_move_data)
+    for rec in recommendations:
+        st.success(f"🎓 {rec}")
+    
+    # Continue training section
+    st.markdown("### ➡️ Continue Training")
+    
+    continue_col1, continue_col2, continue_col3 = st.columns(3)
+    
+    with continue_col1:
+        if st.button("➡️ Next Position", type="primary", key="continue_next_analysis", use_container_width=True):
+            clear_move_analysis()
             load_next_position()
             st.rerun()
+    
+    with continue_col2:
+        if st.button("🎲 Random Position", key="continue_random_analysis", use_container_width=True):
+            clear_move_analysis()
+            load_random_position()
+            st.rerun()
+    
+    with continue_col3:
+        if st.button("🔄 Try This Position Again", key="retry_position", use_container_width=True):
+            clear_move_analysis()
+            start_position_timer()
+            st.rerun()
+
+def generate_move_insights(result: str, move_data: Dict[str, Any], time_taken: float, top_moves: List[Dict]) -> List[str]:
+    """Generate insights based on move analysis."""
+    insights = []
+    
+    rank = move_data.get('rank', 999)
+    cp_loss = move_data.get('centipawn_loss', 0)
+    
+    # Time-based insights
+    if time_taken < 5:
+        insights.append("You played very quickly! Consider taking more time for complex positions.")
+    elif time_taken > 60:
+        insights.append("You took your time with this position - good for thorough analysis!")
+    
+    # Rank-based insights
+    if rank == 1:
+        insights.append("You found the engine's top choice! Excellent pattern recognition.")
+    elif rank <= 3:
+        insights.append("Your move was among the top engine choices - well done!")
+    elif rank > 10:
+        insights.append("Try to look for more forcing moves or better piece coordination.")
+    
+    # Centipawn loss insights
+    if cp_loss == 0:
+        insights.append("Perfect move with no material loss!")
+    elif cp_loss < 10:
+        insights.append("Excellent move with minimal disadvantage.")
+    elif cp_loss > 50:
+        insights.append("This move loses significant material or position. Review tactical patterns.")
+    
+    # Comparison with other moves
+    if len(top_moves) > 1:
+        best_score = top_moves[0].get('score', 0)
+        user_score = move_data.get('score', 0)
+        if abs(best_score - user_score) < 10:
+            insights.append("Your move was very close in evaluation to the best move!")
+    
+    return insights
+
+def generate_training_recommendations(result: str, move_data: Dict[str, Any]) -> List[str]:
+    """Generate personalized training recommendations."""
+    recommendations = []
+    
+    classification = move_data.get('classification', '').lower()
+    rank = move_data.get('rank', 999)
+    
+    if result in ['excellent', 'correct']:
+        recommendations.append("Great job! Keep practicing similar positions to reinforce these patterns.")
+        if rank == 1:
+            recommendations.append("You're developing strong chess intuition. Try harder positions to challenge yourself.")
     else:
-        st.error("Failed to record move. Please try again.")
+        if classification == 'blunder':
+            recommendations.append("Focus on tactical training to avoid blunders. Practice basic tactical motifs.")
+        elif classification == 'mistake':
+            recommendations.append("Review the position for better alternatives. Study similar pawn structures.")
+        else:
+            recommendations.append("Analyze the top engine moves to understand better strategic concepts.")
+        
+        recommendations.append("Consider studying master games with similar positions.")
+    
+    return recommendations
+
+def generate_enhanced_position_analysis(position_data: Dict[str, Any], selected_move_data: Dict[str, Any]) -> Optional[str]:
+    """Generate enhanced HTML analysis."""
+    try:
+        if 'html_generator' not in st.session_state:
+            st.session_state.html_generator = ComprehensiveHTMLGenerator()
+        
+        html_generator = st.session_state.html_generator
+        
+        with st.spinner("🔄 Generating comprehensive HTML analysis..."):
+            output_path = html_generator.generate_enhanced_analysis(
+                position_data=position_data,
+                selected_move_data=selected_move_data,
+                include_spatial_analysis=True,
+                include_side_by_side=True
+            )
+        
+        if output_path:
+            st.success(f"✅ HTML analysis generated successfully!")
+            return output_path
+        else:
+            st.error("❌ Failed to generate HTML analysis")
+            return None
+            
+    except Exception as e:
+        st.error(f"❌ Error generating analysis: {e}")
+        return None
+
 
 def determine_enhanced_move_result(selected_move_data: Dict[str, Any], position_data: Dict[str, Any]) -> str:
     """Determine move result using enhanced scoring algorithm."""
@@ -630,84 +793,16 @@ def determine_enhanced_move_result(selected_move_data: Dict[str, Any], position_
     else:
         return 'incorrect'
 
-def display_enhanced_move_result(result: str, selected_move_data: Dict[str, Any], time_taken: float, top_moves: List[Dict]):
-    """Display enhanced move result with comprehensive feedback."""
-    st.markdown("### 🎯 Move Analysis Results")
-    
-    # Result styling
-    result_colors = {
-        'excellent': '🌟',
-        'correct': '✅',
-        'inaccuracy': '⚠️',
-        'blunder': '❌',
-        'incorrect': '❌'
-    }
-    
-    result_messages = {
-        'excellent': 'Excellent move! Perfect execution.',
-        'correct': 'Good move! Well played.',
-        'inaccuracy': 'Inaccurate move. Could be better.',
-        'blunder': 'Blunder! This loses material or position.',
-        'incorrect': 'Incorrect move. Try to find a better option.'
-    }
-    
-    icon = result_colors.get(result, '❓')
-    message = result_messages.get(result, 'Move evaluated')
-    
-    st.success(f"{icon} **{message}**") if result in ['excellent', 'correct'] else st.warning(f"{icon} **{message}**")
-    
-    # Move details
-    detail_col1, detail_col2, detail_col3 = st.columns(3)
-    
-    with detail_col1:
-        rank = selected_move_data.get('rank', 999)
-        st.metric("Move Rank", f"#{rank}")
-    
-    with detail_col2:
-        cp_loss = selected_move_data.get('centipawn_loss', 0)
-        st.metric("Centipawn Loss", f"{cp_loss}")
-    
-    with detail_col3:
-        st.metric("Time Taken", f"{time_taken:.1f}s")
-    
-    # Show top moves analysis
-    st.markdown("#### 🏆 Top Engine Moves")
-    
-    if top_moves:
-        # Create a formatted table of top moves
-        move_data = []
-        for i, move in enumerate(top_moves[:5], 1):
-            formatted_move = convert_to_piece_icons(move.get('move', ''))
-            score = move.get('score', 0)
-            cp_loss = move.get('centipawn_loss', 0)
-            classification = move.get('classification', '').title()
-            pv = format_principal_variation(
-                move.get('pv', ''), 
-                position_data.get('turn', 'white'),
-                position_data.get('fullmove_number', 1)
-            )
-            
-            move_data.append({
-                'Rank': i,
-                'Move': formatted_move,
-                'Score': f"{score:.2f}" if isinstance(score, (int, float)) else str(score),
-                'CP Loss': cp_loss,
-                'Classification': classification,
-                'Principal Variation': pv[:50] + '...' if len(pv) > 50 else pv
-            })
-        
-        st.table(move_data)
-
 def record_enhanced_user_move(user_id: int, position_data: Dict[str, Any], 
                             selected_move_data: Dict[str, Any], time_taken: float, result: str) -> bool:
-    """Record user move with enhanced analysis data and proper decimal rounding."""
+    """Record user move with proper database schema."""
     try:
         conn = database.get_db_connection()
         cursor = conn.cursor()
         
         position_id = position_data.get('id')
         
-        # Find the move_id from the moves table
+        # Find the move_id from the moves table (if exists)
         cursor.execute('''
             SELECT id FROM moves 
             WHERE position_id = ? AND move = ?
@@ -717,74 +812,66 @@ def record_enhanced_user_move(user_id: int, position_data: Dict[str, Any],
         move_record = cursor.fetchone()
         move_id = move_record[0] if move_record else None
         
-        # Round all decimal values to 2-3 places as required
-        time_taken = round(time_taken, 2)
-        centipawn_loss = round(selected_move_data.get('centipawn_loss', 0), 2)
-        
-        # Insert user move record
+        # Insert user move record with simplified schema
         cursor.execute('''
             INSERT INTO user_moves (
-                user_id, position_id, move_id, selected_move, time_taken, 
-                result, session_id, rank, centipawn_loss, classification,
-                created_at, move_notation, uci_notation
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                user_id, position_id, move_id, time_taken, 
+                result, timestamp, session_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
-            user_id, position_id, move_id, selected_move_data.get('move'),
-            time_taken, result, st.session_state.get('training_session_id'),
-            selected_move_data.get('rank', 999), centipawn_loss,
-            selected_move_data.get('classification', ''),
-            datetime.now().isoformat(), selected_move_data.get('move'),
-            selected_move_data.get('uci', '')
+            user_id, 
+            position_id, 
+            move_id, 
+            round(time_taken, 2),
+            result, 
+            datetime.now().isoformat(),
+            st.session_state.get('training_session_id')
         ))
         
         conn.commit()
         conn.close()
+        
+        print(f"✅ Move recorded: {selected_move_data.get('move')} - {result}")
         return True
         
     except Exception as e:
-        st.error(f"Error recording move: {e}")
+        print(f"❌ Error recording move: {e}")
         return False
 
-def generate_enhanced_position_analysis(position_data: Dict[str, Any], selected_move_data: Dict[str, Any]):
-    """Generate enhanced HTML analysis with side-by-side boards and spatial control."""
+def generate_enhanced_position_analysis(position_data: Dict[str, Any], selected_move_data: Dict[str, Any]) -> Optional[str]:
+    """Generate enhanced HTML analysis."""
     try:
         if 'html_generator' not in st.session_state:
             st.session_state.html_generator = ComprehensiveHTMLGenerator()
         
         html_generator = st.session_state.html_generator
         
-        # Generate comprehensive analysis
-        with st.spinner("🔄 Generating comprehensive analysis..."):
-            output_path = html_generator.generate_enhanced_analysis(
-                position_data=position_data,
-                selected_move_data=selected_move_data,
-                include_spatial_analysis=True,
-                include_side_by_side=True
-            )
+        output_path = html_generator.generate_enhanced_analysis(
+            position_data=position_data,
+            selected_move_data=selected_move_data,
+            include_spatial_analysis=True,
+            include_side_by_side=True
+        )
         
         if output_path:
-            st.success(f"✅ Enhanced HTML analysis generated: {output_path}")
-            
-            # Provide download link
-            try:
-                with open(output_path, 'r', encoding='utf-8') as f:
-                    html_content = f.read()
-                
-                st.download_button(
-                    label="📥 Download HTML Analysis",
-                    data=html_content,
-                    file_name=f"position_{position_data.get('id', 'unknown')}_analysis.html",
-                    mime="text/html"
-                )
-            except Exception as e:
-                st.warning(f"Analysis generated but download failed: {e}")
+            st.success(f"✅ HTML analysis generated: {output_path}")
+            return output_path
         else:
             st.error("❌ Failed to generate HTML analysis")
+            return None
             
     except Exception as e:
-        st.error(f"Error generating analysis: {e}")
+        st.error(f"❌ Error generating analysis: {e}")
+        return None
 
-# Timer functions (keeping existing implementation)
+def clear_move_analysis():
+    """Clear move analysis state."""
+    st.session_state.show_analysis_after_move = False
+    st.session_state.move_submitted = False
+    if 'last_move_analysis' in st.session_state:
+        del st.session_state.last_move_analysis
+
+# Timer functions
 def start_position_timer():
     """Start the position timer."""
     st.session_state.timer_start = time.time()
@@ -825,7 +912,7 @@ def get_current_position_time():
         return st.session_state.position_timer + elapsed
     return st.session_state.position_timer
 
-# Position loading functions (enhanced versions)
+# Position loading functions
 def load_random_position():
     """Load a random position from the database."""
     try:
@@ -866,6 +953,7 @@ def load_random_position():
             st.session_state.current_position = position_data
             st.session_state.show_analysis_after_move = False
             st.session_state.show_side_by_side_boards = False
+            clear_move_analysis()
             start_position_timer()
         
         conn.close()
@@ -906,8 +994,7 @@ def load_next_position():
             position_data['top_moves'] = [parse_move_json_fields(dict(move)) for move in moves]
             
             st.session_state.current_position = position_data
-            st.session_state.show_analysis_after_move = False
-            st.session_state.show_side_by_side_boards = False
+            clear_move_analysis()
             start_position_timer()
         else:
             # No next position, load first position
@@ -947,8 +1034,7 @@ def load_position_by_id(position_id: int):
             position_data['top_moves'] = [parse_move_json_fields(dict(move)) for move in moves]
             
             st.session_state.current_position = position_data
-            st.session_state.show_analysis_after_move = False
-            st.session_state.show_side_by_side_boards = False
+            clear_move_analysis()
             start_position_timer()
         else:
             st.error(f"Position {position_id} not found.")
@@ -987,8 +1073,7 @@ def load_first_position():
             position_data['top_moves'] = [parse_move_json_fields(dict(move)) for move in moves]
             
             st.session_state.current_position = position_data
-            st.session_state.show_analysis_after_move = False
-            st.session_state.show_side_by_side_boards = False
+            clear_move_analysis()
             start_position_timer()
         
         conn.close()
@@ -1055,10 +1140,25 @@ def get_user_training_settings():
         'theme': 'default'
     }
 
+def convert_to_piece_icons(move_string: str) -> str:
+    """Convert move notation to use piece icons instead of letters."""
+    piece_icons = {
+        'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘'
+    }
+    
+    if not move_string:
+        return move_string
+    
+    # Handle different move formats
+    result = move_string
+    
+    # Replace piece letters with icons (but not pawns)
+    for piece, icon in piece_icons.items():
+        result = result.replace(piece, icon)
+    
+    return result
+
 # Keep original submit_move function for backward compatibility
 def submit_move(selected_move_data: Dict[str, Any], generate_html: bool = False):
     """Original submit move function for backward compatibility."""
     submit_legal_move(selected_move_data, generate_html)
-
-
-

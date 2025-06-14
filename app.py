@@ -613,7 +613,7 @@ def main():
                     st.error("❌ Invalid admin credentials")
     
     else:
-        # Main application interface
+        # Main application interface with normal menu items
         with st.sidebar:
             st.markdown(f"### Welcome, {st.session_state.user_email}")
             
@@ -633,15 +633,54 @@ def main():
             is_admin = result and result[0] if result else False
             conn.close()
             
-            # Navigation
-            pages = ["🎯 Training", "📊 Insights", "📈 Analysis", "🎮 Game Analysis", "🔍 Spatial Analysis", "⚙️ Settings"]
+            # Navigation Menu Items (NOT dropdown)
+            st.markdown("### 🧭 Navigation")
             
+            # Initialize page selection
+            if 'selected_page' not in st.session_state:
+                st.session_state.selected_page = "🎯 Training"
+            
+            # Menu buttons
+            if st.button("🎯 Training", use_container_width=True):
+                st.session_state.selected_page = "🎯 Training"
+                st.rerun()
+            
+            if st.button("📊 Insights", use_container_width=True):
+                st.session_state.selected_page = "📊 Insights"
+                st.rerun()
+            
+            if st.button("📈 Analysis", use_container_width=True):
+                st.session_state.selected_page = "📈 Analysis"
+                st.rerun()
+            
+            if st.button("🎮 Game Analysis", use_container_width=True):
+                st.session_state.selected_page = "🎮 Game Analysis"
+                st.rerun()
+            
+            if st.button("🔍 Spatial Analysis", use_container_width=True):
+                st.session_state.selected_page = "🔍 Spatial Analysis"
+                st.rerun()
+            
+            if st.button("⚙️ Settings", use_container_width=True):
+                st.session_state.selected_page = "⚙️ Settings"
+                st.rerun()
+            
+            # Admin-only menu items
             if is_admin:
-                pages.extend(["🗄️ Database Viewer", "👑 Admin Panel"])
-            
-            selected_page = st.selectbox("Navigate to:", pages)
+                st.markdown("---")
+                st.markdown("### 👑 Admin")
+                
+                if st.button("🗄️ Database Viewer", use_container_width=True):
+                    st.session_state.selected_page = "🗄️ Database Viewer"
+                    st.rerun()
+                
+                if st.button("👑 Admin Panel", use_container_width=True):
+                    st.session_state.selected_page = "👑 Admin Panel"
+                    st.rerun()
         
         # Display selected page
+        selected_page = st.session_state.get('selected_page', "🎯 Training")
+        
         if selected_page == "🎯 Training":
             training.display_training_interface()
         

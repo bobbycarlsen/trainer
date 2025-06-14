@@ -95,7 +95,7 @@ def display_batch_spatial_analysis():
     st.info("🚧 Batch analysis coming soon! This will analyze multiple positions for patterns.")
 
 def display_comprehensive_spatial_analysis(fen: str, position_data: Dict[str, Any]):
-    """Display comprehensive spatial analysis for a position."""
+    """Display comprehensive spatial analysis with enhanced UX design."""
     try:
         board = chess.Board(fen)
         
@@ -107,28 +107,204 @@ def display_comprehensive_spatial_analysis(fen: str, position_data: Dict[str, An
         with st.spinner("🔄 Calculating spatial metrics..."):
             metrics = calculate_comprehensive_spatial_metrics(board)
         
-        # Display analysis in tabs
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "🗺️ Space Control", "📊 Metrics", "🎯 Tactical", "🏰 Positional", "💡 Insights"
+        # Enhanced header with key insights
+        st.markdown("### 🔍 Comprehensive Position Analysis")
+        
+        # Quick insights summary at the top
+        display_quick_insights_summary(metrics, position_data)
+        
+        st.markdown("---")
+        
+        # Main analysis in organized sections
+        analysis_section1, analysis_section2 = st.columns([1, 1])
+        
+        with analysis_section1:
+            st.markdown("#### 🗺️ Spatial Control Overview")
+            display_space_control_metrics(board, metrics)
+            
+            st.markdown("#### 🎯 Center & Territory")
+            display_center_territory_analysis(metrics)
+        
+        with analysis_section2:
+            st.markdown("#### ⚡ Piece Activity")
+            display_piece_activity_summary(metrics)
+            
+            st.markdown("#### 🏰 King Safety & Structure")
+            display_safety_structure_analysis(metrics)
+        
+        st.markdown("---")
+        
+        # Detailed visualizations
+        viz_tab1, viz_tab2, viz_tab3 = st.tabs([
+            "🗺️ Space Control Board", "📊 Detailed Metrics", "💡 Strategic Insights"
         ])
         
-        with tab1:
-            display_space_control_visualization(board, metrics)
+        with viz_tab1:
+            display_enhanced_space_control_visualization(board, metrics)
         
-        with tab2:
-            display_spatial_metrics_dashboard(metrics, position_data)
+        with viz_tab2:
+            display_detailed_metrics_dashboard(metrics, position_data)
         
-        with tab3:
-            display_tactical_analysis(board, metrics)
-        
-        with tab4:
-            display_positional_analysis(board, metrics)
-        
-        with tab5:
-            display_spatial_insights(board, metrics, position_data)
+        with viz_tab3:
+            display_strategic_insights_enhanced(board, metrics, position_data)
             
     except Exception as e:
         st.error(f"Error in spatial analysis: {e}")
+
+def display_quick_insights_summary(metrics: Dict[str, Any], position_data: Dict[str, Any]):
+    """Display quick insights summary with key KPIs."""
+    insights_col1, insights_col2, insights_col3, insights_col4 = st.columns(4)
+    
+    # Space advantage
+    space_control = metrics.get('space_control', {})
+    space_advantage = space_control.get('space_advantage', 0)
+    
+    with insights_col1:
+        advantage_color = "normal" if abs(space_advantage) < 5 else "inverse"
+        st.metric(
+            "Space Control", 
+            f"{space_advantage:+.0f}",
+            delta=f"{'White' if space_advantage > 0 else 'Black'} advantage" if abs(space_advantage) > 2 else "Balanced"
+        )
+    
+    # Material balance
+    material = metrics.get('material_balance', {})
+    material_diff = material.get('material_difference', 0)
+    
+    with insights_col2:
+        st.metric(
+            "Material", 
+            f"{material_diff:+.1f}",
+            delta=f"{'White' if material_diff > 0 else 'Black'} ahead" if abs(material_diff) > 0.5 else "Equal"
+        )
+    
+    # Center control
+    center = metrics.get('center_control', {})
+    center_adv = center.get('center_advantage', 0)
+    
+    with insights_col3:
+        st.metric(
+            "Center Control", 
+            f"{center_adv:+}",
+            delta="Strong" if abs(center_adv) > 3 else "Moderate"
+        )
+    
+    # King safety
+    king_safety = metrics.get('king_safety', {})
+    white_threats = king_safety.get('white', {}).get('threats', 0)
+    black_threats = king_safety.get('black', {}).get('threats', 0)
+    
+    with insights_col4:
+        total_threats = white_threats + black_threats
+        safety_status = "Dangerous" if total_threats > 4 else "Safe" if total_threats == 0 else "Moderate"
+        st.metric(
+            "King Safety", 
+            safety_status,
+            delta=f"{total_threats} total threats"
+        )
+
+def display_space_control_metrics(board: chess.Board, metrics: Dict[str, Any]):
+    """Display space control metrics in organized format."""
+    space_control = metrics.get('space_control', {})
+    
+    # Space percentages
+    space_col1, space_col2 = st.columns(2)
+    
+    with space_col1:
+        white_space = space_control.get('white_space_percentage', 0)
+        st.metric("White Territory", f"{white_space:.1f}%")
+        
+        contested = space_control.get('contested_percentage', 0)
+        st.metric("Contested Squares", f"{contested:.1f}%")
+    
+    with space_col2:
+        black_space = space_control.get('black_space_percentage', 0)
+        st.metric("Black Territory", f"{black_space:.1f}%")
+        
+        neutral = space_control.get('neutral_percentage', 0)
+        st.metric("Neutral Squares", f"{neutral:.1f}%")
+
+def display_center_territory_analysis(metrics: Dict[str, Any]):
+    """Display center and territory analysis."""
+    center = metrics.get('center_control', {})
+    
+    center_col1, center_col2 = st.columns(2)
+    
+    with center_col1:
+        center_control = center.get('center_control', {})
+        white_center = center_control.get('white', 0)
+        black_center = center_control.get('black', 0)
+        
+        st.markdown("**Center Attacks:**")
+        st.markdown(f"• White: {white_center}")
+        st.markdown(f"• Black: {black_center}")
+    
+    with center_col2:
+        occupation = center.get('center_occupation', {})
+        white_occ = occupation.get('white', 0)
+        black_occ = occupation.get('black', 0)
+        
+        st.markdown("**Center Pieces:**")
+        st.markdown(f"• White: {white_occ}")
+        st.markdown(f"• Black: {black_occ}")
+
+def display_piece_activity_summary(metrics: Dict[str, Any]):
+    """Display piece activity summary."""
+    activity = metrics.get('piece_activity', {})
+    
+    if activity:
+        # Calculate total mobility
+        white_mobility = sum(piece_data.get('total_mobility', 0) 
+                           for piece_data in activity.get('white', {}).values())
+        black_mobility = sum(piece_data.get('total_mobility', 0) 
+                           for piece_data in activity.get('black', {}).values())
+        
+        mobility_col1, mobility_col2 = st.columns(2)
+        
+        with mobility_col1:
+            st.metric("White Mobility", white_mobility)
+        
+        with mobility_col2:
+            st.metric("Black Mobility", black_mobility)
+        
+        # Most active pieces
+        st.markdown("**Most Active Pieces:**")
+        for color in ['white', 'black']:
+            if color in activity:
+                most_active = max(
+                    activity[color].items(),
+                    key=lambda x: x[1].get('avg_mobility', 0),
+                    default=(None, {})
+                )
+                if most_active[0]:
+                    piece_name = most_active[0].title()
+                    avg_mob = most_active[1].get('avg_mobility', 0)
+                    st.markdown(f"• {color.title()}: {piece_name} ({avg_mob:.1f} avg moves)")
+
+def display_safety_structure_analysis(metrics: Dict[str, Any]):
+    """Display king safety and pawn structure analysis."""
+    king_safety = metrics.get('king_safety', {})
+    pawn_structure = metrics.get('pawn_structure', {})
+    
+    # King safety summary
+    safety_col1, safety_col2 = st.columns(2)
+    
+    with safety_col1:
+        st.markdown("**King Safety:**")
+        for color in ['white', 'black']:
+            if color in king_safety:
+                threats = king_safety[color].get('threats', 0)
+                shelter = king_safety[color].get('shelter', 0)
+                status = "🔒 Safe" if threats == 0 else f"⚠️ {threats} threats"
+                st.markdown(f"• {color.title()}: {status}")
+    
+    with safety_col2:
+        st.markdown("**Pawn Structure:**")
+        for color in ['white', 'black']:
+            if color in pawn_structure:
+                isolated = pawn_structure[color].get('isolated', 0)
+                passed = pawn_structure[color].get('passed', 0)
+                st.markdown(f"• {color.title()}: {isolated} isolated, {passed} passed")
 
 def calculate_comprehensive_spatial_metrics(board: chess.Board) -> Dict[str, Any]:
     """Calculate comprehensive spatial metrics for a chess position."""
@@ -991,3 +1167,111 @@ def calculate_center_control(board: chess.Board) -> Dict[str, int]:
         'advantage': white_control - black_control
     }
 
+def display_enhanced_space_control_visualization(board: chess.Board, metrics: Dict[str, Any]):
+    """Display enhanced space control visualization."""
+    st.markdown("#### 🗺️ Enhanced Space Control Board")
+    
+    # Create visualization
+    fig = create_space_control_board_plotly(metrics, flipped=(not board.turn))
+    
+    if fig:
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Space control summary
+        space_control = metrics.get('space_control', {})
+        
+        summary_col1, summary_col2, summary_col3 = st.columns(3)
+        
+        with summary_col1:
+            white_space = space_control.get('white_space_percentage', 0)
+            st.metric("White Control", f"{white_space:.1f}%")
+        
+        with summary_col2:
+            black_space = space_control.get('black_space_percentage', 0)
+            st.metric("Black Control", f"{black_space:.1f}%")
+        
+        with summary_col3:
+            advantage = space_control.get('space_advantage', 0)
+            st.metric("Advantage", f"{advantage:+.0f}")
+    else:
+        st.warning("Space control visualization not available for this position.")
+
+def display_detailed_metrics_dashboard(metrics: Dict[str, Any], position_data: Dict[str, Any]):
+    """Display detailed metrics dashboard."""
+    st.markdown("#### 📊 Comprehensive Metrics")
+    
+    # Material metrics
+    material = metrics.get('material_balance', {})
+    if material:
+        st.markdown("**Material Balance:**")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            white_material = material.get('white_total', 0)
+            st.metric("White Material", white_material)
+        
+        with col2:
+            black_material = material.get('black_total', 0)
+            st.metric("Black Material", black_material)
+        
+        with col3:
+            material_diff = material.get('material_difference', 0)
+            st.metric("Material Difference", f"{material_diff:+.1f}")
+    
+    # Center control metrics
+    center = metrics.get('center_control', {})
+    if center:
+        st.markdown("**Center Control:**")
+        center_col1, center_col2 = st.columns(2)
+        
+        with center_col1:
+            center_adv = center.get('center_advantage', 0)
+            st.metric("Center Advantage", f"{center_adv:+}")
+        
+        with center_col2:
+            extended_adv = center.get('extended_advantage', 0)
+            st.metric("Extended Center", f"{extended_adv:+}")
+
+def display_strategic_insights_enhanced(board: chess.Board, metrics: Dict[str, Any], position_data: Dict[str, Any]):
+    """Display enhanced strategic insights."""
+    st.markdown("#### 💡 Strategic Insights")
+    
+    insights = generate_spatial_insights(metrics, position_data)
+    
+    # Display insights in organized format
+    for category, insight_list in insights.items():
+        if insight_list:
+            category_title = category.replace('_', ' ').title()
+            with st.expander(f"🔍 {category_title}"):
+                for insight in insight_list:
+                    st.markdown(f"• {insight}")
+    
+    # Additional strategic recommendations
+    st.markdown("#### 🎯 Training Recommendations")
+    
+    # Generate recommendations based on analysis
+    recommendations = []
+    
+    # Material-based recommendations
+    material = metrics.get('material_balance', {})
+    if material:
+        material_diff = material.get('material_difference', 0)
+        if abs(material_diff) > 2:
+            if material_diff > 0:
+                recommendations.append("Practice converting material advantages into winning positions.")
+            else:
+                recommendations.append("Study defensive techniques when material is down.")
+    
+    # Center control recommendations
+    center = metrics.get('center_control', {})
+    if center:
+        center_adv = center.get('center_advantage', 0)
+        if abs(center_adv) > 3:
+            recommendations.append("Focus on central control - it's a key factor in this position type.")
+    
+    # Display recommendations
+    if recommendations:
+        for rec in recommendations:
+            st.info(f"💡 {rec}")
+    else:
+        st.info("💡 Continue practicing different position types to improve overall understanding.")

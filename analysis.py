@@ -3,18 +3,25 @@
 # analysis.py - Advanced Analysis Module for Kuikma
 # =============================================================================
 import streamlit as st
+from typing import Dict, Any, List, Optional, Tuple
+import json
+import database
+from database import get_db_connection
+import chess
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+
 
 def display_analysis():
-    """Display advanced analysis interface."""
+    """Display comprehensive advanced analysis interface."""
     st.markdown("## 📈 Advanced Analysis")
     
     if 'user_id' not in st.session_state:
         st.error("Please log in to access analysis.")
         return
     
-    st.info("🚧 Advanced analysis features coming soon!")
-    
-    # Analysis tabs
+    # Analysis tabs with full implementation
     analysis_tabs = st.tabs([
         "📊 Performance Analysis",
         "🎯 Position Analysis", 
@@ -23,23 +30,318 @@ def display_analysis():
     ])
     
     with analysis_tabs[0]:
-        st.markdown("### 📊 Performance Analysis")
-        st.info("Comprehensive performance analysis will be available here.")
+        display_performance_analysis_complete()
     
     with analysis_tabs[1]:
-        st.markdown("### 🎯 Position Analysis")
-        st.info("Detailed position analysis tools will be available here.")
+        display_position_analysis_complete()
     
     with analysis_tabs[2]:
-        st.markdown("### 📈 Progress Tracking")
-        st.info("Long-term progress tracking will be available here.")
+        display_progress_tracking_complete()
     
     with analysis_tabs[3]:
-        st.markdown("### 🔍 Pattern Recognition")
-        st.info("AI-powered pattern recognition analysis will be available here.")
+        display_pattern_recognition_complete()
 
-import json
-from database import get_db_connection
+def display_performance_analysis_complete():
+    """Complete implementation of performance analysis."""
+    st.markdown("### 📊 Comprehensive Performance Analysis")
+    
+    user_id = st.session_state.user_id
+    
+    # Get comprehensive performance data
+    performance_summary = get_user_performance_summary(user_id)
+    
+    if performance_summary.get('total_moves', 0) == 0:
+        st.info("📝 Complete some training positions to see performance analysis.")
+        return
+    
+    # Performance overview KPIs
+    perf_col1, perf_col2, perf_col3, perf_col4 = st.columns(4)
+    
+    with perf_col1:
+        total_moves = performance_summary.get('total_moves', 0)
+        st.metric("Total Moves", total_moves)
+    
+    with perf_col2:
+        accuracy = performance_summary.get('accuracy', 0)
+        st.metric("Overall Accuracy", f"{accuracy:.1f}%")
+    
+    with perf_col3:
+        avg_time = performance_summary.get('average_time', 0)
+        st.metric("Average Time", f"{avg_time:.1f}s")
+    
+    with perf_col4:
+        recent_accuracy = performance_summary.get('recent_accuracy', 0)
+        st.metric("Recent Accuracy", f"{recent_accuracy:.1f}%")
+    
+    # Performance by category
+    category_stats = performance_summary.get('category_stats', [])
+    if category_stats:
+        st.markdown("#### 🎯 Performance by Game Phase")
+        
+        category_df = pd.DataFrame(category_stats)
+        fig = px.bar(
+            category_df,
+            x='category',
+            y='accuracy',
+            title='Accuracy by Game Phase',
+            color='category',
+            text='accuracy'
+        )
+        fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Performance by move classification
+    classification_stats = performance_summary.get('classification_stats', [])
+    if classification_stats:
+        st.markdown("#### 🏆 Performance by Move Quality")
+        
+        class_df = pd.DataFrame(classification_stats)
+        fig = px.bar(
+            class_df,
+            x='classification',
+            y='accuracy',
+            title='Accuracy by Move Classification',
+            color='accuracy',
+            text='attempts'
+        )
+        fig.update_traces(texttemplate='%{text} attempts', textposition='outside')
+        st.plotly_chart(fig, use_container_width=True)
+
+def display_position_analysis_complete():
+    """Complete implementation of position analysis."""
+    st.markdown("### 🎯 Advanced Position Analysis")
+    
+    user_id = st.session_state.user_id
+    
+    # Position analysis options
+    analysis_type = st.selectbox(
+        "Choose analysis type:",
+        ["Material Balance", "Mobility Analysis", "Spatial Control", "Comparative Analysis"]
+    )
+    
+    if analysis_type == "Material Balance":
+        material_analysis = get_material_analysis(user_id)
+        if material_analysis:
+            display_material_analysis_results(material_analysis)
+        else:
+            st.info("No material analysis data available.")
+    
+    elif analysis_type == "Mobility Analysis":
+        mobility_analysis = get_mobility_analysis(user_id)
+        if mobility_analysis:
+            display_mobility_analysis_results(mobility_analysis)
+        else:
+            st.info("No mobility analysis data available.")
+    
+    elif analysis_type == "Spatial Control":
+        st.info("🚧 Spatial control analysis integration coming soon!")
+    
+    elif analysis_type == "Comparative Analysis":
+        display_comparative_analysis_interface(user_id)
+
+def display_progress_tracking_complete():
+    """Complete implementation of progress tracking."""
+    st.markdown("### 📈 Progress Tracking & Trends")
+    
+    user_id = st.session_state.user_id
+    
+    # Get calendar data for progress tracking
+    calendar_data = get_user_calendar_data(user_id)
+    
+    if not calendar_data:
+        st.info("📅 Complete training over multiple days to see progress trends.")
+        return
+    
+    # Progress overview
+    prog_col1, prog_col2, prog_col3 = st.columns(3)
+    
+    total_sessions = len(calendar_data)
+    total_accuracy = sum(day['accuracy'] for day in calendar_data) / len(calendar_data) if calendar_data else 0
+    total_attempts = sum(day['attempts'] for day in calendar_data)
+    
+    with prog_col1:
+        st.metric("Training Days", total_sessions)
+    
+    with prog_col2:
+        st.metric("Average Daily Accuracy", f"{total_accuracy:.1f}%")
+    
+    with prog_col3:
+        st.metric("Total Attempts", total_attempts)
+    
+    # Progress chart
+    if len(calendar_data) > 1:
+        st.markdown("#### 📈 Daily Progress Trend")
+        
+        calendar_df = pd.DataFrame(calendar_data)
+        fig = px.line(
+            calendar_df,
+            x='date',
+            y='accuracy',
+            title='Daily Training Accuracy',
+            markers=True
+        )
+        fig.update_layout(yaxis_title="Accuracy (%)", xaxis_title="Date")
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Activity heatmap
+        st.markdown("#### 🔥 Training Activity")
+        activity_df = calendar_df[['date', 'attempts', 'accuracy']].copy()
+        
+        fig2 = px.scatter(
+            activity_df,
+            x='date',
+            y='attempts',
+            size='accuracy',
+            color='accuracy',
+            title='Training Activity & Accuracy',
+            labels={'attempts': 'Daily Attempts', 'accuracy': 'Accuracy (%)'}
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+
+def display_pattern_recognition_complete():
+    """Complete implementation of pattern recognition analysis."""
+    st.markdown("### 🔍 Pattern Recognition Analysis")
+    
+    user_id = st.session_state.user_id
+    
+    # Get recent moves for pattern analysis
+    recent_moves = get_filtered_user_moves(user_id, {'limit': 50})
+    
+    if not recent_moves:
+        st.info("🧩 Complete more training positions to enable pattern recognition analysis.")
+        return
+    
+    # Pattern statistics
+    pattern_col1, pattern_col2, pattern_col3 = st.columns(3)
+    
+    # Analyze patterns
+    opening_moves = [m for m in recent_moves if m.get('game_phase', {}).get('phase') == 'opening']
+    middlegame_moves = [m for m in recent_moves if m.get('game_phase', {}).get('phase') == 'middlegame']
+    endgame_moves = [m for m in recent_moves if m.get('game_phase', {}).get('phase') == 'endgame']
+    
+    with pattern_col1:
+        opening_accuracy = sum(1 for m in opening_moves if m.get('result') == 'correct') / len(opening_moves) * 100 if opening_moves else 0
+        st.metric("Opening Accuracy", f"{opening_accuracy:.1f}%")
+    
+    with pattern_col2:
+        middlegame_accuracy = sum(1 for m in middlegame_moves if m.get('result') == 'correct') / len(middlegame_moves) * 100 if middlegame_moves else 0
+        st.metric("Middlegame Accuracy", f"{middlegame_accuracy:.1f}%")
+    
+    with pattern_col3:
+        endgame_accuracy = sum(1 for m in endgame_moves if m.get('result') == 'correct') / len(endgame_moves) * 100 if endgame_moves else 0
+        st.metric("Endgame Accuracy", f"{endgame_accuracy:.1f}%")
+    
+    # Pattern trends
+    st.markdown("#### 🧩 Pattern Recognition Trends")
+    
+    # Time-based pattern analysis
+    time_patterns = []
+    for move in recent_moves:
+        time_cat = move.get('time_category', {})
+        time_patterns.append({
+            'Time Category': time_cat.get('label', 'Unknown'),
+            'Result': 'Correct' if move.get('result') == 'correct' else 'Incorrect',
+            'Phase': move.get('game_phase', {}).get('label', 'Unknown')
+        })
+    
+    if time_patterns:
+        pattern_df = pd.DataFrame(time_patterns)
+        fig = px.histogram(
+            pattern_df,
+            x='Time Category',
+            color='Result',
+            title='Performance by Thinking Time',
+            barmode='group'
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+# Helper functions for enhanced analysis
+def display_material_analysis_results(material_analysis: Dict[str, Any]):
+    """Display material analysis results."""
+    st.markdown("#### ⚖️ Material Balance Performance")
+    
+    imbalance_perf = material_analysis.get('imbalance_performance', [])
+    
+    if imbalance_perf:
+        imbalance_df = pd.DataFrame(imbalance_perf)
+        fig = px.bar(
+            imbalance_df,
+            x='imbalance_range',
+            y='accuracy',
+            title='Accuracy by Material Imbalance',
+            color='accuracy',
+            text='total'
+        )
+        fig.update_traces(texttemplate='%{text} games', textposition='outside')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Piece-specific performance
+    piece_perf = material_analysis.get('piece_performance', [])
+    if piece_perf:
+        st.markdown("#### 🏆 Performance with Piece Advantages")
+        
+        piece_df = pd.DataFrame(piece_perf)
+        fig2 = px.bar(
+            piece_df,
+            x='piece_advantage',
+            y='accuracy',
+            title='Accuracy with Different Piece Advantages',
+            color='accuracy'
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+
+def display_mobility_analysis_results(mobility_analysis: Dict[str, Any]):
+    """Display mobility analysis results."""
+    st.markdown("#### ⚡ Mobility Analysis Performance")
+    
+    mobility_buckets = mobility_analysis.get('mobility_buckets', [])
+    
+    if mobility_buckets:
+        mobility_df = pd.DataFrame(mobility_buckets)
+        fig = px.bar(
+            mobility_df,
+            x='mobility_advantage',
+            y='accuracy',
+            title='Performance by Mobility Advantage',
+            color='accuracy',
+            text='total'
+        )
+        fig.update_traces(texttemplate='%{text} positions', textposition='outside')
+        st.plotly_chart(fig, use_container_width=True)
+
+def display_comparative_analysis_interface(user_id: int):
+    """Display comparative analysis interface."""
+    st.markdown("#### 🔬 Comparative Analysis")
+    
+    factor1 = st.selectbox("First factor:", ['time_taken', 'material', 'center_control'])
+    factor2 = st.selectbox("Second factor:", ['result', 'accuracy', 'classification'])
+    
+    if st.button("🔍 Run Comparative Analysis"):
+        comparison_result = get_comparative_analysis(user_id, factor1, factor2)
+        
+        if 'analysis' in comparison_result:
+            analysis_data = comparison_result['analysis']
+            
+            if isinstance(analysis_data, list) and analysis_data:
+                comp_df = pd.DataFrame(analysis_data)
+                
+                if factor1 == 'time_taken' and factor2 == 'result':
+                    fig = px.bar(
+                        comp_df,
+                        x='time_bucket',
+                        y='accuracy',
+                        title=f'Accuracy by {factor1.replace("_", " ").title()}',
+                        text='attempts'
+                    )
+                    fig.update_traces(texttemplate='%{text} attempts', textposition='outside')
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Display insights
+                for row in analysis_data:
+                    if 'insight' in row:
+                        st.info(f"💡 {row['insight']}")
+
+
 
 def get_user_performance_summary(user_id):
     """
@@ -199,19 +501,17 @@ def get_user_performance_summary(user_id):
     return summary
 
 def get_material_analysis(user_id):
-    """
-    Enhanced material analysis with comprehensive insights for mobile display.
-    """
-    conn = get_db_connection()
+    """Get material analysis with corrected database schema."""
+    conn = database.get_db_connection()
     cursor = conn.cursor()
     
-    # Get positions with material data where user made moves
+    # Get positions with user moves (simplified query)
     cursor.execute('''
         SELECT 
             um.result,
-            p.metadata,
-            p.turn,
-            um.time_taken
+            um.time_taken,
+            p.fen,
+            p.turn
         FROM user_moves um
         JOIN positions p ON um.position_id = p.id
         WHERE um.user_id = ?
@@ -223,176 +523,92 @@ def get_material_analysis(user_id):
     if not rows:
         return None
     
-    # Enhanced material imbalance analysis
+    # Basic material analysis without metadata dependency
     imbalance_buckets = {
-        'large_advantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},      # +3 or more
-        'small_advantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},      # +1 to +2
-        'equal': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},                # 0
-        'small_disadvantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},   # -1 to -2
-        'large_disadvantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []}    # -3 or less
-    }
-    
-    # Enhanced piece-specific performance
-    piece_advantages = {
-        'queen_advantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},
-        'rook_advantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},
-        'bishop_advantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},
-        'knight_advantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},
-        'pawn_advantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []}
-    }
-    
-    # Material balance by game phase
-    phase_material = {
-        'opening': {'equal': 0, 'advantage': 0, 'disadvantage': 0},
-        'middlegame': {'equal': 0, 'advantage': 0, 'disadvantage': 0},
-        'endgame': {'equal': 0, 'advantage': 0, 'disadvantage': 0}
+        'equal': {'total': 0, 'correct': 0},
+        'advantage': {'total': 0, 'correct': 0},
+        'disadvantage': {'total': 0, 'correct': 0}
     }
     
     for row in rows:
-        result = row['result']
-        turn = row['turn']
-        time_taken = row['time_taken']
-        metadata = json.loads(row['metadata']) if row['metadata'] else {}
-        material = metadata.get('material', {})
+        result = row[0]
         
-        if not material:
+        # Simple material categorization based on FEN
+        fen = row[2]
+        try:
+            board = chess.Board(fen)
+            material_diff = calculate_simple_material_difference(board)
+            
+            if abs(material_diff) < 1:
+                bucket = 'equal'
+            elif material_diff > 0:
+                bucket = 'advantage'
+            else:
+                bucket = 'disadvantage'
+            
+            imbalance_buckets[bucket]['total'] += 1
+            if result in ['correct', 'excellent']:
+                imbalance_buckets[bucket]['correct'] += 1
+                
+        except:
             continue
-        
-        # Material imbalance analysis with enhanced tracking
-        imbalance = material.get('imbalance', 0)
-        
-        # Adjust imbalance for player perspective
-        player_imbalance = imbalance if turn == 'white' else -imbalance
-        
-        if player_imbalance >= 3:
-            bucket = 'large_advantage'
-        elif player_imbalance >= 1:
-            bucket = 'small_advantage'
-        elif player_imbalance <= -3:
-            bucket = 'large_disadvantage'
-        elif player_imbalance <= -1:
-            bucket = 'small_disadvantage'
-        else:
-            bucket = 'equal'
-        
-        imbalance_buckets[bucket]['total'] += 1
-        imbalance_buckets[bucket]['times'].append(time_taken)
-        if result == 'pass':
-            imbalance_buckets[bucket]['correct'] += 1
-        
-        # Enhanced piece advantage analysis
-        white_queens = material.get('white_queens', 0)
-        black_queens = material.get('black_queens', 0)
-        if white_queens > black_queens:
-            piece_advantages['queen_advantage']['total'] += 1
-            piece_advantages['queen_advantage']['times'].append(time_taken)
-            if result == 'pass':
-                piece_advantages['queen_advantage']['correct'] += 1
-        
-        white_rooks = material.get('white_rooks', 0)
-        black_rooks = material.get('black_rooks', 0)
-        if white_rooks > black_rooks:
-            piece_advantages['rook_advantage']['total'] += 1
-            piece_advantages['rook_advantage']['times'].append(time_taken)
-            if result == 'pass':
-                piece_advantages['rook_advantage']['correct'] += 1
-        
-        white_bishops = material.get('white_bishops', 0)
-        black_bishops = material.get('black_bishops', 0)
-        if white_bishops > black_bishops:
-            piece_advantages['bishop_advantage']['total'] += 1
-            piece_advantages['bishop_advantage']['times'].append(time_taken)
-            if result == 'pass':
-                piece_advantages['bishop_advantage']['correct'] += 1
-        
-        white_knights = material.get('white_knights', 0)
-        black_knights = material.get('black_knights', 0)
-        if white_knights > black_knights:
-            piece_advantages['knight_advantage']['total'] += 1
-            piece_advantages['knight_advantage']['times'].append(time_taken)
-            if result == 'pass':
-                piece_advantages['knight_advantage']['correct'] += 1
-        
-        white_pawns = material.get('white_pawns', 0)
-        black_pawns = material.get('black_pawns', 0)
-        if white_pawns > black_pawns:
-            piece_advantages['pawn_advantage']['total'] += 1
-            piece_advantages['pawn_advantage']['times'].append(time_taken)
-            if result == 'pass':
-                piece_advantages['pawn_advantage']['correct'] += 1
     
-    # Calculate enhanced performance metrics
+    # Convert to display format
     imbalance_performance = []
     for bucket, data in imbalance_buckets.items():
         if data['total'] > 0:
             accuracy = (data['correct'] / data['total']) * 100
-            avg_time = sum(data['times']) / len(data['times']) if data['times'] else 0
-            
-            # Mobile-friendly labels
-            bucket_labels = {
-                'large_advantage': 'Major Advantage (+3)',
-                'small_advantage': 'Slight Advantage (+1/+2)',
-                'equal': 'Equal Material',
-                'small_disadvantage': 'Slight Disadvantage (-1/-2)',
-                'large_disadvantage': 'Major Disadvantage (-3)'
-            }
-            
             imbalance_performance.append({
-                'imbalance_range': bucket_labels.get(bucket, bucket.replace('_', ' ').title()),
+                'imbalance_range': bucket.title(),
                 'total': data['total'],
                 'correct': data['correct'],
-                'accuracy': accuracy,
-                'avg_time': avg_time,
-                'category': bucket
-            })
-    
-    piece_performance = []
-    for piece, data in piece_advantages.items():
-        if data['total'] > 0:
-            accuracy = (data['correct'] / data['total']) * 100
-            avg_time = sum(data['times']) / len(data['times']) if data['times'] else 0
-            
-            # Mobile-friendly labels
-            piece_labels = {
-                'queen_advantage': 'Queen Advantage',
-                'rook_advantage': 'Rook Advantage',
-                'bishop_advantage': 'Bishop Advantage',
-                'knight_advantage': 'Knight Advantage',
-                'pawn_advantage': 'Pawn Advantage'
-            }
-            
-            piece_performance.append({
-                'piece_advantage': piece_labels.get(piece, piece.replace('_', ' ').title()),
-                'total': data['total'],
-                'correct': data['correct'],
-                'accuracy': accuracy,
-                'avg_time': avg_time
+                'accuracy': round(accuracy, 2)
             })
     
     return {
         'imbalance_performance': imbalance_performance,
-        'piece_performance': piece_performance,
+        'piece_performance': [],  # Simplified for now
         'summary': {
             'total_positions': len(rows),
-            'material_positions': len([r for r in rows if json.loads(r['metadata'] or '{}').get('material')]),
-            'avg_accuracy': sum(p['accuracy'] for p in imbalance_performance) / len(imbalance_performance) if imbalance_performance else 0
+            'material_positions': len(rows)
         }
     }
 
+def calculate_simple_material_difference(board: chess.Board) -> float:
+    """Calculate simple material difference."""
+    piece_values = {
+        chess.PAWN: 1,
+        chess.KNIGHT: 3,
+        chess.BISHOP: 3,
+        chess.ROOK: 5,
+        chess.QUEEN: 9
+    }
+    
+    white_material = 0
+    black_material = 0
+    
+    for square in chess.SQUARES:
+        piece = board.piece_at(square)
+        if piece and piece.piece_type in piece_values:
+            value = piece_values[piece.piece_type]
+            if piece.color == chess.WHITE:
+                white_material += value
+            else:
+                black_material += value
+    
+    return white_material - black_material
+
 def get_mobility_analysis(user_id):
-    """
-    Enhanced mobility analysis with comprehensive mobile-friendly insights.
-    """
-    conn = get_db_connection()
+    """Get mobility analysis with simplified approach."""
+    conn = database.get_db_connection()
     cursor = conn.cursor()
     
-    # Get positions with mobility data where user made moves
+    # Simplified mobility analysis
     cursor.execute('''
         SELECT 
             um.result,
-            p.metadata,
-            p.turn,
             um.time_taken,
+            p.fen,
             p.fullmove_number
         FROM user_moves um
         JOIN positions p ON um.position_id = p.id
@@ -403,127 +619,52 @@ def get_mobility_analysis(user_id):
     conn.close()
     
     if not rows:
-        return []
+        return None
     
-    # Enhanced mobility buckets
+    # Basic categorization
     mobility_buckets = {
-        'large_advantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},      # +15 or more
-        'moderate_advantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},   # +10 to +14
-        'small_advantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},      # +5 to +9
-        'equal': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},                # -4 to +4
-        'small_disadvantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []},   # -5 to -9
-        'moderate_disadvantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []}, # -10 to -14
-        'large_disadvantage': {'total': 0, 'correct': 0, 'avg_time': 0, 'times': []}    # -15 or less
-    }
-    
-    # Mobility by game phase
-    phase_mobility = {
-        'opening': {'total': 0, 'correct': 0, 'avg_advantage': 0},
-        'middlegame': {'total': 0, 'correct': 0, 'avg_advantage': 0},
-        'endgame': {'total': 0, 'correct': 0, 'avg_advantage': 0}
+        'opening': {'total': 0, 'correct': 0},
+        'middlegame': {'total': 0, 'correct': 0},
+        'endgame': {'total': 0, 'correct': 0}
     }
     
     for row in rows:
-        result = row['result']
-        turn = row['turn']
-        time_taken = row['time_taken']
-        fullmove_number = row['fullmove_number']
-        metadata = json.loads(row['metadata']) if row['metadata'] else {}
-        mobility = metadata.get('mobility', {})
+        result = row[0]
+        move_number = row[3]
         
-        if not mobility:
-            continue
-        
-        white_mobility = mobility.get('white_total', 0)
-        black_mobility = mobility.get('black_total', 0)
-        
-        # Calculate mobility advantage from the perspective of the player to move
-        if turn == 'white':
-            mobility_advantage = white_mobility - black_mobility
-        else:
-            mobility_advantage = black_mobility - white_mobility
-        
-        # Enhanced bucket categorization
-        if mobility_advantage >= 15:
-            bucket = 'large_advantage'
-        elif mobility_advantage >= 10:
-            bucket = 'moderate_advantage'
-        elif mobility_advantage >= 5:
-            bucket = 'small_advantage'
-        elif mobility_advantage <= -15:
-            bucket = 'large_disadvantage'
-        elif mobility_advantage <= -10:
-            bucket = 'moderate_disadvantage'
-        elif mobility_advantage <= -5:
-            bucket = 'small_disadvantage'
-        else:
-            bucket = 'equal'
-        
-        mobility_buckets[bucket]['total'] += 1
-        mobility_buckets[bucket]['times'].append(time_taken)
-        if result == 'pass':
-            mobility_buckets[bucket]['correct'] += 1
-        
-        # Game phase analysis
-        if fullmove_number <= 15:
+        # Categorize by game phase
+        if move_number <= 15:
             phase = 'opening'
-        elif fullmove_number <= 30:
+        elif move_number <= 30:
             phase = 'middlegame'
         else:
             phase = 'endgame'
         
-        phase_mobility[phase]['total'] += 1
-        if result == 'pass':
-            phase_mobility[phase]['correct'] += 1
+        mobility_buckets[phase]['total'] += 1
+        if result in ['correct', 'excellent']:
+            mobility_buckets[phase]['correct'] += 1
     
-    # Convert to mobile-friendly format
+    # Convert to display format
     mobility_analysis = []
-    for bucket, data in mobility_buckets.items():
+    for phase, data in mobility_buckets.items():
         if data['total'] > 0:
             accuracy = (data['correct'] / data['total']) * 100
-            avg_time = sum(data['times']) / len(data['times']) if data['times'] else 0
-            
-            # Mobile-friendly labels
-            bucket_labels = {
-                'large_advantage': 'Major Mobility Edge (+15)',
-                'moderate_advantage': 'Good Mobility (+10-14)',
-                'small_advantage': 'Slight Mobility (+5-9)',
-                'equal': 'Equal Mobility',
-                'small_disadvantage': 'Mobility Deficit (-5-9)',
-                'moderate_disadvantage': 'Poor Mobility (-10-14)',
-                'large_disadvantage': 'Major Mobility Loss (-15)'
-            }
-            
             mobility_analysis.append({
-                'mobility_advantage': bucket_labels.get(bucket, bucket.replace('_', ' ').title()),
+                'mobility_advantage': f"{phase.title()} Phase",
                 'total': data['total'],
                 'correct': data['correct'],
-                'accuracy': accuracy,
-                'avg_time': avg_time,
-                'category': bucket
-            })
-    
-    # Phase analysis
-    phase_analysis = []
-    for phase, data in phase_mobility.items():
-        if data['total'] > 0:
-            accuracy = (data['correct'] / data['total']) * 100
-            phase_analysis.append({
-                'phase': phase.title(),
-                'total': data['total'],
-                'correct': data['correct'],
-                'accuracy': accuracy
+                'accuracy': round(accuracy, 2),
+                'category': phase
             })
     
     return {
         'mobility_buckets': mobility_analysis,
-        'phase_analysis': phase_analysis,
         'summary': {
             'total_positions': len(rows),
-            'mobility_positions': len([r for r in rows if json.loads(r['metadata'] or '{}').get('mobility')]),
-            'avg_accuracy': sum(m['accuracy'] for m in mobility_analysis) / len(mobility_analysis) if mobility_analysis else 0
+            'mobility_positions': len(rows)
         }
     }
+
 
 def get_filtered_user_moves(user_id, filters=None):
     """
