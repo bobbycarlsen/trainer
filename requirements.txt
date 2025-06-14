@@ -7,7 +7,7 @@ numpy>=1.24.0
 python-chess>=1.9.0,<2.0
 
 # Database
-sqlite3  # Built-in with Python
+# sqlite3  # Built-in with Python
 
 # Visualization
 plotly>=5.18.0
