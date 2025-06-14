@@ -1,3 +1,6 @@
+# =============================================================================
+# chess_board.py - Chess Board Rendering for Kuikma
+# =============================================================================
 """
 Enhanced chess board rendering and interaction handling with mobile optimization.
 Handles the interactive chess board with move suggestions, spatial analysis, and responsive design.
@@ -10,6 +13,81 @@ import json
 import re
 from io import BytesIO
 from typing import List, Dict, Any, Optional, Tuple, Union, Set, Callable
+
+import chess
+import chess.svg
+from typing import Optional, List, Dict, Any
+
+def render_board_svg(fen: str, size: int = 400, last_move: Optional[chess.Move] = None, 
+                    highlight_squares: Optional[List[chess.Square]] = None) -> str:
+    """
+    Render a chess board as SVG.
+    
+    Args:
+        fen: FEN string of the position
+        size: Size of the board in pixels
+        last_move: Last move to highlight
+        highlight_squares: List of squares to highlight
+        
+    Returns:
+        SVG string of the chess board
+    """
+    try:
+        board = chess.Board(fen)
+        
+        # Custom styling
+        style = """
+        .square.light { fill: #f0d9b5; }
+        .square.dark { fill: #b58863; }
+        .square.light.lastmove { fill: #cdd26a; }
+        .square.dark.lastmove { fill: #aaa23a; }
+        .square.light.highlight { fill: #ffff00; }
+        .square.dark.highlight { fill: #ffdd00; }
+        """
+        
+        # Generate SVG
+        svg = chess.svg.board(
+            board=board,
+            size=size,
+            lastmove=last_move,
+            style=style
+        )
+        
+        return svg
+        
+    except Exception as e:
+        return f'<div class="board-error">Error rendering board: {e}</div>'
+
+def get_board_themes() -> Dict[str, Dict[str, str]]:
+    """Get available board themes."""
+    return {
+        'default': {
+            'light': '#f0d9b5',
+            'dark': '#b58863',
+            'highlight': '#cdd26a'
+        },
+        'blue': {
+            'light': '#dee3e6', 
+            'dark': '#8ca2ad',
+            'highlight': '#7fb3d3'
+        },
+        'green': {
+            'light': '#ffffdd',
+            'dark': '#86a666', 
+            'highlight': '#b3c95a'
+        },
+        'wood': {
+            'light': '#f7e6c7',
+            'dark': '#d18b47',
+            'highlight': '#e6c767'
+        },
+        'dark': {
+            'light': '#393939',
+            'dark': '#2b2b2b',
+            'highlight': '#525252'
+        }
+    }
+
 
 def display_chess_board(fen: str, theme: str = 'default', 
                        highlight_best_move: bool = False, 

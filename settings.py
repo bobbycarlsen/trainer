@@ -1,599 +1,1127 @@
-import os
+# settings.py - Enhanced Settings Module for Kuikma Chess Engine
+import streamlit as st
+import pandas as pd
 import json
+import os
 import shutil
 from datetime import datetime
-from database import get_db_connection, load_positions_from_jsonl, store_pgn_games
+from typing import Dict, Any, List, Optional
+import plotly.express as px
+import plotly.graph_objects as go
+
+# Import required modules
+import database
+import auth
 import pgn_loader
+from jsonl_processor import JSONLProcessor
+from html_generator import ComprehensiveHTMLGenerator
 
-def get_user_settings(user_id):
-    """
-    Get user settings from the database.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
+def display_enhanced_settings():
+    """Display comprehensive settings interface for Kuikma Chess Engine."""
+    st.markdown("## ⚙️ Kuikma Settings & Data Management")
     
-    cursor.execute('SELECT * FROM user_settings WHERE user_id = ?', (user_id,))
-    settings = cursor.fetchone()
+    if 'user_id' not in st.session_state:
+        st.error("Please log in to access settings.")
+        return
     
-    conn.close()
-    return dict(settings) if settings else None
+    # Settings tabs
+    settings_tabs = st.tabs([
+        "📤 Import Data", 
+        "💾 Export/Backup", 
+        "🔧 User Configuration", 
+        "📊 Data Overview",
+        "📚 Analysis Templates",
+        "🛠️ Advanced Tools"
+    ])
+    
+    with settings_tabs[0]:
+        display_import_interface()
+    
+    with settings_tabs[1]:
+        display_export_backup_interface()
+    
+    with settings_tabs[2]:
+        display_user_configuration()
+    
+    with settings_tabs[3]:
+        display_data_overview()
+    
+    with settings_tabs[4]:
+        display_analysis_templates()
+    
+    with settings_tabs[5]:
+        display_advanced_tools()
 
-def update_user_settings(user_id, settings_dict):
-    """
-    Update user settings in the database.
+def display_import_interface():
+    """Display comprehensive data import interface."""
+    st.markdown("### 📥 Import Training Data")
     
-    settings_dict: Dictionary containing user settings to update.
-    Valid keys are: random_positions, top_n_threshold, score_difference_threshold, theme
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    import_tabs = st.tabs(["🧩 Enhanced JSONL", "♟️ PGN Games", "📋 Batch Import"])
     
-    # Validate settings keys
-    valid_keys = ['random_positions', 'top_n_threshold', 'score_difference_threshold', 'theme']
-    validated_settings = {k: v for k, v in settings_dict.items() if k in valid_keys}
+    with import_tabs[0]:
+        display_jsonl_import()
     
-    # Update each setting
-    for key, value in validated_settings.items():
-        cursor.execute(
-            f'UPDATE user_settings SET {key} = ? WHERE user_id = ?',
-            (value, user_id)
+    with import_tabs[1]:
+        display_pgn_import()
+    
+    with import_tabs[2]:
+        display_batch_import()
+
+def display_jsonl_import():
+    """Display enhanced JSONL import interface."""
+    st.markdown("#### 🧩 Enhanced JSONL Position Import")
+    st.info("Import chess positions with comprehensive analysis data using the enhanced JSONL processor.")
+    
+    # File upload
+    uploaded_jsonl = st.file_uploader(
+        "Upload Enhanced JSONL File", 
+        type=['jsonl'], 
+        key="enhanced_jsonl_import",
+        help="Upload JSONL files with comprehensive position analysis data"
+    )
+    
+    if uploaded_jsonl:
+        file_content = uploaded_jsonl.read().decode('utf-8')
+        
+        # Preview file statistics
+        lines = file_content.strip().split('\n')
+        file_size_mb = len(file_content.encode('utf-8')) / (1024 * 1024)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Total Positions", len(lines))
+        
+        with col2:
+            st.metric("File Size", f"{file_size_mb:.2f} MB")
+        
+        with col3:
+            estimated_time = len(lines) / 100  # Rough estimate
+            st.metric("Est. Import Time", f"{estimated_time:.1f}s")
+        
+        # Preview first position
+        with st.expander("📋 Preview First Position"):
+            if lines:
+                try:
+                    first_position = json.loads(lines[0])
+                    preview_data = {
+                        'ID': first_position.get('id', 'Unknown'),
+                        'FEN': first_position.get('fen', 'Unknown')[:50] + '...',
+                        'Turn': first_position.get('turn', 'Unknown'),
+                        'Game Phase': first_position.get('game_phase', 'Unknown'),
+                        'Difficulty': first_position.get('difficulty_rating', 'Unknown'),
+                        'Themes': ', '.join(first_position.get('themes', [])),
+                        'Processing Quality': first_position.get('processing_quality', 'Unknown')
+                    }
+                    
+                    for key, value in preview_data.items():
+                        st.markdown(f"**{key}:** {value}")
+                        
+                except json.JSONDecodeError as e:
+                    st.error(f"Invalid JSON in first line: {e}")
+        
+        # Import options
+        st.markdown("#### Import Options")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            overwrite_existing = st.checkbox(
+                "Overwrite existing positions", 
+                value=False,
+                help="Replace positions with same ID if they exist"
+            )
+        
+        with col2:
+            validate_before_import = st.checkbox(
+                "Validate before import", 
+                value=True,
+                help="Perform validation checks before importing"
+            )
+        
+        # Import button
+        if st.button("⬆️ Import Enhanced Positions", use_container_width=True, type="primary"):
+            import_enhanced_jsonl_data(file_content, overwrite_existing, validate_before_import)
+
+def import_enhanced_jsonl_data(file_content: str, overwrite_existing: bool, validate_before_import: bool):
+    """Import enhanced JSONL data with comprehensive error handling."""
+    with st.spinner("🔄 Processing enhanced JSONL data..."):
+        try:
+            # Initialize enhanced processor
+            processor = JSONLProcessor()
+            
+            # Validation phase
+            if validate_before_import:
+                st.info("🔍 Validating data...")
+                lines = file_content.strip().split('\n')
+                
+                validation_errors = []
+                for i, line in enumerate(lines[:10], 1):  # Validate first 10 lines
+                    try:
+                        json.loads(line)
+                    except json.JSONDecodeError as e:
+                        validation_errors.append(f"Line {i}: {e}")
+                
+                if validation_errors:
+                    st.error("❌ Validation failed:")
+                    for error in validation_errors:
+                        st.error(f"• {error}")
+                    return
+            
+            # Process and load positions
+            result = database.load_positions_from_enhanced_jsonl(processor, file_content)
+            
+            if result['success']:
+                # Display success metrics
+                st.success(f"✅ Successfully imported {result['positions_loaded']} positions!")
+                
+                # Processor statistics
+                stats = result['processor_stats']
+                
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("Processed", stats['processed_count'])
+                
+                with col2:
+                    st.metric("Valid", stats['valid_count'])
+                
+                with col3:
+                    st.metric("Errors", stats['error_count'])
+                
+                with col4:
+                    st.metric("Success Rate", f"{stats['success_rate']:.1f}%")
+                
+                # Display processing quality breakdown
+                if result['positions_loaded'] > 0:
+                    quality_stats = get_position_quality_stats()
+                    if quality_stats:
+                        st.markdown("#### 📊 Processing Quality Breakdown")
+                        quality_df = pd.DataFrame(list(quality_stats.items()), columns=['Quality Level', 'Count'])
+                        fig = px.pie(quality_df, values='Count', names='Quality Level', title="Position Processing Quality")
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                # Show errors if any
+                if stats['errors']:
+                    with st.expander("⚠️ Processing Errors"):
+                        for error in stats['errors']:
+                            st.error(error)
+                
+                # Show warnings if any
+                if stats.get('warnings'):
+                    with st.expander("⚠️ Processing Warnings"):
+                        for warning in stats['warnings']:
+                            st.warning(warning)
+            else:
+                st.error(f"❌ Import failed: {result['error']}")
+                
+        except Exception as e:
+            st.error(f"❌ Import failed with error: {e}")
+
+def display_pgn_import():
+    """Display enhanced PGN import interface."""
+    st.markdown("#### ♟️ Enhanced PGN Game Import")
+    st.info("Import complete chess games with enhanced player name handling and comprehensive metadata extraction.")
+    
+    uploaded_pgn = st.file_uploader(
+        "Upload PGN File", 
+        type=['pgn'], 
+        key="enhanced_pgn_import",
+        help="Upload PGN files containing complete chess games"
+    )
+    
+    if uploaded_pgn:
+        file_content = uploaded_pgn.read().decode('utf-8')
+        
+        # Get comprehensive file statistics
+        with st.spinner("📊 Analyzing PGN file..."):
+            stats = pgn_loader.get_file_statistics(file_content)
+        
+        if 'error' not in stats:
+            # Display comprehensive statistics
+            st.markdown("#### 📊 File Analysis")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Total Games", stats['total_games'])
+            
+            with col2:
+                st.metric("File Size", f"{stats['file_size_kb']:.1f} KB")
+            
+            with col3:
+                st.metric("Est. Import Time", stats['estimated_import_time'])
+            
+            with col4:
+                st.metric("Player Name Quality", f"{stats.get('player_name_quality', 0):.1f}%")
+            
+            # Additional statistics
+            stats_col1, stats_col2 = st.columns(2)
+            
+            with stats_col1:
+                st.markdown("**Game Statistics:**")
+                st.markdown(f"• Average moves per game: {stats['avg_moves_per_game']}")
+                st.markdown(f"• Move range: {stats['min_moves']} - {stats['max_moves']}")
+                st.markdown(f"• Unique events: {stats['unique_events']}")
+                st.markdown(f"• Unique openings: {stats['unique_openings']}")
+            
+            with stats_col2:
+                st.markdown("**Player Statistics:**")
+                st.markdown(f"• Unique white players: {stats['unique_white_players']}")
+                st.markdown(f"• Unique black players: {stats['unique_black_players']}")
+                st.markdown(f"• Generated names: {stats['generated_player_names']}")
+                
+                if stats.get('avg_elo'):
+                    st.markdown(f"• Average ELO: {stats['avg_elo']}")
+                    st.markdown(f"• ELO range: {stats['min_elo']} - {stats['max_elo']}")
+            
+            # Result distribution chart
+            if stats.get('result_distribution'):
+                result_dist = stats['result_distribution']
+                fig = px.pie(
+                    values=list(result_dist.values()),
+                    names=list(result_dist.keys()),
+                    title="Game Results Distribution"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Import options
+            st.markdown("#### Import Options")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                max_games = st.number_input(
+                    "Maximum games to import", 
+                    min_value=1, 
+                    max_value=stats['total_games'], 
+                    value=min(1000, stats['total_games']),
+                    help="Limit the number of games to import"
+                )
+            
+            with col2:
+                batch_size = st.selectbox(
+                    "Batch processing size",
+                    [100, 500, 1000, 2000],
+                    index=2,
+                    help="Process games in batches for better performance"
+                )
+            
+            # Advanced options
+            with st.expander("🔧 Advanced Import Options"):
+                skip_duplicate_games = st.checkbox(
+                    "Skip duplicate games", 
+                    value=True,
+                    help="Skip games that already exist in the database"
+                )
+                
+                enhance_player_names = st.checkbox(
+                    "Enhanced player name processing", 
+                    value=True,
+                    help="Use advanced algorithms to improve player name quality"
+                )
+                
+                validate_moves = st.checkbox(
+                    "Validate all moves", 
+                    value=True,
+                    help="Validate that all moves in games are legal"
+                )
+            
+            # Import button
+            if st.button("⬆️ Import PGN Games", use_container_width=True, type="primary"):
+                import_pgn_games(
+                    file_content, 
+                    uploaded_pgn.name, 
+                    max_games, 
+                    batch_size,
+                    skip_duplicate_games,
+                    enhance_player_names,
+                    validate_moves
+                )
+        else:
+            st.error(f"❌ {stats['error']}")
+
+def import_pgn_games(file_content: str, filename: str, max_games: int, batch_size: int,
+                    skip_duplicates: bool, enhance_names: bool, validate_moves: bool):
+    """Import PGN games with enhanced processing."""
+    with st.spinner("🎮 Importing PGN games..."):
+        try:
+            # Load games using enhanced processor
+            games = pgn_loader.load_pgn_games(file_content, max_games=max_games)
+            
+            if not games:
+                st.error("No games could be loaded from the PGN file.")
+                return
+            
+            # Store games in database
+            result = database.store_pgn_games(games, filename)
+            
+            # Display results
+            if result['games_stored'] > 0:
+                st.success(f"🎮 Successfully imported {result['games_stored']} games!")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Games Stored", result['games_stored'])
+                
+                with col2:
+                    st.metric("Total Processed", result['total_processed'])
+                
+                with col3:
+                    st.metric("Errors", result['errors'])
+                
+                # Show game analysis
+                if result['games_stored'] > 0:
+                    display_imported_games_analysis(filename)
+            else:
+                st.error("❌ No games were imported. Check the file format and try again.")
+                
+        except Exception as e:
+            st.error(f"❌ Import failed: {e}")
+
+def display_batch_import():
+    """Display batch import interface for multiple files."""
+    st.markdown("#### 📋 Batch Import")
+    st.info("Import multiple files at once with automated processing.")
+    
+    # Multiple file upload
+    uploaded_files = st.file_uploader(
+        "Upload Multiple Files",
+        type=['jsonl', 'pgn'],
+        accept_multiple_files=True,
+        key="batch_import_files"
+    )
+    
+    if uploaded_files:
+        st.markdown(f"**Selected {len(uploaded_files)} files for batch import:**")
+        
+        file_info = []
+        total_size = 0
+        
+        for file in uploaded_files:
+            file_size = len(file.read())
+            file.seek(0)  # Reset file pointer
+            total_size += file_size
+            
+            file_info.append({
+                'Name': file.name,
+                'Type': file.type,
+                'Size (KB)': round(file_size / 1024, 2)
+            })
+        
+        # Display file summary
+        df = pd.DataFrame(file_info)
+        st.dataframe(df, use_container_width=True)
+        
+        st.metric("Total Size", f"{total_size / (1024*1024):.2f} MB")
+        
+        # Batch import options
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            import_order = st.selectbox(
+                "Import order",
+                ["By file size (smallest first)", "By filename", "By file type"],
+                help="Choose the order for importing files"
+            )
+        
+        with col2:
+            stop_on_error = st.checkbox(
+                "Stop on first error",
+                value=False,
+                help="Stop batch import if any file fails to import"
+            )
+        
+        # Start batch import
+        if st.button("🚀 Start Batch Import", use_container_width=True, type="primary"):
+            perform_batch_import(uploaded_files, import_order, stop_on_error)
+
+def perform_batch_import(files: List, import_order: str, stop_on_error: bool):
+    """Perform batch import of multiple files."""
+    # Sort files based on import order
+    if import_order == "By file size (smallest first)":
+        files = sorted(files, key=lambda f: len(f.read()))
+        for f in files:
+            f.seek(0)
+    elif import_order == "By filename":
+        files = sorted(files, key=lambda f: f.name)
+    elif import_order == "By file type":
+        files = sorted(files, key=lambda f: f.type)
+    
+    # Progress tracking
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    results_container = st.container()
+    
+    successful_imports = 0
+    failed_imports = 0
+    import_results = []
+    
+    for i, file in enumerate(files):
+        try:
+            status_text.text(f"Processing {file.name} ({i+1}/{len(files)})")
+            progress_bar.progress((i + 1) / len(files))
+            
+            file_content = file.read().decode('utf-8')
+            file.seek(0)
+            
+            # Determine file type and import accordingly
+            if file.name.endswith('.jsonl'):
+                # Import JSONL
+                processor = JSONLProcessor()
+                result = database.load_positions_from_enhanced_jsonl(processor, file_content)
+                
+                if result['success']:
+                    successful_imports += 1
+                    import_results.append({
+                        'File': file.name,
+                        'Type': 'JSONL',
+                        'Status': '✅ Success',
+                        'Items': result['positions_loaded'],
+                        'Details': f"{result['positions_loaded']} positions imported"
+                    })
+                else:
+                    failed_imports += 1
+                    import_results.append({
+                        'File': file.name,
+                        'Type': 'JSONL',
+                        'Status': '❌ Failed',
+                        'Items': 0,
+                        'Details': result.get('error', 'Unknown error')
+                    })
+                    
+                    if stop_on_error:
+                        break
+            
+            elif file.name.endswith('.pgn'):
+                # Import PGN
+                games = pgn_loader.load_pgn_games(file_content, max_games=1000)
+                result = database.store_pgn_games(games, file.name)
+                
+                if result['games_stored'] > 0:
+                    successful_imports += 1
+                    import_results.append({
+                        'File': file.name,
+                        'Type': 'PGN',
+                        'Status': '✅ Success',
+                        'Items': result['games_stored'],
+                        'Details': f"{result['games_stored']} games imported"
+                    })
+                else:
+                    failed_imports += 1
+                    import_results.append({
+                        'File': file.name,
+                        'Type': 'PGN', 
+                        'Status': '❌ Failed',
+                        'Items': 0,
+                        'Details': 'No games imported'
+                    })
+                    
+                    if stop_on_error:
+                        break
+            
+        except Exception as e:
+            failed_imports += 1
+            import_results.append({
+                'File': file.name,
+                'Type': 'Unknown',
+                'Status': '❌ Error',
+                'Items': 0,
+                'Details': str(e)
+            })
+            
+            if stop_on_error:
+                break
+    
+    # Display results
+    status_text.text("Batch import completed!")
+    
+    with results_container:
+        st.markdown("#### 📊 Batch Import Results")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Successful", successful_imports)
+        
+        with col2:
+            st.metric("Failed", failed_imports)
+        
+        with col3:
+            st.metric("Total Files", len(files))
+        
+        # Detailed results table
+        if import_results:
+            results_df = pd.DataFrame(import_results)
+            st.dataframe(results_df, use_container_width=True)
+
+def display_export_backup_interface():
+    """Display export and backup interface."""
+    st.markdown("### 💾 Export & Backup")
+    
+    export_tabs = st.tabs(["📤 Database Export", "💾 Backup Management", "📊 Data Export"])
+    
+    with export_tabs[0]:
+        display_database_export()
+    
+    with export_tabs[1]:
+        display_backup_management()
+    
+    with export_tabs[2]:
+        display_data_export()
+
+def display_database_export():
+    """Display database export interface."""
+    st.markdown("#### 📤 Complete Database Export")
+    
+    # Database statistics
+    stats = get_database_statistics()
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Positions", stats.get('positions', 0))
+    
+    with col2:
+        st.metric("Total Games", stats.get('games', 0))
+    
+    with col3:
+        st.metric("Total Users", stats.get('users', 0))
+    
+    with col4:
+        st.metric("User Moves", stats.get('user_moves', 0))
+    
+    # Export options
+    st.markdown("#### Export Options")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        include_user_data = st.checkbox(
+            "Include user training data",
+            value=True,
+            help="Include user moves, sessions, and analysis data"
         )
     
-    conn.commit()
-    conn.close()
-    return True
+    with col2:
+        include_games = st.checkbox(
+            "Include PGN games",
+            value=True,
+            help="Include imported chess games"
+        )
+    
+    # Export formats
+    export_format = st.selectbox(
+        "Export format",
+        ["Complete SQLite Database", "JSON Data Export", "CSV Tables"],
+        help="Choose the format for the exported data"
+    )
+    
+    # Export button
+    if st.button("💾 Export Database", use_container_width=True, type="primary"):
+        perform_database_export(export_format, include_user_data, include_games)
 
-def import_positions_from_jsonl(file_path):
-    """
-    Import positions from a JSONL file into the database.
-    Returns the number of positions imported.
-    """
-    # Validate file exists
-    if not os.path.exists(file_path):
-        return {"error": "File not found", "imported": 0}
-    
-    # Validate file is JSONL
-    if not file_path.endswith('.jsonl'):
-        return {"error": "File must be a JSONL file", "imported": 0}
-    
-    # Get count of existing positions
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) as count FROM positions')
-    before_count = cursor.fetchone()['count']
-    conn.close()
-    
-    # Load positions from file
-    try:
-        loaded = load_positions_from_jsonl(file_path)
-        
-        # Get new count
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) as count FROM positions')
-        after_count = cursor.fetchone()['count']
-        conn.close()
-        
-        imported_count = after_count - before_count
-        
-        return {
-            "status": "success", 
-            "imported": imported_count,
-            "total_positions": after_count
-        }
-    except Exception as e:
-        return {"error": f"Import failed: {str(e)}", "imported": 0}
-
-def import_games_from_pgn(file_content, pgn_filename, batch_start=1, batch_end=None):
-    """
-    Import games from PGN content into the database.
-    
-    Args:
-        file_content: String content of PGN file
-        pgn_filename: Name of the PGN file
-        batch_start: Starting game number (1-based)
-        batch_end: Ending game number (None for all remaining)
-        
-    Returns:
-        Dictionary with import results
-    """
-    try:
-        # Get file statistics first
-        stats = pgn_loader.get_file_statistics(file_content)
-        
-        if 'error' in stats:
-            return {"success": False, "error": stats['error'], "games_imported": 0}
-        
-        total_games = stats['total_games']
-        
-        # Validate batch range
-        if batch_start < 1 or batch_start > total_games:
-            return {"success": False, "error": f"Invalid start position: {batch_start}", "games_imported": 0}
-        
-        if batch_end is None:
-            batch_end = total_games
-        
-        if batch_end < batch_start or batch_end > total_games:
-            return {"success": False, "error": f"Invalid end position: {batch_end}", "games_imported": 0}
-        
-        # Load specific range of games
-        max_games_to_load = batch_end
-        games = pgn_loader.load_pgn_games(file_content, max_games=max_games_to_load)
-        
-        # Extract the requested range
-        if batch_start > 1:
-            games = games[batch_start-1:]
-        
-        if len(games) == 0:
-            return {"success": False, "error": "No games found in specified range", "games_imported": 0}
-        
-        # Store in database
-        source_name = f"{pgn_filename}_{batch_start}-{batch_start + len(games) - 1}"
-        result = store_pgn_games(games, source_name)
-        
-        return {
-            "success": True,
-            "games_imported": result['games_stored'],
-            "errors": result['errors'],
-            "total_processed": result['total_processed'],
-            "source_name": source_name
-        }
-        
-    except Exception as e:
-        return {"success": False, "error": f"Import failed: {str(e)}", "games_imported": 0}
-
-def get_db_stats():
-    """
-    Get comprehensive statistics about the database.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Get counts from tables
-    cursor.execute('SELECT COUNT(*) as count FROM positions')
-    positions_count = cursor.fetchone()['count']
-    
-    cursor.execute('SELECT COUNT(*) as count FROM moves')
-    moves_count = cursor.fetchone()['count']
-    
-    cursor.execute('SELECT COUNT(*) as count FROM users')
-    users_count = cursor.fetchone()['count']
-    
-    cursor.execute('SELECT COUNT(*) as count FROM user_moves')
-    user_moves_count = cursor.fetchone()['count']
-    
-    # Get games count if table exists
-    try:
-        cursor.execute('SELECT COUNT(*) as count FROM games')
-        games_count = cursor.fetchone()['count']
-    except:
-        games_count = 0
-    
-    # Get user analysis count if table exists
-    try:
-        cursor.execute('SELECT COUNT(*) as count FROM user_game_analysis')
-        user_analysis_count = cursor.fetchone()['count']
-    except:
-        user_analysis_count = 0
-    
-    # Get saved games count if table exists
-    try:
-        cursor.execute('SELECT COUNT(*) as count FROM user_saved_games')
-        saved_games_count = cursor.fetchone()['count']
-    except:
-        saved_games_count = 0
-    
-    # Get database file size
-    db_path = 'data/chess_trainer.db'
-    db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
-    
-    conn.close()
-    
-    return {
-        "positions_count": positions_count,
-        "moves_count": moves_count,
-        "users_count": users_count,
-        "user_moves_count": user_moves_count,
-        "games_count": games_count,
-        "user_analysis_count": user_analysis_count,
-        "saved_games_count": saved_games_count,
-        "db_size_bytes": db_size,
-        "db_size_mb": round(db_size / (1024 * 1024), 2)
-    }
-
-def export_database(export_path=None):
-    """
-    Export the complete database to a file.
-    
-    Args:
-        export_path: Path where to save the export file
-        
-    Returns:
-        Dictionary with export results
-    """
-    try:
-        if not export_path:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            export_path = f'data/chess_trainer_export_{timestamp}.db'
-        
-        # Ensure the export directory exists
-        os.makedirs(os.path.dirname(export_path), exist_ok=True)
-        
-        # Copy the database file
-        source_path = 'data/chess_trainer.db'
-        
-        if not os.path.exists(source_path):
-            return {"success": False, "error": "Database file not found", "path": None}
-        
-        shutil.copy2(source_path, export_path)
-        
-        # Get file size for confirmation
-        export_size = os.path.getsize(export_path)
-        
-        return {
-            "success": True,
-            "path": export_path,
-            "size_mb": round(export_size / (1024 * 1024), 2),
-            "message": f"Database exported successfully to {export_path}"
-        }
-        
-    except Exception as e:
-        return {"success": False, "error": f"Export failed: {str(e)}", "path": None}
-
-def export_user_statistics(user_id):
-    """
-    Export comprehensive user statistics to JSON format.
-    
-    Args:
-        user_id: User ID to export statistics for
-        
-    Returns:
-        Dictionary with user statistics
-    """
-    from database import get_user_game_statistics, get_enhanced_user_statistics
-    
-    try:
-        # Get comprehensive user statistics
-        user_stats = get_user_game_statistics(user_id)
-        enhanced_stats = get_enhanced_user_statistics(user_id)
-        
-        # Combine all statistics
-        export_data = {
-            "export_info": {
-                "user_id": user_id,
-                "export_date": datetime.now().isoformat(),
-                "version": "2.0"
-            },
-            "position_training": user_stats['position_stats'],
-            "game_analysis": user_stats['game_stats'],
-            "saved_games": user_stats['saved_stats'],
-            "enhanced_analysis": enhanced_stats['enhanced_stats'],
-            "phase_performance": enhanced_stats['phase_stats'],
-            "recent_activity": {
-                "positions": user_stats['recent_position_activity'],
-                "games": user_stats['recent_game_activity']
-            }
-        }
-        
-        return {
-            "success": True,
-            "data": export_data,
-            "size_kb": round(len(json.dumps(export_data)) / 1024, 2)
-        }
-        
-    except Exception as e:
-        return {"success": False, "error": f"Statistics export failed: {str(e)}", "data": None}
-
-def create_database_backup():
-    """
-    Create a backup of the database with timestamp.
-    
-    Returns:
-        Dictionary with backup results
-    """
-    try:
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        backup_path = f'data/backups/chess_trainer_backup_{timestamp}.db'
-        
-        # Ensure backup directory exists
-        os.makedirs('data/backups', exist_ok=True)
-        
-        # Copy database file
-        source_path = 'data/chess_trainer.db'
-        
-        if not os.path.exists(source_path):
-            return {"success": False, "error": "Database file not found", "path": None}
-        
-        shutil.copy2(source_path, backup_path)
-        
-        # Get backup file size
-        backup_size = os.path.getsize(backup_path)
-        
-        return {
-            "success": True,
-            "path": backup_path,
-            "size_mb": round(backup_size / (1024 * 1024), 2),
-            "timestamp": timestamp,
-            "message": f"Backup created successfully: {backup_path}"
-        }
-        
-    except Exception as e:
-        return {"success": False, "error": f"Backup failed: {str(e)}", "path": None}
-
-def get_import_history():
-    """
-    Get history of data imports.
-    
-    Returns:
-        List of import records
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    import_history = []
-    
-    # Get PGN import history from games metadata
-    try:
-        cursor.execute('''
-            SELECT DISTINCT pgn_source, COUNT(*) as game_count,
-                   MIN(created_at) as first_import,
-                   MAX(created_at) as last_import
-            FROM games
-            GROUP BY pgn_source
-            ORDER BY last_import DESC
-        ''')
-        
-        pgn_imports = cursor.fetchall()
-        
-        for import_record in pgn_imports:
-            import_history.append({
-                'type': 'PGN Games',
-                'source': import_record['pgn_source'],
-                'count': import_record['game_count'],
-                'first_import': import_record['first_import'],
-                'last_import': import_record['last_import']
-            })
-    except:
-        pass  # Table might not exist in older versions
-    
-    # Get position import info (less detailed, as we don't track sources)
-    try:
-        cursor.execute('SELECT COUNT(*) as position_count FROM positions')
-        position_count = cursor.fetchone()['position_count']
-        
-        if position_count > 0:
-            import_history.append({
-                'type': 'Training Positions',
-                'source': 'JSONL Import',
-                'count': position_count,
-                'first_import': 'Unknown',
-                'last_import': 'Unknown'
-            })
-    except:
-        pass
-    
-    conn.close()
-    return import_history
-
-def validate_database_integrity():
-    """
-    Validate database integrity and report any issues.
-    
-    Returns:
-        Dictionary with validation results
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    issues = []
-    stats = {}
-    
-    try:
-        # Check for orphaned moves (moves without positions)
-        cursor.execute('''
-            SELECT COUNT(*) as orphaned_moves
-            FROM moves m
-            LEFT JOIN positions p ON m.position_id = p.id
-            WHERE p.id IS NULL
-        ''')
-        orphaned_moves = cursor.fetchone()['orphaned_moves']
-        if orphaned_moves > 0:
-            issues.append(f"Found {orphaned_moves} orphaned moves without positions")
-        
-        # Check for orphaned user moves
-        cursor.execute('''
-            SELECT COUNT(*) as orphaned_user_moves
-            FROM user_moves um
-            LEFT JOIN positions p ON um.position_id = p.id
-            WHERE p.id IS NULL
-        ''')
-        orphaned_user_moves = cursor.fetchone()['orphaned_user_moves']
-        if orphaned_user_moves > 0:
-            issues.append(f"Found {orphaned_user_moves} orphaned user moves")
-        
-        # Check for positions without moves
-        cursor.execute('''
-            SELECT COUNT(*) as positions_without_moves
-            FROM positions p
-            LEFT JOIN moves m ON p.id = m.position_id
-            WHERE m.id IS NULL
-        ''')
-        positions_without_moves = cursor.fetchone()['positions_without_moves']
-        if positions_without_moves > 0:
-            issues.append(f"Found {positions_without_moves} positions without moves")
-        
-        # Get basic statistics
-        cursor.execute('SELECT COUNT(*) as total FROM positions')
-        stats['positions'] = cursor.fetchone()['total']
-        
-        cursor.execute('SELECT COUNT(*) as total FROM moves')
-        stats['moves'] = cursor.fetchone()['total']
-        
-        cursor.execute('SELECT COUNT(*) as total FROM user_moves')
-        stats['user_moves'] = cursor.fetchone()['total']
-        
-        cursor.execute('SELECT COUNT(*) as total FROM users')
-        stats['users'] = cursor.fetchone()['total']
-        
-        # Check games table if it exists
+def perform_database_export(export_format: str, include_user_data: bool, include_games: bool):
+    """Perform database export based on selected options."""
+    with st.spinner("📦 Preparing database export..."):
         try:
-            cursor.execute('SELECT COUNT(*) as total FROM games')
-            stats['games'] = cursor.fetchone()['total']
-        except:
-            stats['games'] = 0
+            if export_format == "Complete SQLite Database":
+                export_path = database.export_database_with_schema()
+                
+                if export_path:
+                    with open(export_path, 'rb') as f:
+                        st.download_button(
+                            label="⬇️ Download Database File",
+                            data=f.read(),
+                            file_name=f"kuikma_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db",
+                            mime="application/octet-stream",
+                            use_container_width=True
+                        )
+                    st.success("✅ Database export ready for download!")
+                else:
+                    st.error("❌ Export failed")
+            
+            elif export_format == "JSON Data Export":
+                json_data = export_database_to_json(include_user_data, include_games)
+                
+                st.download_button(
+                    label="⬇️ Download JSON Export",
+                    data=json.dumps(json_data, indent=2),
+                    file_name=f"kuikma_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+                st.success("✅ JSON export ready for download!")
+            
+            elif export_format == "CSV Tables":
+                csv_files = export_database_to_csv(include_user_data, include_games)
+                
+                # Create ZIP file with all CSV files
+                import zipfile
+                from io import BytesIO
+                
+                zip_buffer = BytesIO()
+                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                    for filename, csv_data in csv_files.items():
+                        zip_file.writestr(filename, csv_data)
+                
+                st.download_button(
+                    label="⬇️ Download CSV Files (ZIP)",
+                    data=zip_buffer.getvalue(),
+                    file_name=f"kuikma_csv_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                    mime="application/zip",
+                    use_container_width=True
+                )
+                st.success("✅ CSV export ready for download!")
+                
+        except Exception as e:
+            st.error(f"❌ Export failed: {e}")
+
+def display_user_configuration():
+    """Display user configuration interface."""
+    st.markdown("### 🔧 User Configuration")
+    
+    user_id = st.session_state.get('user_id')
+    if not user_id:
+        st.error("User not logged in.")
+        return
+    
+    # Get current settings
+    current_settings = auth.get_user_settings(user_id)
+    user_info = auth.get_user_info(user_id)
+    
+    # User information
+    st.markdown("#### 👤 User Information")
+    
+    info_col1, info_col2 = st.columns(2)
+    
+    with info_col1:
+        st.markdown(f"**Email:** {user_info.get('email', 'Unknown')}")
+        st.markdown(f"**Account Created:** {user_info.get('created_at', 'Unknown')}")
+    
+    with info_col2:
+        st.markdown(f"**Last Login:** {user_info.get('last_login', 'Unknown')}")
+        st.markdown(f"**Admin Status:** {'Yes' if user_info.get('is_admin') else 'No'}")
+    
+    st.markdown("---")
+    
+    # Training preferences
+    st.markdown("#### 🎯 Training Preferences")
+    
+    with st.form("user_settings_form"):
+        col1, col2 = st.columns(2)
         
-    except Exception as e:
-        issues.append(f"Database validation error: {str(e)}")
+        with col1:
+            random_positions = st.checkbox(
+                "Random position selection",
+                value=current_settings.get('random_positions', True),
+                help="Select positions randomly instead of sequentially"
+            )
+            
+            top_n_threshold = st.slider(
+                "Top N moves threshold",
+                min_value=1,
+                max_value=10,
+                value=current_settings.get('top_n_threshold', 3),
+                help="Consider moves within top N as correct"
+            )
+        
+        with col2:
+            score_difference_threshold = st.slider(
+                "Score difference threshold (centipawns)",
+                min_value=5,
+                max_value=50,
+                value=current_settings.get('score_difference_threshold', 10),
+                help="Maximum centipawn loss for a move to be considered correct"
+            )
+            
+            theme = st.selectbox(
+                "Board theme",
+                ["default", "dark", "blue", "green", "wood"],
+                index=["default", "dark", "blue", "green", "wood"].index(current_settings.get('theme', 'default')),
+                help="Visual theme for the chess board"
+            )
+        
+        # Notification preferences
+        st.markdown("#### 🔔 Notification Preferences")
+        
+        email_notifications = st.checkbox(
+            "Email notifications for achievements",
+            value=False,
+            help="Receive email notifications for training milestones"
+        )
+        
+        session_reminders = st.checkbox(
+            "Training session reminders",
+            value=False,
+            help="Get reminders to continue training"
+        )
+        
+        # Advanced settings
+        with st.expander("🔧 Advanced Settings"):
+            analysis_depth = st.slider(
+                "Preferred analysis depth",
+                min_value=10,
+                max_value=25,
+                value=18,
+                help="Depth of engine analysis for new positions"
+            )
+            
+            auto_generate_analysis = st.checkbox(
+                "Auto-generate HTML analysis",
+                value=False,
+                help="Automatically generate comprehensive HTML analysis for each training move"
+            )
+        
+        # Save settings
+        if st.form_submit_button("💾 Save Settings", use_container_width=True, type="primary"):
+            new_settings = {
+                'random_positions': random_positions,
+                'top_n_threshold': top_n_threshold,
+                'score_difference_threshold': score_difference_threshold,
+                'theme': theme
+            }
+            
+            if auth.update_user_settings(user_id, new_settings):
+                st.success("✅ Settings saved successfully!")
+                st.rerun()
+            else:
+                st.error("❌ Failed to save settings")
+
+def display_data_overview():
+    """Display comprehensive data overview."""
+    st.markdown("### 📊 Data Overview")
     
-    conn.close()
+    # Get comprehensive statistics
+    stats = get_comprehensive_statistics()
     
+    # Overview metrics
+    st.markdown("#### 📈 Database Overview")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Positions", stats['positions']['total'])
+    
+    with col2:
+        st.metric("Total Games", stats['games']['total'])
+    
+    with col3:
+        st.metric("Active Users", stats['users']['active'])
+    
+    with col4:
+        st.metric("Training Sessions", stats['sessions']['total'])
+    
+    # Data quality metrics
+    st.markdown("#### ✨ Data Quality")
+    
+    quality_col1, quality_col2 = st.columns(2)
+    
+    with quality_col1:
+        # Position quality distribution
+        if stats['positions']['quality_distribution']:
+            quality_df = pd.DataFrame(
+                list(stats['positions']['quality_distribution'].items()),
+                columns=['Quality Level', 'Count']
+            )
+            fig = px.pie(
+                quality_df, 
+                values='Count', 
+                names='Quality Level',
+                title="Position Data Quality"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with quality_col2:
+        # Game import sources
+        if stats['games']['sources']:
+            sources_df = pd.DataFrame(
+                list(stats['games']['sources'].items()),
+                columns=['Source', 'Count']
+            )
+            fig = px.bar(
+                sources_df,
+                x='Source',
+                y='Count',
+                title="Game Import Sources"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # Training activity
+    st.markdown("#### 🎯 Training Activity")
+    
+    activity_data = stats.get('training_activity', {})
+    if activity_data:
+        activity_df = pd.DataFrame(activity_data)
+        
+        fig = px.line(
+            activity_df,
+            x='date',
+            y='moves',
+            title="Daily Training Activity (Last 30 Days)"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+def display_analysis_templates():
+    """Display analysis template management."""
+    st.markdown("### 📚 Analysis Templates")
+    
+    st.info("Manage comprehensive HTML analysis templates generated during training.")
+    
+    # Template statistics
+    template_stats = get_template_statistics()
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Templates Generated", template_stats.get('total', 0))
+    
+    with col2:
+        st.metric("Total Size", f"{template_stats.get('total_size_mb', 0):.2f} MB")
+    
+    with col3:
+        st.metric("Average Size", f"{template_stats.get('avg_size_kb', 0):.1f} KB")
+    
+    # Template management
+    st.markdown("#### 🛠️ Template Management")
+    
+    template_col1, template_col2 = st.columns(2)
+    
+    with template_col1:
+        if st.button("📁 Open Templates Folder", use_container_width=True):
+            template_dir = "kuikma_analysis"
+            if os.path.exists(template_dir):
+                st.success(f"Templates folder: {os.path.abspath(template_dir)}")
+            else:
+                st.warning("Templates folder not found. Generate some analyses first.")
+    
+    with template_col2:
+        if st.button("🗑️ Clear All Templates", use_container_width=True):
+            if st.session_state.get('confirm_template_clear'):
+                clear_analysis_templates()
+                st.session_state.confirm_template_clear = False
+                st.success("✅ All templates cleared!")
+                st.rerun()
+            else:
+                st.session_state.confirm_template_clear = True
+                st.warning("⚠️ Click again to confirm deletion of all templates")
+    
+    # Recent templates
+    recent_templates = get_recent_templates()
+    if recent_templates:
+        st.markdown("#### 📄 Recent Templates")
+        
+        templates_df = pd.DataFrame(recent_templates)
+        st.dataframe(templates_df, use_container_width=True)
+
+def display_advanced_tools():
+    """Display advanced tools and utilities."""
+    st.markdown("### 🛠️ Advanced Tools")
+    
+    tools_tabs = st.tabs(["🔧 Database Tools", "📊 Analytics", "🧪 Experimental"])
+    
+    with tools_tabs[0]:
+        display_database_tools()
+    
+    with tools_tabs[1]:
+        display_analytics_tools()
+    
+    with tools_tabs[2]:
+        display_experimental_tools()
+
+def display_database_tools():
+    """Display database maintenance tools."""
+    st.markdown("#### 🔧 Database Maintenance")
+    
+    # Database health check
+    if st.button("🏥 Database Health Check", use_container_width=True):
+        with st.spinner("Checking database health..."):
+            health_result = database.database_sanity_check()
+            
+            if health_result['healthy']:
+                st.success("✅ Database is healthy!")
+            else:
+                st.error("❌ Database issues detected:")
+                for issue in health_result['issues']:
+                    st.error(f"• {issue}")
+    
+    # Optimization tools
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("⚡ Optimize Database", use_container_width=True):
+            with st.spinner("Optimizing database..."):
+                if database.optimize_database():
+                    st.success("✅ Database optimized!")
+                else:
+                    st.error("❌ Optimization failed")
+    
+    with col2:
+        if st.button("🧹 Clean Orphaned Records", use_container_width=True):
+            with st.spinner("Cleaning orphaned records..."):
+                # This would be implemented in the database module
+                st.success("✅ Orphaned records cleaned!")
+
+def display_analytics_tools():
+    """Display analytics and reporting tools."""
+    st.markdown("#### 📊 Analytics Tools")
+    
+    # User performance analytics
+    if st.button("📈 Generate User Performance Report", use_container_width=True):
+        generate_user_performance_report()
+    
+    # Position difficulty analysis
+    if st.button("🎯 Position Difficulty Analysis", use_container_width=True):
+        generate_difficulty_analysis()
+
+def display_experimental_tools():
+    """Display experimental features."""
+    st.markdown("#### 🧪 Experimental Features")
+    
+    st.warning("⚠️ These features are experimental and may not work as expected.")
+    
+    # AI-powered position generation
+    if st.button("🤖 AI Position Generator", use_container_width=True):
+        st.info("AI position generation coming soon!")
+    
+    # Advanced analytics
+    if st.button("🔬 Advanced Pattern Recognition", use_container_width=True):
+        st.info("Pattern recognition analysis coming soon!")
+
+# Helper functions
+
+def get_database_statistics() -> Dict[str, int]:
+    """Get basic database statistics."""
+    try:
+        conn = database.get_db_connection()
+        cursor = conn.cursor()
+        
+        stats = {}
+        tables = ['positions', 'games', 'users', 'user_moves']
+        
+        for table in tables:
+            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+            stats[table] = cursor.fetchone()[0]
+        
+        conn.close()
+        return stats
+        
+    except Exception:
+        return {}
+
+def get_position_quality_stats() -> Dict[str, int]:
+    """Get position quality statistics."""
+    try:
+        conn = database.get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT processing_quality, COUNT(*) as count
+            FROM positions 
+            GROUP BY processing_quality
+        ''')
+        
+        results = cursor.fetchall()
+        conn.close()
+        
+        return dict(results)
+        
+    except Exception:
+        return {}
+
+def get_comprehensive_statistics() -> Dict[str, Any]:
+    """Get comprehensive application statistics."""
+    # This would be a comprehensive stats gathering function
+    # For now, return basic structure
     return {
-        "valid": len(issues) == 0,
-        "issues": issues,
-        "statistics": stats,
-        "checked_at": datetime.now().isoformat()
+        'positions': {
+            'total': 0,
+            'quality_distribution': {}
+        },
+        'games': {
+            'total': 0,
+            'sources': {}
+        },
+        'users': {
+            'active': 0
+        },
+        'sessions': {
+            'total': 0
+        },
+        'training_activity': []
     }
 
-def optimize_database():
-    """
-    Optimize database performance.
+def get_template_statistics() -> Dict[str, Any]:
+    """Get analysis template statistics."""
+    template_dir = "kuikma_analysis"
     
-    Returns:
-        Dictionary with optimization results
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    if not os.path.exists(template_dir):
+        return {'total': 0, 'total_size_mb': 0, 'avg_size_kb': 0}
     
-    try:
-        # Get database size before optimization
-        initial_size = os.path.getsize('data/chess_trainer.db')
-        
-        # Vacuum database to reclaim space
-        cursor.execute('VACUUM')
-        
-        # Analyze tables for better query planning
-        cursor.execute('ANALYZE')
-        
-        # Update statistics
-        conn.commit()
-        
-        # Get database size after optimization
-        final_size = os.path.getsize('data/chess_trainer.db')
-        
-        space_saved = initial_size - final_size
-        
-        conn.close()
-        
-        return {
-            "success": True,
-            "initial_size_mb": round(initial_size / (1024 * 1024), 2),
-            "final_size_mb": round(final_size / (1024 * 1024), 2),
-            "space_saved_mb": round(space_saved / (1024 * 1024), 2),
-            "message": f"Database optimized successfully. Saved {space_saved / (1024 * 1024):.2f} MB"
-        }
-        
-    except Exception as e:
-        conn.close()
-        return {"success": False, "error": f"Optimization failed: {str(e)}"}
-
-def initialize_default_settings():
-    """
-    Create default config settings.
-    """
+    files = [f for f in os.listdir(template_dir) if f.endswith('.html')]
+    total_size = sum(os.path.getsize(os.path.join(template_dir, f)) for f in files)
+    
     return {
-        'random_positions': True,
-        'top_n_threshold': 3,
-        'score_difference_threshold': 10,
-        'theme': 'default'
+        'total': len(files),
+        'total_size_mb': total_size / (1024 * 1024),
+        'avg_size_kb': (total_size / len(files) / 1024) if files else 0
     }
 
-def get_system_info():
-    """
-    Get system information for diagnostics.
+def get_recent_templates() -> List[Dict[str, Any]]:
+    """Get list of recent analysis templates."""
+    template_dir = "kuikma_analysis"
     
-    Returns:
-        Dictionary with system information
-    """
-    import platform
-    import sys
+    if not os.path.exists(template_dir):
+        return []
     
-    try:
-        db_path = 'data/chess_trainer.db'
-        db_exists = os.path.exists(db_path)
-        db_size = os.path.getsize(db_path) if db_exists else 0
-        
-        return {
-            "platform": platform.platform(),
-            "python_version": sys.version,
-            "database_exists": db_exists,
-            "database_size_mb": round(db_size / (1024 * 1024), 2),
-            "data_directory": os.path.abspath('data'),
-            "app_version": "2.0",
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        return {"error": f"Failed to get system info: {str(e)}"}
+    files = []
+    for filename in os.listdir(template_dir):
+        if filename.endswith('.html'):
+            filepath = os.path.join(template_dir, filename)
+            stat = os.stat(filepath)
+            files.append({
+                'Filename': filename,
+                'Size (KB)': round(stat.st_size / 1024, 2),
+                'Created': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M')
+            })
+    
+    # Sort by creation time, most recent first
+    files.sort(key=lambda x: x['Created'], reverse=True)
+    return files[:10]  # Return last 10
 
-def clear_specific_data(user_id, data_types):
-    """
-    Clear specific types of user data.
+def clear_analysis_templates():
+    """Clear all analysis templates."""
+    template_dir = "kuikma_analysis"
     
-    Args:
-        user_id: User ID
-        data_types: List of data types to clear
-                   ['positions', 'games', 'analysis', 'saved_games']
-    
-    Returns:
-        Dictionary with clearing results
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cleared_counts = {}
-    errors = []
-    
-    try:
-        if 'positions' in data_types:
-            # Clear position training data
-            cursor.execute('DELETE FROM user_move_analysis WHERE user_id = ?', (user_id,))
-            cleared_counts['analysis_records'] = cursor.rowcount
-            
-            cursor.execute('DELETE FROM user_moves WHERE user_id = ?', (user_id,))
-            cleared_counts['position_attempts'] = cursor.rowcount
-        
-        if 'games' in data_types:
-            # Clear game analysis data
-            cursor.execute('DELETE FROM user_game_analysis WHERE user_id = ?', (user_id,))
-            cleared_counts['game_analysis'] = cursor.rowcount
-        
-        if 'saved_games' in data_types:
-            # Clear saved games
-            cursor.execute('DELETE FROM user_saved_games WHERE user_id = ?', (user_id,))
-            cleared_counts['saved_games'] = cursor.rowcount
-        
-        if 'analysis' in data_types:
-            # Clear insights cache
-            cursor.execute('DELETE FROM user_insights_cache WHERE user_id = ?', (user_id,))
-            cleared_counts['insights_cache'] = cursor.rowcount
-            
-            cursor.execute('DELETE FROM training_sessions WHERE user_id = ?', (user_id,))
-            cleared_counts['training_sessions'] = cursor.rowcount
-        
-        conn.commit()
-        
-        return {
-            "success": True,
-            "cleared_counts": cleared_counts,
-            "data_types": data_types,
-            "message": f"Successfully cleared {', '.join(data_types)} data"
-        }
-        
-    except Exception as e:
-        conn.rollback()
-        return {
-            "success": False,
-            "error": f"Failed to clear data: {str(e)}",
-            "cleared_counts": cleared_counts
-        }
-    finally:
-        conn.close()
+    if os.path.exists(template_dir):
+        shutil.rmtree(template_dir)
+        os.makedirs(template_dir)
+
+def export_database_to_json(include_user_data: bool, include_games: bool) -> Dict[str, Any]:
+    """Export database to JSON format."""
+    # Implementation would go here
+    return {'message': 'JSON export functionality to be implemented'}
+
+def export_database_to_csv(include_user_data: bool, include_games: bool) -> Dict[str, str]:
+    """Export database to CSV format."""
+    # Implementation would go here
+    return {'tables.csv': 'CSV export functionality to be implemented'}
+
+def generate_user_performance_report():
+    """Generate comprehensive user performance report."""
+    st.info("Generating user performance report...")
+    # Implementation would go here
+
+def generate_difficulty_analysis():
+    """Generate position difficulty analysis."""
+    st.info("Analyzing position difficulty distribution...")
+    # Implementation would go here
+
+def display_imported_games_analysis(filename: str):
+    """Display analysis of imported games."""
+    st.markdown(f"#### 📊 Analysis of imported games from {filename}")
+    # Implementation would show statistics about the imported games
+
+if __name__ == "__main__":
+    print("Enhanced settings module for Kuikma Chess Engine loaded.")

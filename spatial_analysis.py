@@ -1,4 +1,7 @@
-# spatial_analysis.py - Updated with position comparison fixes
+
+# =============================================================================
+# spatial_analysis.py - Spatial Analysis Module for Kuikma  
+# =============================================================================
 
 import chess
 import numpy as np
@@ -7,6 +10,24 @@ import streamlit as st
 from typing import Dict, List, Tuple, Any, Optional
 import plotly.graph_objects as go
 import plotly.express as px
+
+
+def display_spatial_analysis():
+    """Display spatial analysis interface."""
+    st.markdown("## 🔍 Spatial Analysis")
+    
+    st.info("🚧 Spatial analysis features coming soon!")
+    
+    st.markdown("""
+    ### Planned Features:
+    - **Piece Distribution Analysis**: Visualize how pieces are distributed across the board
+    - **Space Control Metrics**: Analyze territory control and influence
+    - **Convex Hull Analysis**: Advanced geometric analysis of piece positioning
+    - **Heat Maps**: Visual representation of piece activity and threats
+    - **Interactive Controls**: Customize visualization parameters
+    """)
+
+
 
 def validate_fen_string(fen: str) -> bool:
     """
@@ -1298,3 +1319,8 @@ def display_spatial_analysis_safe(current_fen: str, previous_fen: str = None):
     except Exception as e:
         st.error(f"⚠️ Spatial analysis error: {e}")
         st.info("💡 Basic position information still available")
+
+
+if __name__ == "__main__":
+    print("Essential Kuikma modules loaded successfully.")
+

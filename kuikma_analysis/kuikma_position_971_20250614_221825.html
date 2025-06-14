@@ -1,0 +1,2256 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Middlegame - Center Control - Kuikma Chess Analysis</title>
+    <style>
+        
+        /* Kuikma Comprehensive Analysis Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .analysis-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header-section {
+            background: linear-gradient(135deg, #2E8B57 0%, #228B22 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .kuikma-title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .position-title {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+            opacity: 0.95;
+        }
+        
+        .position-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.8;
+        }
+        
+        .section {
+            padding: 25px 30px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .section:last-child {
+            border-bottom: none;
+        }
+        
+        .section-title {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #2E8B57;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #2E8B57;
+            display: flex;
+            align-items: center;
+        }
+        
+        .section-icon {
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
+        
+        .overview-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+            align-items: start;
+        }
+        
+        .board-container {
+            text-align: center;
+        }
+        
+        .board-container svg {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .position-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #2E8B57;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .info-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        
+        .info-value {
+            color: #333;
+            font-size: 1rem;
+        }
+        
+        .moves-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .moves-table th,
+        .moves-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .moves-table th {
+            background: #2E8B57;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .moves-table tr:hover {
+            background: #f5f5f5;
+        }
+        
+        .move-rank {
+            font-weight: bold;
+            text-align: center;
+            width: 60px;
+        }
+        
+        .move-notation {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #2E8B57;
+        }
+        
+        .move-score {
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .move-classification {
+            text-align: center;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+        
+        .classification-excellent {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .classification-good {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .classification-inaccuracy {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .classification-mistake {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .classification-blunder {
+            background: #f5c6cb;
+            color: #721c24;
+        }
+        
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .analysis-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-top: 4px solid #2E8B57;
+        }
+        
+        .card-title {
+            font-weight: bold;
+            color: #2E8B57;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .card-content {
+            color: #555;
+            line-height: 1.5;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2E8B57;
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .themes-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .theme-tag {
+            background: #2E8B57;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .json-container {
+            background: #f1f3f4;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .json-content {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            color: #333;
+        }
+        
+        .footer-section {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .kuikma-footer {
+            color: #2E8B57;
+            font-weight: bold;
+        }
+        
+        .difficulty-indicator {
+            display: inline-flex;
+            align-items: center;
+            background: #2E8B57;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .phase-indicator {
+            display: inline-flex;
+            align-items: center;
+            background: #17a2b8;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .visualization-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .overview-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .analysis-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .moves-table {
+                font-size: 0.85rem;
+            }
+            
+            .moves-table th,
+            .moves-table td {
+                padding: 8px 10px;
+            }
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="analysis-container">
+        
+        <div class="header-section">
+            <div class="kuikma-title">♟️ Kuikma Chess Analysis</div>
+            <div class="position-title">Middlegame - Center Control</div>
+            <div class="position-subtitle">White has a significant advantage with material_imbalance being key</div>
+            <div style="margin-top: 15px;">
+                <span class="difficulty-indicator">📊 Difficulty: 1450</span>
+                <span class="phase-indicator" style="margin-left: 10px;">🎯 Phase: Middlegame</span>
+            </div>
+        </div>
+        
+        
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-icon">♟️</span>
+                Position Overview
+            </h2>
+            <div class="overview-grid">
+                <div class="board-container">
+                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 390 390" width="400" height="400"><style>
+                .square.light { fill: #f0d9b5; }
+                .square.dark { fill: #b58863; }
+                .square.light.lastmove { fill: #cdd26a; }
+                .square.dark.lastmove { fill: #aaa23a; }
+                </style><desc><pre>. . . . k . . .
+. p . . . p p .
+. b p . . . . p
+p . . B P . . P
+. . . . . P P .
+P . B . . K . .
+. P . . P . . .
+. . . . . . . .</pre></desc><defs><g id="white-pawn" class="white pawn"><path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 16.5 16 18.59 16 21c0 2.03.94 3.84 2.41 5.03-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47 1.47-1.19 2.41-3 2.41-5.03 0-2.41-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z" fill="#fff" stroke="#000" stroke-width="1.5" stroke-linecap="round" /></g><g id="white-bishop" class="white bishop" fill="none" fill-rule="evenodd" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><g fill="#fff" stroke-linecap="butt"><path d="M9 36c3.39-.97 10.11.43 13.5-2 3.39 2.43 10.11 1.03 13.5 2 0 0 1.65.54 3 2-.68.97-1.65.99-3 .5-3.39-.97-10.11.46-13.5-1-3.39 1.46-10.11.03-13.5 1-1.354.49-2.323.47-3-.5 1.354-1.94 3-2 3-2zM15 32c2.5 2.5 12.5 2.5 15 0 .5-1.5 0-2 0-2 0-2.5-2.5-4-2.5-4 5.5-1.5 6-11.5-5-15.5-11 4-10.5 14-5 15.5 0 0-2.5 1.5-2.5 4 0 0-.5.5 0 2zM25 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0z" /></g><path d="M17.5 26h10M15 30h15m-7.5-14.5v5M20 18h5" stroke-linejoin="miter" /></g><g id="white-king" class="white king" fill="none" fill-rule="evenodd" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22.5 11.63V6M20 8h5" stroke-linejoin="miter" /><path d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5" fill="#fff" stroke-linecap="butt" stroke-linejoin="miter" /><path d="M11.5 37c5.5 3.5 15.5 3.5 21 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-3.5-7.5-13-10.5-16-4-3 6 5 10 5 10V37z" fill="#fff" /><path d="M11.5 30c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0" /></g><g id="black-pawn" class="black pawn"><path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 16.5 16 18.59 16 21c0 2.03.94 3.84 2.41 5.03-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47 1.47-1.19 2.41-3 2.41-5.03 0-2.41-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z" fill="#000" stroke="#000" stroke-width="1.5" stroke-linecap="round" /></g><g id="black-bishop" class="black bishop" fill="none" fill-rule="evenodd" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 36c3.39-.97 10.11.43 13.5-2 3.39 2.43 10.11 1.03 13.5 2 0 0 1.65.54 3 2-.68.97-1.65.99-3 .5-3.39-.97-10.11.46-13.5-1-3.39 1.46-10.11.03-13.5 1-1.354.49-2.323.47-3-.5 1.354-1.94 3-2 3-2zm6-4c2.5 2.5 12.5 2.5 15 0 .5-1.5 0-2 0-2 0-2.5-2.5-4-2.5-4 5.5-1.5 6-11.5-5-15.5-11 4-10.5 14-5 15.5 0 0-2.5 1.5-2.5 4 0 0-.5.5 0 2zM25 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0z" fill="#000" stroke-linecap="butt" /><path d="M17.5 26h10M15 30h15m-7.5-14.5v5M20 18h5" stroke="#fff" stroke-linejoin="miter" /></g><g id="black-king" class="black king" fill="none" fill-rule="evenodd" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22.5 11.63V6" stroke-linejoin="miter" /><path d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5" fill="#000" stroke-linecap="butt" stroke-linejoin="miter" /><path d="M11.5 37c5.5 3.5 15.5 3.5 21 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-3.5-7.5-13-10.5-16-4-3 6 5 10 5 10V37z" fill="#000" /><path d="M20 8h5" stroke-linejoin="miter" /><path d="M32 29.5s8.5-4 6.03-9.65C34.15 14 25 18 22.5 24.5l.01 2.1-.01-2.1C20 18 9.906 14 6.997 19.85c-2.497 5.65 4.853 9 4.853 9M11.5 30c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0" stroke="#fff" /></g></defs><rect x="7.5" y="7.5" width="375" height="375" fill="none" stroke="#212121" stroke-width="15" /><g transform="translate(20, 1) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M23.328 10.016q-1.742 0-2.414.398-.672.398-.672 1.36 0 .765.5 1.218.508.445 1.375.445 1.196 0 1.914-.843.727-.852.727-2.258v-.32zm2.867-.594v4.992h-1.437v-1.328q-.492.797-1.227 1.18-.734.375-1.797.375-1.343 0-2.14-.75-.79-.758-.79-2.024 0-1.476.985-2.226.992-.75 2.953-.75h2.016V8.75q0-.992-.656-1.531-.649-.547-1.829-.547-.75 0-1.46.18-.711.18-1.368.539V6.062q.79-.304 1.532-.453.742-.156 1.445-.156 1.898 0 2.836.984.937.985.937 2.985z" /></g><g transform="translate(20, 375) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M23.328 10.016q-1.742 0-2.414.398-.672.398-.672 1.36 0 .765.5 1.218.508.445 1.375.445 1.196 0 1.914-.843.727-.852.727-2.258v-.32zm2.867-.594v4.992h-1.437v-1.328q-.492.797-1.227 1.18-.734.375-1.797.375-1.343 0-2.14-.75-.79-.758-.79-2.024 0-1.476.985-2.226.992-.75 2.953-.75h2.016V8.75q0-.992-.656-1.531-.649-.547-1.829-.547-.75 0-1.46.18-.711.18-1.368.539V6.062q.79-.304 1.532-.453.742-.156 1.445-.156 1.898 0 2.836.984.937.985.937 2.985z" /></g><g transform="translate(65, 1) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M24.922 10.047q0-1.586-.656-2.485-.649-.906-1.79-.906-1.14 0-1.796.906-.649.899-.649 2.485 0 1.586.649 2.492.656.898 1.797.898 1.14 0 1.789-.898.656-.906.656-2.492zm-4.89-3.055q.452-.781 1.14-1.156.695-.383 1.656-.383 1.594 0 2.586 1.266 1 1.265 1 3.328 0 2.062-1 3.328-.992 1.266-2.586 1.266-.96 0-1.656-.375-.688-.383-1.14-1.164v1.312h-1.446V2.258h1.445z" /></g><g transform="translate(65, 375) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M24.922 10.047q0-1.586-.656-2.485-.649-.906-1.79-.906-1.14 0-1.796.906-.649.899-.649 2.485 0 1.586.649 2.492.656.898 1.797.898 1.14 0 1.789-.898.656-.906.656-2.492zm-4.89-3.055q.452-.781 1.14-1.156.695-.383 1.656-.383 1.594 0 2.586 1.266 1 1.265 1 3.328 0 2.062-1 3.328-.992 1.266-2.586 1.266-.96 0-1.656-.375-.688-.383-1.14-1.164v1.312h-1.446V2.258h1.445z" /></g><g transform="translate(110, 1) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M25.96 6v1.344q-.608-.336-1.226-.5-.609-.172-1.234-.172-1.398 0-2.172.89-.773.883-.773 2.485 0 1.601.773 2.492.774.883 2.172.883.625 0 1.234-.164.618-.172 1.227-.508v1.328q-.602.281-1.25.422-.64.14-1.367.14-1.977 0-3.14-1.242-1.165-1.242-1.165-3.351 0-2.14 1.172-3.367 1.18-1.227 3.227-1.227.664 0 1.296.14.633.134 1.227.407z" /></g><g transform="translate(110, 375) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M25.96 6v1.344q-.608-.336-1.226-.5-.609-.172-1.234-.172-1.398 0-2.172.89-.773.883-.773 2.485 0 1.601.773 2.492.774.883 2.172.883.625 0 1.234-.164.618-.172 1.227-.508v1.328q-.602.281-1.25.422-.64.14-1.367.14-1.977 0-3.14-1.242-1.165-1.242-1.165-3.351 0-2.14 1.172-3.367 1.18-1.227 3.227-1.227.664 0 1.296.14.633.134 1.227.407z" /></g><g transform="translate(155, 1) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M24.973 6.992V2.258h1.437v12.156h-1.437v-1.312q-.453.78-1.149 1.164-.687.375-1.656.375-1.586 0-2.586-1.266-.992-1.266-.992-3.328 0-2.063.992-3.328 1-1.266 2.586-1.266.969 0 1.656.383.696.375 1.149 1.156zm-4.899 3.055q0 1.586.649 2.492.656.898 1.797.898 1.14 0 1.796-.898.657-.906.657-2.492 0-1.586-.657-2.485-.656-.906-1.796-.906-1.141 0-1.797.906-.649.899-.649 2.485z" /></g><g transform="translate(155, 375) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M24.973 6.992V2.258h1.437v12.156h-1.437v-1.312q-.453.78-1.149 1.164-.687.375-1.656.375-1.586 0-2.586-1.266-.992-1.266-.992-3.328 0-2.063.992-3.328 1-1.266 2.586-1.266.969 0 1.656.383.696.375 1.149 1.156zm-4.899 3.055q0 1.586.649 2.492.656.898 1.797.898 1.14 0 1.796-.898.657-.906.657-2.492 0-1.586-.657-2.485-.656-.906-1.796-.906-1.141 0-1.797.906-.649.899-.649 2.485z" /></g><g transform="translate(200, 1) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M26.555 9.68v.703h-6.61q.094 1.484.89 2.265.806.774 2.235.774.828 0 1.602-.203.781-.203 1.547-.61v1.36q-.774.328-1.586.5-.813.172-1.649.172-2.093 0-3.32-1.22-1.219-1.218-1.219-3.296 0-2.148 1.157-3.406 1.164-1.266 3.132-1.266 1.766 0 2.79 1.14 1.03 1.134 1.03 3.087zm-1.438-.422q-.015-1.18-.664-1.883-.64-.703-1.703-.703-1.203 0-1.93.68-.718.68-.828 1.914z" /></g><g transform="translate(200, 375) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M26.555 9.68v.703h-6.61q.094 1.484.89 2.265.806.774 2.235.774.828 0 1.602-.203.781-.203 1.547-.61v1.36q-.774.328-1.586.5-.813.172-1.649.172-2.093 0-3.32-1.22-1.219-1.218-1.219-3.296 0-2.148 1.157-3.406 1.164-1.266 3.132-1.266 1.766 0 2.79 1.14 1.03 1.134 1.03 3.087zm-1.438-.422q-.015-1.18-.664-1.883-.64-.703-1.703-.703-1.203 0-1.93.68-.718.68-.828 1.914z" /></g><g transform="translate(245, 1) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M25.285 2.258v1.195H23.91q-.773 0-1.078.313-.297.312-.297 1.125v.773h2.367v1.117h-2.367v7.633H21.09V6.781h-1.375V5.664h1.375v-.61q0-1.46.68-2.124.68-.672 2.156-.672z" /></g><g transform="translate(245, 375) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M25.285 2.258v1.195H23.91q-.773 0-1.078.313-.297.312-.297 1.125v.773h2.367v1.117h-2.367v7.633H21.09V6.781h-1.375V5.664h1.375v-.61q0-1.46.68-2.124.68-.672 2.156-.672z" /></g><g transform="translate(290, 1) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M24.973 9.937q0-1.562-.649-2.421-.64-.86-1.804-.86-1.157 0-1.805.86-.64.859-.64 2.421 0 1.555.64 2.415.648.859 1.805.859 1.164 0 1.804-.86.649-.859.649-2.414zm1.437 3.391q0 2.234-.992 3.32-.992 1.094-3.04 1.094-.757 0-1.429-.117-.672-.11-1.304-.344v-1.398q.632.344 1.25.508.617.164 1.257.164 1.414 0 2.118-.743.703-.734.703-2.226v-.711q-.446.773-1.141 1.156-.695.383-1.664.383-1.61 0-2.594-1.227-.984-1.226-.984-3.25 0-2.03.984-3.257.985-1.227 2.594-1.227.969 0 1.664.383t1.14 1.156V5.664h1.438z" /></g><g transform="translate(290, 375) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M24.973 9.937q0-1.562-.649-2.421-.64-.86-1.804-.86-1.157 0-1.805.86-.64.859-.64 2.421 0 1.555.64 2.415.648.859 1.805.859 1.164 0 1.804-.86.649-.859.649-2.414zm1.437 3.391q0 2.234-.992 3.32-.992 1.094-3.04 1.094-.757 0-1.429-.117-.672-.11-1.304-.344v-1.398q.632.344 1.25.508.617.164 1.257.164 1.414 0 2.118-.743.703-.734.703-2.226v-.711q-.446.773-1.141 1.156-.695.383-1.664.383-1.61 0-2.594-1.227-.984-1.226-.984-3.25 0-2.03.984-3.257.985-1.227 2.594-1.227.969 0 1.664.383t1.14 1.156V5.664h1.438z" /></g><g transform="translate(335, 1) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M26.164 9.133v5.281h-1.437V9.18q0-1.243-.485-1.86-.484-.617-1.453-.617-1.164 0-1.836.742-.672.742-.672 2.024v4.945h-1.445V2.258h1.445v4.765q.516-.789 1.211-1.18.703-.39 1.617-.39 1.508 0 2.282.938.773.93.773 2.742z" /></g><g transform="translate(335, 375) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M26.164 9.133v5.281h-1.437V9.18q0-1.243-.485-1.86-.484-.617-1.453-.617-1.164 0-1.836.742-.672.742-.672 2.024v4.945h-1.445V2.258h1.445v4.765q.516-.789 1.211-1.18.703-.39 1.617-.39 1.508 0 2.282.938.773.93.773 2.742z" /></g><g transform="translate(0, 335) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M6.754 26.996h2.578v-8.898l-2.805.562v-1.437l2.79-.563h1.578v10.336h2.578v1.328h-6.72z" /></g><g transform="translate(375, 335) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M6.754 26.996h2.578v-8.898l-2.805.562v-1.437l2.79-.563h1.578v10.336h2.578v1.328h-6.72z" /></g><g transform="translate(0, 290) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M8.195 26.996h5.508v1.328H6.297v-1.328q.898-.93 2.445-2.492 1.555-1.57 1.953-2.024.758-.851 1.055-1.437.305-.594.305-1.164 0-.93-.657-1.516-.648-.586-1.695-.586-.742 0-1.57.258-.82.258-1.758.781v-1.593q.953-.383 1.781-.578.828-.196 1.516-.196 1.812 0 2.89.906 1.079.907 1.079 2.422 0 .72-.274 1.368-.265.64-.976 1.515-.196.227-1.243 1.313-1.046 1.078-2.953 3.023z" /></g><g transform="translate(375, 290) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M8.195 26.996h5.508v1.328H6.297v-1.328q.898-.93 2.445-2.492 1.555-1.57 1.953-2.024.758-.851 1.055-1.437.305-.594.305-1.164 0-.93-.657-1.516-.648-.586-1.695-.586-.742 0-1.57.258-.82.258-1.758.781v-1.593q.953-.383 1.781-.578.828-.196 1.516-.196 1.812 0 2.89.906 1.079.907 1.079 2.422 0 .72-.274 1.368-.265.64-.976 1.515-.196.227-1.243 1.313-1.046 1.078-2.953 3.023z" /></g><g transform="translate(0, 245) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M11.434 22.035q1.132.242 1.765 1.008.64.766.64 1.89 0 1.727-1.187 2.672-1.187.946-3.375.946-.734 0-1.515-.149-.774-.14-1.602-.43V26.45q.656.383 1.438.578.78.196 1.632.196 1.485 0 2.258-.586.782-.586.782-1.703 0-1.032-.727-1.61-.719-.586-2.008-.586h-1.36v-1.297h1.423q1.164 0 1.78-.46.618-.47.618-1.344 0-.899-.64-1.375-.633-.485-1.82-.485-.65 0-1.391.141-.743.14-1.633.437V16.95q.898-.25 1.68-.375.788-.125 1.484-.125 1.797 0 2.844.82 1.046.813 1.046 2.204 0 .968-.554 1.64-.555.664-1.578.922z" /></g><g transform="translate(375, 245) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M11.434 22.035q1.132.242 1.765 1.008.64.766.64 1.89 0 1.727-1.187 2.672-1.187.946-3.375.946-.734 0-1.515-.149-.774-.14-1.602-.43V26.45q.656.383 1.438.578.78.196 1.632.196 1.485 0 2.258-.586.782-.586.782-1.703 0-1.032-.727-1.61-.719-.586-2.008-.586h-1.36v-1.297h1.423q1.164 0 1.78-.46.618-.47.618-1.344 0-.899-.64-1.375-.633-.485-1.82-.485-.65 0-1.391.141-.743.14-1.633.437V16.95q.898-.25 1.68-.375.788-.125 1.484-.125 1.797 0 2.844.82 1.046.813 1.046 2.204 0 .968-.554 1.64-.555.664-1.578.922z" /></g><g transform="translate(0, 200) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M11.016 18.035L7.03 24.262h3.985zm-.414-1.375h1.984v7.602h1.664v1.312h-1.664v2.75h-1.57v-2.75H5.75v-1.523z" /></g><g transform="translate(375, 200) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M11.016 18.035L7.03 24.262h3.985zm-.414-1.375h1.984v7.602h1.664v1.312h-1.664v2.75h-1.57v-2.75H5.75v-1.523z" /></g><g transform="translate(0, 155) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M6.719 16.66h6.195v1.328h-4.75v2.86q.344-.118.688-.172.343-.063.687-.063 1.953 0 3.094 1.07 1.14 1.07 1.14 2.899 0 1.883-1.171 2.93-1.172 1.039-3.305 1.039-.735 0-1.5-.125-.758-.125-1.57-.375v-1.586q.703.383 1.453.57.75.188 1.586.188 1.351 0 2.14-.711.79-.711.79-1.93 0-1.219-.79-1.93-.789-.71-2.14-.71-.633 0-1.266.14-.625.14-1.281.438z" /></g><g transform="translate(375, 155) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M6.719 16.66h6.195v1.328h-4.75v2.86q.344-.118.688-.172.343-.063.687-.063 1.953 0 3.094 1.07 1.14 1.07 1.14 2.899 0 1.883-1.171 2.93-1.172 1.039-3.305 1.039-.735 0-1.5-.125-.758-.125-1.57-.375v-1.586q.703.383 1.453.57.75.188 1.586.188 1.351 0 2.14-.711.79-.711.79-1.93 0-1.219-.79-1.93-.789-.71-2.14-.71-.633 0-1.266.14-.625.14-1.281.438z" /></g><g transform="translate(0, 110) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M10.137 21.863q-1.063 0-1.688.727-.617.726-.617 1.992 0 1.258.617 1.992.625.727 1.688.727 1.062 0 1.68-.727.624-.734.624-1.992 0-1.266-.625-1.992-.617-.727-1.68-.727zm3.133-4.945v1.437q-.594-.28-1.204-.43-.601-.148-1.195-.148-1.562 0-2.39 1.055-.82 1.055-.938 3.188.46-.68 1.156-1.04.696-.367 1.531-.367 1.758 0 2.774 1.07 1.023 1.063 1.023 2.899 0 1.797-1.062 2.883-1.063 1.086-2.828 1.086-2.024 0-3.094-1.547-1.07-1.555-1.07-4.5 0-2.766 1.312-4.406 1.313-1.649 3.524-1.649.593 0 1.195.117.61.118 1.266.352z" /></g><g transform="translate(375, 110) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M10.137 21.863q-1.063 0-1.688.727-.617.726-.617 1.992 0 1.258.617 1.992.625.727 1.688.727 1.062 0 1.68-.727.624-.734.624-1.992 0-1.266-.625-1.992-.617-.727-1.68-.727zm3.133-4.945v1.437q-.594-.28-1.204-.43-.601-.148-1.195-.148-1.562 0-2.39 1.055-.82 1.055-.938 3.188.46-.68 1.156-1.04.696-.367 1.531-.367 1.758 0 2.774 1.07 1.023 1.063 1.023 2.899 0 1.797-1.062 2.883-1.063 1.086-2.828 1.086-2.024 0-3.094-1.547-1.07-1.555-1.07-4.5 0-2.766 1.312-4.406 1.313-1.649 3.524-1.649.593 0 1.195.117.61.118 1.266.352z" /></g><g transform="translate(0, 65) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M6.25 16.66h7.5v.672L9.516 28.324H7.867l3.985-10.336H6.25z" /></g><g transform="translate(375, 65) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M6.25 16.66h7.5v.672L9.516 28.324H7.867l3.985-10.336H6.25z" /></g><g transform="translate(0, 20) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M10 22.785q-1.125 0-1.773.602-.641.601-.641 1.656t.64 1.656q.649.602 1.774.602t1.773-.602q.649-.61.649-1.656 0-1.055-.649-1.656-.64-.602-1.773-.602zm-1.578-.672q-1.016-.25-1.586-.945-.563-.695-.563-1.695 0-1.399.993-2.211 1-.813 2.734-.813 1.742 0 2.734.813.993.812.993 2.21 0 1-.57 1.696-.563.695-1.571.945 1.14.266 1.773 1.04.641.773.641 1.89 0 1.695-1.04 2.602-1.03.906-2.96.906t-2.969-.906Q6 26.738 6 25.043q0-1.117.64-1.89.641-.774 1.782-1.04zm-.578-2.492q0 .906.562 1.414.57.508 1.594.508 1.016 0 1.586-.508.578-.508.578-1.414 0-.906-.578-1.414-.57-.508-1.586-.508-1.023 0-1.594.508-.562.508-.562 1.414z" /></g><g transform="translate(375, 20) scale(0.75, 0.75)" fill="#e5e5e5" stroke="#e5e5e5"><path d="M10 22.785q-1.125 0-1.773.602-.641.601-.641 1.656t.64 1.656q.649.602 1.774.602t1.773-.602q.649-.61.649-1.656 0-1.055-.649-1.656-.64-.602-1.773-.602zm-1.578-.672q-1.016-.25-1.586-.945-.563-.695-.563-1.695 0-1.399.993-2.211 1-.813 2.734-.813 1.742 0 2.734.813.993.812.993 2.21 0 1-.57 1.696-.563.695-1.571.945 1.14.266 1.773 1.04.641.773.641 1.89 0 1.695-1.04 2.602-1.03.906-2.96.906t-2.969-.906Q6 26.738 6 25.043q0-1.117.64-1.89.641-.774 1.782-1.04zm-.578-2.492q0 .906.562 1.414.57.508 1.594.508 1.016 0 1.586-.508.578-.508.578-1.414 0-.906-.578-1.414-.57-.508-1.586-.508-1.023 0-1.594.508-.562.508-.562 1.414z" /></g><rect x="15" y="330" width="45" height="45" class="square dark a1" stroke="none" fill="#d18b47" /><rect x="60" y="330" width="45" height="45" class="square light b1" stroke="none" fill="#ffce9e" /><rect x="105" y="330" width="45" height="45" class="square dark c1" stroke="none" fill="#d18b47" /><rect x="150" y="330" width="45" height="45" class="square light d1" stroke="none" fill="#ffce9e" /><rect x="195" y="330" width="45" height="45" class="square dark e1" stroke="none" fill="#d18b47" /><rect x="240" y="330" width="45" height="45" class="square light f1" stroke="none" fill="#ffce9e" /><rect x="285" y="330" width="45" height="45" class="square dark g1" stroke="none" fill="#d18b47" /><rect x="330" y="330" width="45" height="45" class="square light h1" stroke="none" fill="#ffce9e" /><rect x="15" y="285" width="45" height="45" class="square light a2" stroke="none" fill="#ffce9e" /><rect x="60" y="285" width="45" height="45" class="square dark b2" stroke="none" fill="#d18b47" /><rect x="105" y="285" width="45" height="45" class="square light c2" stroke="none" fill="#ffce9e" /><rect x="150" y="285" width="45" height="45" class="square dark d2" stroke="none" fill="#d18b47" /><rect x="195" y="285" width="45" height="45" class="square light e2" stroke="none" fill="#ffce9e" /><rect x="240" y="285" width="45" height="45" class="square dark f2" stroke="none" fill="#d18b47" /><rect x="285" y="285" width="45" height="45" class="square light g2" stroke="none" fill="#ffce9e" /><rect x="330" y="285" width="45" height="45" class="square dark h2" stroke="none" fill="#d18b47" /><rect x="15" y="240" width="45" height="45" class="square dark a3" stroke="none" fill="#d18b47" /><rect x="60" y="240" width="45" height="45" class="square light b3" stroke="none" fill="#ffce9e" /><rect x="105" y="240" width="45" height="45" class="square dark c3" stroke="none" fill="#d18b47" /><rect x="150" y="240" width="45" height="45" class="square light d3" stroke="none" fill="#ffce9e" /><rect x="195" y="240" width="45" height="45" class="square dark e3" stroke="none" fill="#d18b47" /><rect x="240" y="240" width="45" height="45" class="square light f3" stroke="none" fill="#ffce9e" /><rect x="285" y="240" width="45" height="45" class="square dark g3" stroke="none" fill="#d18b47" /><rect x="330" y="240" width="45" height="45" class="square light h3" stroke="none" fill="#ffce9e" /><rect x="15" y="195" width="45" height="45" class="square light a4" stroke="none" fill="#ffce9e" /><rect x="60" y="195" width="45" height="45" class="square dark b4" stroke="none" fill="#d18b47" /><rect x="105" y="195" width="45" height="45" class="square light c4" stroke="none" fill="#ffce9e" /><rect x="150" y="195" width="45" height="45" class="square dark d4" stroke="none" fill="#d18b47" /><rect x="195" y="195" width="45" height="45" class="square light e4" stroke="none" fill="#ffce9e" /><rect x="240" y="195" width="45" height="45" class="square dark f4" stroke="none" fill="#d18b47" /><rect x="285" y="195" width="45" height="45" class="square light g4" stroke="none" fill="#ffce9e" /><rect x="330" y="195" width="45" height="45" class="square dark h4" stroke="none" fill="#d18b47" /><rect x="15" y="150" width="45" height="45" class="square dark a5" stroke="none" fill="#d18b47" /><rect x="60" y="150" width="45" height="45" class="square light b5" stroke="none" fill="#ffce9e" /><rect x="105" y="150" width="45" height="45" class="square dark c5" stroke="none" fill="#d18b47" /><rect x="150" y="150" width="45" height="45" class="square light d5" stroke="none" fill="#ffce9e" /><rect x="195" y="150" width="45" height="45" class="square dark e5" stroke="none" fill="#d18b47" /><rect x="240" y="150" width="45" height="45" class="square light f5" stroke="none" fill="#ffce9e" /><rect x="285" y="150" width="45" height="45" class="square dark g5" stroke="none" fill="#d18b47" /><rect x="330" y="150" width="45" height="45" class="square light h5" stroke="none" fill="#ffce9e" /><rect x="15" y="105" width="45" height="45" class="square light a6" stroke="none" fill="#ffce9e" /><rect x="60" y="105" width="45" height="45" class="square dark b6" stroke="none" fill="#d18b47" /><rect x="105" y="105" width="45" height="45" class="square light c6" stroke="none" fill="#ffce9e" /><rect x="150" y="105" width="45" height="45" class="square dark d6" stroke="none" fill="#d18b47" /><rect x="195" y="105" width="45" height="45" class="square light e6" stroke="none" fill="#ffce9e" /><rect x="240" y="105" width="45" height="45" class="square dark f6" stroke="none" fill="#d18b47" /><rect x="285" y="105" width="45" height="45" class="square light g6" stroke="none" fill="#ffce9e" /><rect x="330" y="105" width="45" height="45" class="square dark h6" stroke="none" fill="#d18b47" /><rect x="15" y="60" width="45" height="45" class="square dark a7" stroke="none" fill="#d18b47" /><rect x="60" y="60" width="45" height="45" class="square light b7" stroke="none" fill="#ffce9e" /><rect x="105" y="60" width="45" height="45" class="square dark c7" stroke="none" fill="#d18b47" /><rect x="150" y="60" width="45" height="45" class="square light d7" stroke="none" fill="#ffce9e" /><rect x="195" y="60" width="45" height="45" class="square dark e7" stroke="none" fill="#d18b47" /><rect x="240" y="60" width="45" height="45" class="square light f7" stroke="none" fill="#ffce9e" /><rect x="285" y="60" width="45" height="45" class="square dark g7" stroke="none" fill="#d18b47" /><rect x="330" y="60" width="45" height="45" class="square light h7" stroke="none" fill="#ffce9e" /><rect x="15" y="15" width="45" height="45" class="square light a8" stroke="none" fill="#ffce9e" /><rect x="60" y="15" width="45" height="45" class="square dark b8" stroke="none" fill="#d18b47" /><rect x="105" y="15" width="45" height="45" class="square light c8" stroke="none" fill="#ffce9e" /><rect x="150" y="15" width="45" height="45" class="square dark d8" stroke="none" fill="#d18b47" /><rect x="195" y="15" width="45" height="45" class="square light e8" stroke="none" fill="#ffce9e" /><rect x="240" y="15" width="45" height="45" class="square dark f8" stroke="none" fill="#d18b47" /><rect x="285" y="15" width="45" height="45" class="square light g8" stroke="none" fill="#ffce9e" /><rect x="330" y="15" width="45" height="45" class="square dark h8" stroke="none" fill="#d18b47" /><use href="#white-pawn" xlink:href="#white-pawn" transform="translate(60, 285)" /><use href="#white-pawn" xlink:href="#white-pawn" transform="translate(195, 285)" /><use href="#white-pawn" xlink:href="#white-pawn" transform="translate(15, 240)" /><use href="#white-bishop" xlink:href="#white-bishop" transform="translate(105, 240)" /><use href="#white-king" xlink:href="#white-king" transform="translate(240, 240)" /><use href="#white-pawn" xlink:href="#white-pawn" transform="translate(240, 195)" /><use href="#white-pawn" xlink:href="#white-pawn" transform="translate(285, 195)" /><use href="#black-pawn" xlink:href="#black-pawn" transform="translate(15, 150)" /><use href="#white-bishop" xlink:href="#white-bishop" transform="translate(150, 150)" /><use href="#white-pawn" xlink:href="#white-pawn" transform="translate(195, 150)" /><use href="#white-pawn" xlink:href="#white-pawn" transform="translate(330, 150)" /><use href="#black-bishop" xlink:href="#black-bishop" transform="translate(60, 105)" /><use href="#black-pawn" xlink:href="#black-pawn" transform="translate(105, 105)" /><use href="#black-pawn" xlink:href="#black-pawn" transform="translate(330, 105)" /><use href="#black-pawn" xlink:href="#black-pawn" transform="translate(60, 60)" /><use href="#black-pawn" xlink:href="#black-pawn" transform="translate(240, 60)" /><use href="#black-pawn" xlink:href="#black-pawn" transform="translate(285, 60)" /><use href="#black-king" xlink:href="#black-king" transform="translate(195, 15)" /></svg>
+                </div>
+                <div class="position-info">
+                    <h3>Position Details</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">Turn to Play</div>
+                            <div class="info-value">White</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Move Number</div>
+                            <div class="info-value">28</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Halfmove Clock</div>
+                            <div class="info-value">1</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Position Type</div>
+                            <div class="info-value">Positional</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Castling Rights</div>
+                            <div class="info-value">{'white_kingside': False, 'white_queenside': False, 'black_kingside': False, 'black_queenside': False}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">En Passant</div>
+                            <div class="info-value">None</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <div class="info-label">Position Themes</div>
+                        <div class="themes-container"><span class="theme-tag">center_control</span><span class="theme-tag">weak_square_exploitation</span><span class="theme-tag">defensive</span><span class="theme-tag">check</span><span class="theme-tag">piece_activity</span><span class="theme-tag">middlegame</span><span class="theme-tag">hanging_piece</span><span class="theme-tag">discovered_attack</span><span class="theme-tag">trapped_piece</span><span class="theme-tag">fork_potential</span><span class="theme-tag">positional</span><span class="theme-tag">material_imbalance</span></div>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <div class="info-label">FEN Notation</div>
+                        <div style="background: white; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; word-break: break-all; margin-top: 5px;">
+                            4k3/1p3pp1/1bp4p/p2BP2P/5PP1/P1B2K2/1P2P3/8 w - - 1 28
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-icon">🎯</span>
+                Move Analysis
+            </h2>
+            <table class="moves-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Move</th>
+                        <th>Score</th>
+                        <th>CP Loss</th>
+                        <th>Classification</th>
+                        <th>Principal Variation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+            <tr>
+                <td class="move-rank">🥇</td>
+                <td class="move-notation">Bb3</td>
+                <td class="move-score">7.10</td>
+                <td class="move-score">0</td>
+                <td><span class="move-classification classification-great">Great</span></td>
+                <td style="font-family: monospace; font-size: 0.85rem;"></td>
+            </tr>
+            
+            <tr>
+                <td class="move-rank">🥈</td>
+                <td class="move-notation">Be4</td>
+                <td class="move-score">7.08</td>
+                <td class="move-score">2</td>
+                <td><span class="move-classification classification-good">Good</span></td>
+                <td style="font-family: monospace; font-size: 0.85rem;"></td>
+            </tr>
+            
+            <tr>
+                <td class="move-rank">🥉</td>
+                <td class="move-notation">Bc4</td>
+                <td class="move-score">7.06</td>
+                <td class="move-score">4</td>
+                <td><span class="move-classification classification-good">Good</span></td>
+                <td style="font-family: monospace; font-size: 0.85rem;"></td>
+            </tr>
+            
+            <tr>
+                <td class="move-rank">4</td>
+                <td class="move-notation">Ba2</td>
+                <td class="move-score">7.03</td>
+                <td class="move-score">7</td>
+                <td><span class="move-classification classification-good">Good</span></td>
+                <td style="font-family: monospace; font-size: 0.85rem;"></td>
+            </tr>
+            
+            <tr>
+                <td class="move-rank">5</td>
+                <td class="move-notation">Bxf7+</td>
+                <td class="move-score">5.99</td>
+                <td class="move-score">111</td>
+                <td><span class="move-classification classification-mistake">Mistake</span></td>
+                <td style="font-family: monospace; font-size: 0.85rem;"></td>
+            </tr>
+            
+            <tr>
+                <td class="move-rank">6</td>
+                <td class="move-notation">e4</td>
+                <td class="move-score">5.75</td>
+                <td class="move-score">135</td>
+                <td><span class="move-classification classification-mistake">Mistake</span></td>
+                <td style="font-family: monospace; font-size: 0.85rem;"></td>
+            </tr>
+            
+            <tr>
+                <td class="move-rank">7</td>
+                <td class="move-notation">Bxc6+</td>
+                <td class="move-score">5.63</td>
+                <td class="move-score">147</td>
+                <td><span class="move-classification classification-mistake">Mistake</span></td>
+                <td style="font-family: monospace; font-size: 0.85rem;"></td>
+            </tr>
+            
+            <tr>
+                <td class="move-rank">8</td>
+                <td class="move-notation">e6</td>
+                <td class="move-score">5.54</td>
+                <td class="move-score">156</td>
+                <td><span class="move-classification classification-blunder">Blunder</span></td>
+                <td style="font-family: monospace; font-size: 0.85rem;"></td>
+            </tr>
+            
+            <tr>
+                <td class="move-rank">9</td>
+                <td class="move-notation">Ke4</td>
+                <td class="move-score">5.32</td>
+                <td class="move-score">178</td>
+                <td><span class="move-classification classification-blunder">Blunder</span></td>
+                <td style="font-family: monospace; font-size: 0.85rem;"></td>
+            </tr>
+            
+            <tr>
+                <td class="move-rank">10</td>
+                <td class="move-notation">b4</td>
+                <td class="move-score">4.95</td>
+                <td class="move-score">215</td>
+                <td><span class="move-classification classification-blunder">Blunder</span></td>
+                <td style="font-family: monospace; font-size: 0.85rem;"></td>
+            </tr>
+            
+                </tbody>
+            </table>
+        </div>
+        
+        
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-icon">⚖️</span>
+                Position Evaluation
+            </h2>
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value">0</div>
+                    <div class="metric-label">White Material</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">0</div>
+                    <div class="metric-label">Black Material</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">+0</div>
+                    <div class="metric-label">Balance</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">N/A</div>
+                    <div class="metric-label">Position Score</div>
+                </div>
+            </div>
+            
+        </div>
+        
+        
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-icon">⚔️</span>
+                Tactical Analysis
+            </h2>
+            <div class="analysis-grid">
+                
+            <div class="analysis-card">
+                <div class="card-title">👑 King Safety</div>
+                <div class="card-content">
+                    <strong>White King:</strong> Unknown<br>
+                    <strong>Black King:</strong> Unknown
+                </div>
+            </div>
+            
+            <div class="analysis-card">
+                <div class="card-title">🎯 Center Control</div>
+                <div class="card-content">
+                    <strong>White Control:</strong> 0%<br>
+                    <strong>Black Control:</strong> 0%
+                </div>
+            </div>
+            
+            </div>
+        </div>
+        
+        
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-icon">🏗️</span>
+                Positional Analysis
+            </h2>
+            <div class="analysis-grid">
+                
+            <div class="analysis-card">
+                <div class="card-title">🏰 Pawn Structure</div>
+                <div class="card-content">
+                    <strong>Open Files:</strong> 1<br><strong>Half Open Files:</strong> 2<br><strong>White Pawn Islands:</strong> 2<br><strong>Black Pawn Islands:</strong> 2<br><strong>White Passed Pawns:</strong> 0<br><strong>Black Passed Pawns:</strong> 0<br><strong>White Isolated Pawns:</strong> 0<br><strong>Black Isolated Pawns:</strong> 0<br><strong>White Doubled Pawns:</strong> 1<br><strong>Black Doubled Pawns:</strong> 0<br><strong>Pawn Chains:</strong> 2<br><strong>Weaknesses:</strong> white_doubled_pawns
+                </div>
+            </div>
+            
+            <div class="analysis-card">
+                <div class="card-title">🔄 Piece Mobility</div>
+                <div class="card-content">
+                    <strong>White Total:</strong> 15<br><strong>Black Total:</strong> 0<br><strong>White Avg:</strong> 5.0<br><strong>Black Avg:</strong> 0.0
+                </div>
+            </div>
+            
+            <div class="analysis-card">
+                <div class="card-title">🎭 Piece Development</div>
+                <div class="card-content">
+                    <strong>White:</strong> 1.7000000000000002<br><strong>Black:</strong> 1.1
+                </div>
+            </div>
+            
+            </div>
+        </div>
+        
+        
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-icon">🧠</span>
+                Strategic Insights
+            </h2>
+            <div class="analysis-grid">
+                
+            <div class="analysis-card">
+                <div class="card-title">🎯 Best Moves</div>
+                <div class="card-content">
+                    <div style="font-family: monospace; font-weight: bold; color: #2E8B57; font-size: 1.1rem;">
+                        Be4, Bc4
+                    </div>
+                </div>
+            </div>
+            
+                
+            <div class="analysis-card">
+                <div class="card-title">🏷️ Position Classification</div>
+                <div class="card-content">
+                    <div class="themes-container"><span class="theme-tag">middlegame</span><span class="theme-tag">positional</span><span class="theme-tag">defensive</span></div>
+                </div>
+            </div>
+            
+            </div>
+        </div>
+        
+        
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-icon">🎓</span>
+                Learning Insights
+            </h2>
+            <div class="analysis-grid">
+                
+                <div class="analysis-card">
+                    <div class="card-title">📚 Position Assessment</div>
+                    <div class="card-content">White has a significant advantage with material_imbalance being key</div>
+                </div>
+                
+            </div>
+        </div>
+        
+        
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-icon">🔬</span>
+                Comprehensive Analysis
+            </h2>
+            <div class="json-container">
+                <div class="json-content">{
+  "position_score": 710,
+  "strategic_themes": [
+    "material_imbalance",
+    "center_control",
+    "piece_activity"
+  ],
+  "tactical_motifs": [
+    "fork_potential",
+    "discovered_attack",
+    "hanging_piece",
+    "trapped_piece"
+  ],
+  "critical_squares": [
+    "d5",
+    "d8",
+    "e4",
+    "e2",
+    "d7",
+    "e5",
+    "e3",
+    "d4"
+  ],
+  "piece_placement_quality": {
+    "white": 0.55,
+    "black": 0.225
+  },
+  "tempo_evaluation": 0.3
+}</div>
+            </div>
+        </div>
+        
+        
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-icon">🌲</span>
+                Variation Analysis
+            </h2>
+            <div class="json-container">
+                <div class="json-content">{
+  "variations": [
+    {
+      "move_rank": 1,
+      "initial_move": {
+        "move": "Bb3",
+        "score": 710,
+        "depth": 23,
+        "pv": "28.Bb3 Ke7 29.Bc2 Bd8 30.Be4 Ke6 31.e3 f6 32.Bf5+ Kf7 33.exf6 gxf6 34.e4 b6 35.e5 fxe5 36.fxe5 Bg5 37.Bd4 Bc1 ...",
+        "uci": "d5b3",
+        "centipawn_loss": 0,
+        "classification": "great",
+        "tactics": [],
+        "position_impact": {
+          "material_change": 0,
+          "king_safety_impact": 0,
+          "center_control_change": -2,
+          "development_impact": -0.20000000000000018,
+          "pawn_structure_impact": 0,
+          "piece_coordination_change": -1.3333333333333333,
+          "space_advantage_change": 0,
+          "initiative_change": -6.499999999999999
+        },
+        "ml_evaluation": {},
+        "move_complexity": 2,
+        "strategic_value": 0
+      },
+      "line_analysis": [],
+      "final_evaluation": {
+        "material_trend": "stable",
+        "position_trend": "stable",
+        "complexity": 0,
+        "tactical_density": 2,
+        "final_assessment": "White controls the center. Overall assessment: significant advantage."
+      },
+      "key_features": [
+        "positional",
+        "simple"
+      ],
+      "material_evolution": [
+        490
+      ],
+      "positional_evolution": [
+        710
+      ],
+      "comprehensive_final_stats": {
+        "material_imbalance_score": 2.45,
+        "center_control_scores": {
+          "white": 7,
+          "black": 2,
+          "balance": 5
+        },
+        "tactical_weights": {
+          "total_tactical_elements": 2,
+          "tactical_density": 2,
+          "tactical_progression": "stable",
+          "dominant_tactics": [
+            "discovered_attack",
+            "trapped_piece"
+          ]
+        },
+        "king_safety_differential": {
+          "white_safety": 7,
+          "black_safety": 5,
+          "safety_balance": 2
+        },
+        "piece_activity_metrics": {
+          "white_activity": 0.0,
+          "black_activity": 6.0,
+          "activity_balance": -6.0
+        },
+        "strategic_assessment": {
+          "primary_themes": [
+            "material_imbalance",
+            "center_control",
+            "piece_activity"
+          ],
+          "position_type": "positional_middlegame",
+          "winning_chances": "significant_advantage",
+          "complexity_rating": 4.05
+        },
+        "variation_quality": {
+          "consistency": 0.5,
+          "improvement_trend": "stable",
+          "tactical_sharpness": 2,
+          "positional_stability": 1.0
+        }
+      }
+    },
+    {
+      "move_rank": 2,
+      "initial_move": {
+        "move": "Be4",
+        "score": 708,
+        "depth": 23,
+        "pv": "28.Be4 Bd8 29.a4 Bc7 30.e3 Kf8 31.b4 axb4 32.Bxb4+ Kg8 33.Bd6 Bxd6 34.exd6 Kf8 35.a5 Ke8 36.Bf5 g6 37.hxg6 fxg6 ...",
+        "uci": "d5e4",
+        "centipawn_loss": 2,
+        "classification": "good",
+        "tactics": [],
+        "position_impact": {
+          "material_change": 0,
+          "king_safety_impact": 0,
+          "center_control_change": 0,
+          "development_impact": 0.0,
+          "pawn_structure_impact": 0,
+          "piece_coordination_change": -1.6666666666666665,
+          "space_advantage_change": 2,
+          "initiative_change": -6.499999999999999
+        },
+        "ml_evaluation": {},
+        "move_complexity": 2,
+        "strategic_value": 3
+      },
+      "line_analysis": [],
+      "final_evaluation": {
+        "material_trend": "stable",
+        "position_trend": "stable",
+        "complexity": 0,
+        "tactical_density": 2,
+        "final_assessment": "White controls the center. Overall assessment: significant advantage."
+      },
+      "key_features": [
+        "positional",
+        "simple"
+      ],
+      "material_evolution": [
+        490
+      ],
+      "positional_evolution": [
+        708
+      ],
+      "comprehensive_final_stats": {
+        "material_imbalance_score": 2.45,
+        "center_control_scores": {
+          "white": 9,
+          "black": 2,
+          "balance": 7
+        },
+        "tactical_weights": {
+          "total_tactical_elements": 2,
+          "tactical_density": 2,
+          "tactical_progression": "stable",
+          "dominant_tactics": [
+            "discovered_attack",
+            "trapped_piece"
+          ]
+        },
+        "king_safety_differential": {
+          "white_safety": 8,
+          "black_safety": 6,
+          "safety_balance": 2
+        },
+        "piece_activity_metrics": {
+          "white_activity": 0.0,
+          "black_activity": 6.0,
+          "activity_balance": -6.0
+        },
+        "strategic_assessment": {
+          "primary_themes": [
+            "material_imbalance",
+            "center_control",
+            "piece_activity"
+          ],
+          "position_type": "positional_middlegame",
+          "winning_chances": "significant_advantage",
+          "complexity_rating": 4.05
+        },
+        "variation_quality": {
+          "consistency": 0.5,
+          "improvement_trend": "stable",
+          "tactical_sharpness": 2,
+          "positional_stability": 1.0
+        }
+      }
+    },
+    {
+      "move_rank": 3,
+      "initial_move": {
+        "move": "Bc4",
+        "score": 706,
+        "depth": 23,
+        "pv": "28.Bc4 Ke7 29.Bd3 Bc7 30.Be4 Kf8 31.a4 Bd8 32.e3 Bc7 33.b4 axb4 34.Bxb4+ Kg8 35.Bd6 Bxd6 36.exd6 Kf8 37.a5 Ke8 ...",
+        "uci": "d5c4",
+        "centipawn_loss": 4,
+        "classification": "good",
+        "tactics": [],
+        "position_impact": {
+          "material_change": 0,
+          "king_safety_impact": 0,
+          "center_control_change": -2,
+          "development_impact": -0.10000000000000009,
+          "pawn_structure_impact": 0,
+          "piece_coordination_change": -1.3333333333333333,
+          "space_advantage_change": 2,
+          "initiative_change": -6.499999999999999
+        },
+        "ml_evaluation": {},
+        "move_complexity": 2,
+        "strategic_value": 1
+      },
+      "line_analysis": [],
+      "final_evaluation": {
+        "material_trend": "stable",
+        "position_trend": "stable",
+        "complexity": 0,
+        "tactical_density": 2,
+        "final_assessment": "White controls the center. Overall assessment: significant advantage."
+      },
+      "key_features": [
+        "positional",
+        "simple"
+      ],
+      "material_evolution": [
+        490
+      ],
+      "positional_evolution": [
+        706
+      ],
+      "comprehensive_final_stats": {
+        "material_imbalance_score": 2.45,
+        "center_control_scores": {
+          "white": 7,
+          "black": 2,
+          "balance": 5
+        },
+        "tactical_weights": {
+          "total_tactical_elements": 2,
+          "tactical_density": 2,
+          "tactical_progression": "stable",
+          "dominant_tactics": [
+            "discovered_attack",
+            "trapped_piece"
+          ]
+        },
+        "king_safety_differential": {
+          "white_safety": 8,
+          "black_safety": 5,
+          "safety_balance": 3
+        },
+        "piece_activity_metrics": {
+          "white_activity": 0.0,
+          "black_activity": 6.0,
+          "activity_balance": -6.0
+        },
+        "strategic_assessment": {
+          "primary_themes": [
+            "material_imbalance",
+            "center_control",
+            "piece_activity"
+          ],
+          "position_type": "positional_middlegame",
+          "winning_chances": "significant_advantage",
+          "complexity_rating": 4.05
+        },
+        "variation_quality": {
+          "consistency": 0.5,
+          "improvement_trend": "stable",
+          "tactical_sharpness": 2,
+          "positional_stability": 1.0
+        }
+      }
+    },
+    {
+      "move_rank": 4,
+      "initial_move": {
+        "move": "Ba2",
+        "score": 703,
+        "depth": 23,
+        "pv": "28.Ba2 Ke7 29.Bb1 Kf8 30.Bc2 Bc7 31.Be4 Bd8 32.a4 Kg8 33.b4 axb4 34.Bxb4 b5 35.a5 c5 36.a6 Bb6 37.Ba5 Ba7 ...",
+        "uci": "d5a2",
+        "centipawn_loss": 7,
+        "classification": "good",
+        "tactics": [],
+        "position_impact": {
+          "material_change": 0,
+          "king_safety_impact": 0,
+          "center_control_change": -2,
+          "development_impact": -0.30000000000000027,
+          "pawn_structure_impact": 0,
+          "piece_coordination_change": -1.3333333333333333,
+          "space_advantage_change": 0,
+          "initiative_change": -6.499999999999999
+        },
+        "ml_evaluation": {},
+        "move_complexity": 2,
+        "strategic_value": 0
+      },
+      "line_analysis": [],
+      "final_evaluation": {
+        "material_trend": "stable",
+        "position_trend": "stable",
+        "complexity": 0,
+        "tactical_density": 2,
+        "final_assessment": "White controls the center. Overall assessment: significant advantage."
+      },
+      "key_features": [
+        "positional",
+        "simple"
+      ],
+      "material_evolution": [
+        490
+      ],
+      "positional_evolution": [
+        703
+      ],
+      "comprehensive_final_stats": {
+        "material_imbalance_score": 2.45,
+        "center_control_scores": {
+          "white": 7,
+          "black": 2,
+          "balance": 5
+        },
+        "tactical_weights": {
+          "total_tactical_elements": 2,
+          "tactical_density": 2,
+          "tactical_progression": "stable",
+          "dominant_tactics": [
+            "discovered_attack",
+            "trapped_piece"
+          ]
+        },
+        "king_safety_differential": {
+          "white_safety": 7,
+          "black_safety": 5,
+          "safety_balance": 2
+        },
+        "piece_activity_metrics": {
+          "white_activity": 0.0,
+          "black_activity": 6.0,
+          "activity_balance": -6.0
+        },
+        "strategic_assessment": {
+          "primary_themes": [
+            "material_imbalance",
+            "center_control",
+            "piece_activity"
+          ],
+          "position_type": "positional_middlegame",
+          "winning_chances": "significant_advantage",
+          "complexity_rating": 4.05
+        },
+        "variation_quality": {
+          "consistency": 0.5,
+          "improvement_trend": "stable",
+          "tactical_sharpness": 2,
+          "positional_stability": 1.0
+        }
+      }
+    },
+    {
+      "move_rank": 5,
+      "initial_move": {
+        "move": "Bxf7+",
+        "score": 599,
+        "depth": 23,
+        "pv": "28.Bxf7+ Kxf7 29.Ke4 Ke6 30.f5+ Kf7 31.e6+ Kg8 32.e7 Kf7 33.Bxg7 Kxe7 34.Bxh6 a4 35.Bf4 Bd8 36.h6 Kf8 37.g5 Kg8 ...",
+        "uci": "d5f7",
+        "centipawn_loss": 111,
+        "classification": "mistake",
+        "tactics": [
+          "weak_square_exploitation",
+          "hanging_piece",
+          "trapped_piece",
+          "check",
+          "material_imbalance"
+        ],
+        "position_impact": {
+          "material_change": 200,
+          "king_safety_impact": 0,
+          "center_control_change": -2,
+          "development_impact": -0.20000000000000018,
+          "pawn_structure_impact": 0,
+          "piece_coordination_change": -1.3333333333333333,
+          "space_advantage_change": 3,
+          "initiative_change": -4.199999999999999
+        },
+        "ml_evaluation": {},
+        "move_complexity": 5,
+        "strategic_value": 0
+      },
+      "line_analysis": [],
+      "final_evaluation": {
+        "material_trend": "stable",
+        "position_trend": "stable",
+        "complexity": 0,
+        "tactical_density": 2,
+        "final_assessment": "Material imbalance favors white. White controls the center. Overall assessment: decisive."
+      },
+      "key_features": [
+        "positional",
+        "simple"
+      ],
+      "material_evolution": [
+        690
+      ],
+      "positional_evolution": [
+        599
+      ],
+      "comprehensive_final_stats": {
+        "material_imbalance_score": 3.45,
+        "center_control_scores": {
+          "white": 7,
+          "black": 2,
+          "balance": 5
+        },
+        "tactical_weights": {
+          "total_tactical_elements": 2,
+          "tactical_density": 2,
+          "tactical_progression": "stable",
+          "dominant_tactics": [
+            "hanging_piece",
+            "trapped_piece"
+          ]
+        },
+        "king_safety_differential": {
+          "white_safety": 7,
+          "black_safety": 5,
+          "safety_balance": 2
+        },
+        "piece_activity_metrics": {
+          "white_activity": 0.0,
+          "black_activity": 5.0,
+          "activity_balance": -5.0
+        },
+        "strategic_assessment": {
+          "primary_themes": [
+            "material_imbalance",
+            "passed_pawns",
+            "center_control"
+          ],
+          "position_type": "positional_middlegame",
+          "winning_chances": "decisive",
+          "complexity_rating": 3.125
+        },
+        "variation_quality": {
+          "consistency": 0.5,
+          "improvement_trend": "stable",
+          "tactical_sharpness": 2,
+          "positional_stability": 1.0
+        }
+      }
+    },
+    {
+      "move_rank": 6,
+      "initial_move": {
+        "move": "e4",
+        "score": 575,
+        "depth": 23,
+        "pv": "28.e4 cxd5 29.exd5 Kf8 30.a4 g6 31.hxg6 fxg6 32.f5 gxf5 33.gxf5 Bc5 34.e6 Bd6 35.Kg4 Bb4 36.Bd4 Bd6 37.f6",
+        "uci": "e2e4",
+        "centipawn_loss": 135,
+        "classification": "mistake",
+        "tactics": [],
+        "position_impact": {
+          "material_change": 10,
+          "king_safety_impact": 0,
+          "center_control_change": 3,
+          "development_impact": 0.0,
+          "pawn_structure_impact": 2,
+          "piece_coordination_change": -1.3333333333333333,
+          "space_advantage_change": 2,
+          "initiative_change": -5.6
+        },
+        "ml_evaluation": {},
+        "move_complexity": 1,
+        "strategic_value": 3
+      },
+      "line_analysis": [],
+      "final_evaluation": {
+        "material_trend": "stable",
+        "position_trend": "stable",
+        "complexity": 0,
+        "tactical_density": 3,
+        "final_assessment": "White controls the center. Overall assessment: significant advantage."
+      },
+      "key_features": [
+        "positional",
+        "simple"
+      ],
+      "material_evolution": [
+        500
+      ],
+      "positional_evolution": [
+        575
+      ],
+      "comprehensive_final_stats": {
+        "material_imbalance_score": 2.5,
+        "center_control_scores": {
+          "white": 12,
+          "black": 2,
+          "balance": 10
+        },
+        "tactical_weights": {
+          "total_tactical_elements": 3,
+          "tactical_density": 3,
+          "tactical_progression": "stable",
+          "dominant_tactics": [
+            "fork_potential",
+            "discovered_attack",
+            "trapped_piece"
+          ]
+        },
+        "king_safety_differential": {
+          "white_safety": 7,
+          "black_safety": 5,
+          "safety_balance": 2
+        },
+        "piece_activity_metrics": {
+          "white_activity": 0.0,
+          "black_activity": 6.0,
+          "activity_balance": -6.0
+        },
+        "strategic_assessment": {
+          "primary_themes": [
+            "material_imbalance",
+            "center_control",
+            "piece_activity"
+          ],
+          "position_type": "tactical_middlegame",
+          "winning_chances": "significant_advantage",
+          "complexity_rating": 6.65
+        },
+        "variation_quality": {
+          "consistency": 0.5,
+          "improvement_trend": "stable",
+          "tactical_sharpness": 3,
+          "positional_stability": 1.0
+        }
+      }
+    },
+    {
+      "move_rank": 7,
+      "initial_move": {
+        "move": "Bxc6+",
+        "score": 563,
+        "depth": 23,
+        "pv": "28.Bxc6+ bxc6 29.a4 Bc7 30.b4 axb4 31.Bxb4 Bd8 32.Bc3 Kd7 33.e6+ fxe6 34.Bxg7 c5 35.Bc3 Kc8 36.e4 Kb7 37.f5 Bg5 ...",
+        "uci": "d5c6",
+        "centipawn_loss": 147,
+        "classification": "mistake",
+        "tactics": [
+          "hanging_piece",
+          "check",
+          "trapped_piece"
+        ],
+        "position_impact": {
+          "material_change": 100,
+          "king_safety_impact": 0,
+          "center_control_change": -1,
+          "development_impact": -0.10000000000000009,
+          "pawn_structure_impact": 0,
+          "piece_coordination_change": -1.3333333333333333,
+          "space_advantage_change": 2,
+          "initiative_change": -4.1
+        },
+        "ml_evaluation": {},
+        "move_complexity": 5,
+        "strategic_value": 1
+      },
+      "line_analysis": [],
+      "final_evaluation": {
+        "material_trend": "stable",
+        "position_trend": "stable",
+        "complexity": 0,
+        "tactical_density": 4,
+        "final_assessment": "White controls the center. Tactically sharp position. Overall assessment: decisive."
+      },
+      "key_features": [
+        "positional",
+        "simple"
+      ],
+      "material_evolution": [
+        590
+      ],
+      "positional_evolution": [
+        563
+      ],
+      "comprehensive_final_stats": {
+        "material_imbalance_score": 2.95,
+        "center_control_scores": {
+          "white": 8,
+          "black": 1,
+          "balance": 7
+        },
+        "tactical_weights": {
+          "total_tactical_elements": 4,
+          "tactical_density": 4,
+          "tactical_progression": "stable",
+          "dominant_tactics": [
+            "fork_potential",
+            "discovered_attack",
+            "hanging_piece"
+          ]
+        },
+        "king_safety_differential": {
+          "white_safety": 9,
+          "black_safety": 4,
+          "safety_balance": 5
+        },
+        "piece_activity_metrics": {
+          "white_activity": 0.0,
+          "black_activity": 3.0,
+          "activity_balance": -3.0
+        },
+        "strategic_assessment": {
+          "primary_themes": [
+            "material_imbalance",
+            "center_control",
+            "piece_activity"
+          ],
+          "position_type": "tactical_middlegame",
+          "winning_chances": "decisive",
+          "complexity_rating": 5.025
+        },
+        "variation_quality": {
+          "consistency": 0.5,
+          "improvement_trend": "stable",
+          "tactical_sharpness": 4,
+          "positional_stability": 1.0
+        }
+      }
+    },
+    {
+      "move_rank": 8,
+      "initial_move": {
+        "move": "e6",
+        "score": 554,
+        "depth": 23,
+        "pv": "28.e6 cxd5 29.Bxg7 fxe6 30.a4 Kf7 31.Bxh6 Bd4 32.b3 Kg8 33.Bg5 Kh7 34.Bd8 Bb2 35.g5 Kg7 36.Bb6 Bc3 37.Kg4 Kf8 ...",
+        "uci": "e5e6",
+        "centipawn_loss": 156,
+        "classification": "blunder",
+        "tactics": [
+          "hanging_piece"
+        ],
+        "position_impact": {
+          "material_change": -10,
+          "king_safety_impact": 0,
+          "center_control_change": -2,
+          "development_impact": 0.0,
+          "pawn_structure_impact": 2,
+          "piece_coordination_change": -1.3333333333333333,
+          "space_advantage_change": 1,
+          "initiative_change": -4.6
+        },
+        "ml_evaluation": {},
+        "move_complexity": 1,
+        "strategic_value": 1
+      },
+      "line_analysis": [],
+      "final_evaluation": {
+        "material_trend": "stable",
+        "position_trend": "stable",
+        "complexity": 0,
+        "tactical_density": 4,
+        "final_assessment": "White controls the center. Tactically sharp position. Overall assessment: significant advantage."
+      },
+      "key_features": [
+        "positional",
+        "simple"
+      ],
+      "material_evolution": [
+        480
+      ],
+      "positional_evolution": [
+        554
+      ],
+      "comprehensive_final_stats": {
+        "material_imbalance_score": 2.4,
+        "center_control_scores": {
+          "white": 7,
+          "black": 2,
+          "balance": 5
+        },
+        "tactical_weights": {
+          "total_tactical_elements": 4,
+          "tactical_density": 4,
+          "tactical_progression": "stable",
+          "dominant_tactics": [
+            "fork_potential",
+            "discovered_attack",
+            "hanging_piece"
+          ]
+        },
+        "king_safety_differential": {
+          "white_safety": 9,
+          "black_safety": 4,
+          "safety_balance": 5
+        },
+        "piece_activity_metrics": {
+          "white_activity": 0.0,
+          "black_activity": 5.5,
+          "activity_balance": -5.5
+        },
+        "strategic_assessment": {
+          "primary_themes": [
+            "material_imbalance",
+            "center_control",
+            "piece_activity"
+          ],
+          "position_type": "tactical_middlegame",
+          "winning_chances": "significant_advantage",
+          "complexity_rating": 7.15
+        },
+        "variation_quality": {
+          "consistency": 0.5,
+          "improvement_trend": "stable",
+          "tactical_sharpness": 4,
+          "positional_stability": 1.0
+        }
+      }
+    },
+    {
+      "move_rank": 9,
+      "initial_move": {
+        "move": "Ke4",
+        "score": 532,
+        "depth": 23,
+        "pv": "28.Ke4 cxd5+ 29.Kxd5 a4 30.Kc4 Be3 31.f5 Kd7 32.Kb5 Bf4 33.Kxa4 Kc6 34.e6 fxe6 35.fxe6 Kd6 36.Bxg7 Kxe6 37.Kb5 Kd5 ...",
+        "uci": "f3e4",
+        "centipawn_loss": 178,
+        "classification": "blunder",
+        "tactics": [],
+        "position_impact": {
+          "material_change": 0,
+          "king_safety_impact": 0,
+          "center_control_change": 4,
+          "development_impact": 0.09999999999999987,
+          "pawn_structure_impact": 0,
+          "piece_coordination_change": -1.6666666666666665,
+          "space_advantage_change": 3,
+          "initiative_change": -1.5999999999999996
+        },
+        "ml_evaluation": {},
+        "move_complexity": 2,
+        "strategic_value": 3
+      },
+      "line_analysis": [],
+      "final_evaluation": {
+        "material_trend": "stable",
+        "position_trend": "stable",
+        "complexity": 0,
+        "tactical_density": 3,
+        "final_assessment": "White controls the center. Overall assessment: significant advantage."
+      },
+      "key_features": [
+        "positional",
+        "simple"
+      ],
+      "material_evolution": [
+        490
+      ],
+      "positional_evolution": [
+        532
+      ],
+      "comprehensive_final_stats": {
+        "material_imbalance_score": 2.45,
+        "center_control_scores": {
+          "white": 13,
+          "black": 2,
+          "balance": 11
+        },
+        "tactical_weights": {
+          "total_tactical_elements": 3,
+          "tactical_density": 3,
+          "tactical_progression": "stable",
+          "dominant_tactics": [
+            "fork_potential",
+            "discovered_attack",
+            "trapped_piece"
+          ]
+        },
+        "king_safety_differential": {
+          "white_safety": 12,
+          "black_safety": 5,
+          "safety_balance": 7
+        },
+        "piece_activity_metrics": {
+          "white_activity": 0.0,
+          "black_activity": 6.0,
+          "activity_balance": -6.0
+        },
+        "strategic_assessment": {
+          "primary_themes": [
+            "material_imbalance",
+            "center_control",
+            "piece_activity"
+          ],
+          "position_type": "tactical_middlegame",
+          "winning_chances": "significant_advantage",
+          "complexity_rating": 8.65
+        },
+        "variation_quality": {
+          "consistency": 0.5,
+          "improvement_trend": "stable",
+          "tactical_sharpness": 3,
+          "positional_stability": 1.0
+        }
+      }
+    },
+    {
+      "move_rank": 10,
+      "initial_move": {
+        "move": "b4",
+        "score": 495,
+        "depth": 23,
+        "pv": "28.b4 cxd5 29.bxa5 Bc5 30.Bb4 Ba7 31.e4 d4 32.Ke2 Bb8 33.Kd3 Ba7 34.g5 Kd7 35.gxh6 gxh6 36.f5",
+        "uci": "b2b4",
+        "centipawn_loss": 215,
+        "classification": "blunder",
+        "tactics": [],
+        "position_impact": {
+          "material_change": 0,
+          "king_safety_impact": 0,
+          "center_control_change": 0,
+          "development_impact": 0.0,
+          "pawn_structure_impact": 1,
+          "piece_coordination_change": -1.0,
+          "space_advantage_change": 1,
+          "initiative_change": -4.699999999999999
+        },
+        "ml_evaluation": {},
+        "move_complexity": 1,
+        "strategic_value": 0
+      },
+      "line_analysis": [],
+      "final_evaluation": {
+        "material_trend": "stable",
+        "position_trend": "stable",
+        "complexity": 0,
+        "tactical_density": 4,
+        "final_assessment": "White controls the center. Tactically sharp position. Overall assessment: significant advantage."
+      },
+      "key_features": [
+        "positional",
+        "simple"
+      ],
+      "material_evolution": [
+        490
+      ],
+      "positional_evolution": [
+        495
+      ],
+      "comprehensive_final_stats": {
+        "material_imbalance_score": 2.45,
+        "center_control_scores": {
+          "white": 9,
+          "black": 2,
+          "balance": 7
+        },
+        "tactical_weights": {
+          "total_tactical_elements": 4,
+          "tactical_density": 4,
+          "tactical_progression": "stable",
+          "dominant_tactics": [
+            "fork_potential",
+            "discovered_attack",
+            "hanging_piece"
+          ]
+        },
+        "king_safety_differential": {
+          "white_safety": 9,
+          "black_safety": 5,
+          "safety_balance": 4
+        },
+        "piece_activity_metrics": {
+          "white_activity": 0.0,
+          "black_activity": 6.0,
+          "activity_balance": -6.0
+        },
+        "strategic_assessment": {
+          "primary_themes": [
+            "material_imbalance",
+            "center_control",
+            "piece_activity"
+          ],
+          "position_type": "tactical_middlegame",
+          "winning_chances": "significant_advantage",
+          "complexity_rating": 7.25
+        },
+        "variation_quality": {
+          "consistency": 0.5,
+          "improvement_trend": "stable",
+          "tactical_sharpness": 4,
+          "positional_stability": 1.0
+        }
+      }
+    }
+  ],
+  "key_moments": [
+    {
+      "variation_rank": 5,
+      "type": "decisive_advantage",
+      "description": "Variation 5 leads to decisive advantage"
+    },
+    {
+      "variation_rank": 7,
+      "type": "decisive_advantage",
+      "description": "Variation 7 leads to decisive advantage"
+    }
+  ],
+  "tactical_patterns": [
+    "discovered_attack",
+    "trapped_piece",
+    "fork_potential",
+    "hanging_piece"
+  ],
+  "strategic_evolution": [
+    {
+      "variation_rank": 1,
+      "themes": [
+        "material_imbalance",
+        "center_control",
+        "piece_activity"
+      ],
+      "position_type": "positional_middlegame"
+    },
+    {
+      "variation_rank": 2,
+      "themes": [
+        "material_imbalance",
+        "center_control",
+        "piece_activity"
+      ],
+      "position_type": "positional_middlegame"
+    },
+    {
+      "variation_rank": 3,
+      "themes": [
+        "material_imbalance",
+        "center_control",
+        "piece_activity"
+      ],
+      "position_type": "positional_middlegame"
+    },
+    {
+      "variation_rank": 4,
+      "themes": [
+        "material_imbalance",
+        "center_control",
+        "piece_activity"
+      ],
+      "position_type": "positional_middlegame"
+    },
+    {
+      "variation_rank": 5,
+      "themes": [
+        "material_imbalance",
+        "passed_pawns",
+        "center_control"
+      ],
+      "position_type": "positional_middlegame"
+    },
+    {
+      "variation_rank": 6,
+      "themes": [
+        "material_imbalance",
+        "center_control",
+        "piece_activity"
+      ],
+      "position_type": "tactical_middlegame"
+    },
+    {
+      "variation_rank": 7,
+      "themes": [
+        "material_imbalance",
+        "center_control",
+        "piece_activity"
+      ],
+      "position_type": "tactical_middlegame"
+    },
+    {
+      "variation_rank": 8,
+      "themes": [
+        "material_imbalance",
+        "center_control",
+        "piece_activity"
+      ],
+      "position_type": "tactical_middlegame"
+    },
+    {
+      "variation_rank": 9,
+      "themes": [
+        "material_imbalance",
+        "center_control",
+        "piece_activity"
+      ],
+      "position_type": "tactical_middlegame"
+    },
+    {
+      "variation_rank": 10,
+      "themes": [
+        "material_imbalance",
+        "center_control",
+        "piece_activity"
+      ],
+      "position_type": "tactical_middlegame"
+    }
+  ]
+}</div>
+            </div>
+        </div>
+        
+        
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-icon">📊</span>
+                Visualization Data
+            </h2>
+            <div class="visualization-container">
+                <p><em>Visualization data available for interactive displays and charts.</em></p>
+                <div class="json-container">
+                    <div class="json-content">{
+  "heatmaps": {
+    "piece_activity": {
+      "b2": 2,
+      "e2": 2,
+      "a3": 1,
+      "c3": 5,
+      "f3": 3,
+      "f4": 1,
+      "g4": 1,
+      "a5": 0,
+      "d5": 7,
+      "e5": 1,
+      "h5": 0,
+      "b6": 0,
+      "c6": 0,
+      "h6": 0,
+      "b7": 0,
+      "f7": 0,
+      "g7": 0,
+      "e8": 0
+    },
+    "attack_density": {
+      "a1": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "b1": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "c1": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "d1": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "e1": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "f1": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "g1": {
+        "white": 0,
+        "black": 1,
+        "total": 1
+      },
+      "h1": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "a2": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "b2": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "c2": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "d2": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "e2": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "f2": {
+        "white": 1,
+        "black": 1,
+        "total": 2
+      },
+      "g2": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "h2": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "a3": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "b3": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "c3": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "d3": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "e3": {
+        "white": 1,
+        "black": 1,
+        "total": 2
+      },
+      "f3": {
+        "white": 2,
+        "black": 0,
+        "total": 2
+      },
+      "g3": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "h3": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "a4": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "b4": {
+        "white": 2,
+        "black": 1,
+        "total": 3
+      },
+      "c4": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "d4": {
+        "white": 1,
+        "black": 1,
+        "total": 2
+      },
+      "e4": {
+        "white": 2,
+        "black": 0,
+        "total": 2
+      },
+      "f4": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "g4": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "h4": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "a5": {
+        "white": 1,
+        "black": 1,
+        "total": 2
+      },
+      "b5": {
+        "white": 0,
+        "black": 1,
+        "total": 1
+      },
+      "c5": {
+        "white": 0,
+        "black": 1,
+        "total": 1
+      },
+      "d5": {
+        "white": 0,
+        "black": 1,
+        "total": 1
+      },
+      "e5": {
+        "white": 2,
+        "black": 0,
+        "total": 2
+      },
+      "f5": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "g5": {
+        "white": 1,
+        "black": 1,
+        "total": 2
+      },
+      "h5": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "a6": {
+        "white": 0,
+        "black": 1,
+        "total": 1
+      },
+      "b6": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "c6": {
+        "white": 1,
+        "black": 1,
+        "total": 2
+      },
+      "d6": {
+        "white": 1,
+        "black": 0,
+        "total": 1
+      },
+      "e6": {
+        "white": 1,
+        "black": 1,
+        "total": 2
+      },
+      "f6": {
+        "white": 1,
+        "black": 1,
+        "total": 2
+      },
+      "g6": {
+        "white": 1,
+        "black": 1,
+        "total": 2
+      },
+      "h6": {
+        "white": 0,
+        "black": 1,
+        "total": 1
+      },
+      "a7": {
+        "white": 0,
+        "black": 1,
+        "total": 1
+      },
+      "b7": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "c7": {
+        "white": 0,
+        "black": 1,
+        "total": 1
+      },
+      "d7": {
+        "white": 0,
+        "black": 1,
+        "total": 1
+      },
+      "e7": {
+        "white": 0,
+        "black": 1,
+        "total": 1
+      },
+      "f7": {
+        "white": 1,
+        "black": 1,
+        "total": 2
+      },
+      "g7": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "h7": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "a8": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "b8": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "c8": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "d8": {
+        "white": 0,
+        "black": 2,
+        "total": 2
+      },
+      "e8": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "f8": {
+        "white": 0,
+        "black": 1,
+        "total": 1
+      },
+      "g8": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      },
+      "h8": {
+        "white": 0,
+        "black": 0,
+        "total": 0
+      }
+    },
+    "control_zones": {
+      "central": {
+        "white": 59.45945945945946,
+        "black": 40.54054054054054
+      },
+      "kingside": {
+        "white": 60.0,
+        "black": 40.0
+      },
+      "queenside": {
+        "white": 58.333333333333336,
+        "black": 41.66666666666667
+      }
+    },
+    "critical_squares": {
+      "d5": 1.0,
+      "d8": 0.2,
+      "e4": 1.0,
+      "e2": 0.4,
+      "d7": 0.1,
+      "e5": 1.0,
+      "e3": 0.8,
+      "d4": 1.0
+    }
+  },
+  "vectors": {
+    "attack_lines": [
+      {
+        "from": "c3",
+        "to": "a5",
+        "type": "bishop_attack",
+        "target": "pawn"
+      },
+      {
+        "from": "d5",
+        "to": "c6",
+        "type": "bishop_attack",
+        "target": "pawn"
+      },
+      {
+        "from": "d5",
+        "to": "f7",
+        "type": "bishop_attack",
+        "target": "pawn"
+      }
+    ],
+    "piece_relations": [],
+    "pawn_structure": [
+      {
+        "file": "a",
+        "tension": true,
+        "advanced": false
+      },
+      {
+        "file": "b",
+        "tension": true,
+        "advanced": true
+      },
+      {
+        "file": "f",
+        "tension": true,
+        "advanced": true
+      },
+      {
+        "file": "g",
+        "tension": true,
+        "advanced": true
+      },
+      {
+        "file": "h",
+        "tension": true,
+        "advanced": true
+      }
+    ]
+  },
+  "metrics": {
+    "position_balance": 0.98,
+    "dynamic_factor": 0.30434782608695654,
+    "complexity_score": 0.41,
+    "tension_level": 0.125
+  },
+  "highlights": {
+    "best_squares": [
+      "b3",
+      "e4",
+      "c4"
+    ],
+    "danger_zones": [
+      "b4"
+    ],
+    "key_pieces": [
+      "f3",
+      "e8"
+    ],
+    "critical_files": [
+      "d",
+      "e"
+    ]
+  }
+}</div>
+                </div>
+            </div>
+        </div>
+        
+        
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-icon">ℹ️</span>
+                Metadata
+            </h2>
+            <div class="info-grid">
+                
+            <div class="info-item">
+                <div class="info-label">Position ID</div>
+                <div class="info-value">971</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Source Type</div>
+                <div class="info-value">upload</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Processing Quality</div>
+                <div class="info-value">high</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Timestamp</div>
+                <div class="info-value">None</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Processed Timestamp</div>
+                <div class="info-value">2025-06-14 09:20:29</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Engine Depth</div>
+                <div class="info-value">0</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Analysis Time</div>
+                <div class="info-value">Unknown</div>
+            </div>
+            
+            </div>
+        </div>
+        
+        
+        <div class="footer-section">
+            <div class="kuikma-footer">Generated by Kuikma Chess Engine</div>
+            <div>Analysis created on 2025-06-14 22:18:25</div>
+            <div style="margin-top: 10px; font-size: 0.8rem;">
+                Position ID: 971 | 
+                Processing Quality: high
+            </div>
+        </div>
+        
+    </div>
+</body>
+</html>

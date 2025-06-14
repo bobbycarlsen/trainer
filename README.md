@@ -1,4 +1,4 @@
-# Chess Trainer Application
+# Kuikma | Chess Trainer Application
 
 A comprehensive, mobile-first chess training application that helps users improve their chess skills through targeted practice, complete game analysis, advanced insights, and spatial analysis.
 
@@ -80,62 +80,288 @@ games, user_game_analysis, user_saved_games, user_game_sessions
 - **Performance Optimized**: Efficient loading and rendering
 - **Offline Capable**: Local database storage with no external dependencies
 
-## 📦 Installation & Setup
+# =============================================================================
+# README.md Content (as Python string for easy copying)
+# =============================================================================
+
+README_CONTENT = """
+# 🏛️ Kuikma Chess Engine
+
+**Advanced Chess Training & Analysis Platform**
+
+Kuikma is a comprehensive chess training application with enhanced position analysis, game import capabilities, and advanced user management features.
+
+## ✨ Key Features
+
+### 🎯 Enhanced Training System
+- **Comprehensive Position Analysis**: Rich JSONL data with material, tactical, and positional insights
+- **Smart Move Evaluation**: Advanced scoring with centipawn loss analysis
+- **Personalized Difficulty**: Adaptive difficulty ratings from 800-2600
+- **Interactive Timer**: Built-in position timing with pause/resume
+- **Session Tracking**: Comprehensive session statistics and progress monitoring
+
+### 🗄️ Advanced Database Management
+- **Complete Database Viewer**: Full CRUD operations on all tables
+- **Admin Panel**: Comprehensive user and system management
+- **Database Health Monitoring**: Sanity checks and optimization tools
+- **Automated Backups**: Export and restore functionality
+- **Performance Optimization**: Intelligent indexing and query optimization
+
+### 📚 Comprehensive Analysis
+- **Single-File HTML Templates**: Rich position analysis with all insights
+- **Material & Positional Analysis**: Deep position evaluation metrics
+- **Learning Insights**: Skill-level appropriate training recommendations
+- **Tactical Theme Recognition**: Automatic pattern identification
+- **Visualization Data**: Charts and visual analysis tools
+
+### ♟️ Enhanced Game Import
+- **Fixed Player Names**: Intelligent name extraction and cleaning
+- **Batch Processing**: Import thousands of games efficiently  
+- **Comprehensive Metadata**: Full game information preservation
+- **Quality Assessment**: Import statistics and validation
+- **Multiple Formats**: Support for various PGN sources
+
+### 👥 User Management
+- **Automated Admin Creation**: admin@kuikma.com with secure defaults
+- **Role-Based Access**: Admin and user permission levels
+- **Personal Settings**: Customizable training preferences
+- **Progress Tracking**: Detailed performance analytics
+- **Session Management**: Secure authentication and session handling
+
+## 🚀 Quick Start
 
 ### Prerequisites
 ```bash
+Python 3.8+
+pip (Python package manager)
+```
+
+### Installation
+```bash
+# Clone or download the application files
+# Navigate to the application directory
+
+# Install dependencies
 pip install -r requirements.txt
-```
 
-### Dependencies
-```
-streamlit>=1.28.0
-pandas>=2.1.0
-numpy>=1.25.2
-matplotlib>=3.8.0
-seaborn>=0.12.2
-plotly>=5.15.0
-requests>=2.31.0
-python-dateutil>=2.8.2
-python-chess>=1.9.0
-scipy>=1.11.0
-# New dependencies for enhanced features
-weasyprint>=61.0
-# Optional: Enhanced PDF generation
-cffi>=1.15.0
-```
+# Run setup (creates database, admin user, etc.)
+python setup.py
 
-### Database Initialization
-```bash
-python database.py
-```
-
-### Run Application
-```bash
+# Start the application
 streamlit run app.py
 ```
+
+### First Login
+1. Open http://localhost:8501
+2. Click "Admin" tab
+3. Login with: admin@kuikma.com / passpass
+4. Navigate to Settings to import your chess data
 
 ## 📁 Project Structure
 
 ```
-chess-trainer/
-├── app.py                     # Main mobile-friendly application
-├── database.py                # Enhanced database with game storage
-├── training.py                # Streamlined training with essential features
-├── insights.py                # Comprehensive insights and analytics
-├── analysis.py                # Performance analysis and metrics
-├── pgn_loader.py              # PGN file processing and game import
-├── spatial_analysis.py        # Spatial visualization and metrics
-├── chess_board.py             # Mobile-optimized chess board rendering
-├── auth.py                    # User authentication
-├── settings.py                # Configuration and data management
-├── config.py                  # Application configuration
-├── requirements.txt           # Python dependencies
-├── README.md                  # This file
+kuikma-chess-engine/
+├── app.py                          # Main application
+├── database.py                     # Enhanced database with full schema
+├── auth.py                         # Authentication and user management
+├── training.py                     # Training interface with HTML generation
+├── settings.py                     # Comprehensive settings and import/export
+├── jsonl_processor.py              # Enhanced JSONL processor
+├── pgn_loader.py                   # Fixed PGN import with name handling
+├── html_generator.py # Single-file HTML template generator
+├── insights.py                     # User insights and analytics
+├── analysis.py                     # Advanced analysis tools
+├── chess_board.py                  # Chess board rendering
+├── spatial_analysis.py             # Spatial analysis tools (coming soon)
+├── config.py                       # Application configuration
+├── setup.py                        # Setup and initialization script
+├── requirements.txt                # Python dependencies
+├── README.md                       # This file
 └── data/
-    └── chess_trainer.db       # SQLite database
+    ├── kuikma_chess.db             # Main database
+    └── backups/                    # Database backups
+└── kuikma_analysis/                # Generated HTML analyses
+└── logs/                           # Application logs
 ```
 
+## 📊 Database Schema
+
+### Core Tables
+- **users**: User accounts with admin flags
+- **positions**: Enhanced position data with comprehensive analysis
+- **moves**: Move analysis with ML evaluation and tactical data
+- **user_moves**: Training attempts with session tracking
+- **user_settings**: Personalized training configurations
+
+### Game Analysis Tables  
+- **games**: Complete chess games with enhanced metadata
+- **user_game_analysis**: Game analysis progress tracking
+- **user_saved_games**: User's saved games for later analysis
+
+### Analytics Tables
+- **user_move_analysis**: Detailed move analysis data
+- **training_sessions**: Session grouping and metadata
+- **user_insights_cache**: Performance optimization cache
+
+## 🔧 Configuration
+
+### User Training Settings
+- **Random Positions**: Random vs sequential position selection
+- **Top N Threshold**: Number of top moves considered correct (1-10)
+- **Score Threshold**: Maximum centipawn loss for correctness (5-50cp)
+- **Board Theme**: Visual appearance (default, dark, blue, green, wood)
+
+### Import Settings
+- **JSONL Processing**: Enhanced validation and error handling
+- **PGN Import**: Batch processing with intelligent name extraction
+- **Quality Assessment**: Processing quality indicators (basic/standard/high)
+
+### Admin Settings
+- **Database Management**: Complete CRUD operations and maintenance
+- **User Management**: Account creation, role assignment, statistics
+- **System Monitoring**: Health checks, performance optimization
+
+## 📤 Data Import/Export
+
+### Enhanced JSONL Import
+```json
+{
+  "id": 12345,
+  "fen": "position_fen_here",
+  "title": "Position Title", 
+  "difficulty_rating": 1500,
+  "game_phase": "middlegame",
+  "themes": ["tactical", "pins"],
+  "comprehensive_analysis": {...},
+  "learning_insights": {...},
+  "top_moves": [...]
+}
+```
+
+### PGN Import Features
+- **Smart Name Extraction**: Handles missing/malformed player names
+- **Metadata Preservation**: Complete header information
+- **Batch Processing**: Efficient handling of large files
+- **Quality Reporting**: Import statistics and error handling
+
+### Export Options
+- **Complete Database**: Full SQLite export with schema
+- **JSON Data**: Structured data export for integration
+- **CSV Tables**: Individual table exports for analysis
+- **HTML Templates**: Comprehensive position analysis files
+
+## 🛡️ Security Features
+
+### Authentication
+- **Secure Password Hashing**: SHA-256 with proper salting
+- **Session Management**: Timeout and secure session handling
+- **Admin Protection**: Special handling for admin accounts
+- **Role-Based Access**: Feature restrictions based on user role
+
+### Data Protection
+- **Input Validation**: Comprehensive data validation
+- **SQL Injection Prevention**: Parameterized queries
+- **Error Handling**: Graceful error management
+- **Backup Systems**: Automated backup creation
+
+## 📈 Performance Features
+
+### Database Optimization
+- **Strategic Indexing**: Optimized indexes for common queries
+- **Query Optimization**: Efficient data retrieval patterns
+- **Batch Processing**: Bulk operations for large datasets
+- **Memory Management**: Optimized for large position collections
+
+### User Experience
+- **Responsive Design**: Mobile-friendly interface
+- **Progressive Loading**: Efficient data loading strategies
+- **Session Persistence**: Maintain state across interactions
+- **Real-time Feedback**: Immediate response to user actions
+
+## 🧪 Advanced Features
+
+### HTML Analysis Generation
+- **Comprehensive Templates**: All position data in single file
+- **Professional Styling**: Print-ready format
+- **Interactive Elements**: Expandable sections and data views
+- **Export Options**: Download for offline use
+
+### Database Administration
+- **Complete CRUD Operations**: Full database management
+- **Health Monitoring**: Automated system health checks
+- **Performance Tuning**: Database optimization tools
+- **Data Migration**: Import/export with schema preservation
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Database Errors**
+```bash
+# Reset database completely
+python setup.py
+# Or use the database reset function in Admin Panel
+```
+
+**Import Failures**
+- Check file format (valid JSONL/PGN)
+- Verify file encoding (UTF-8)
+- Review error messages in import logs
+- Use smaller batch sizes for large files
+
+**Permission Issues**
+- Ensure proper admin login
+- Check user role assignments
+- Verify database file permissions
+
+**Performance Issues**
+- Run database optimization (Admin Panel)
+- Clear old session data
+- Reduce import batch sizes
+- Check available disk space
+
+### Getting Help
+1. Check the application logs in `logs/kuikma.log`
+2. Use the database sanity check in Admin Panel
+3. Review import statistics for error details
+4. Check system requirements and dependencies
+
+## 🔮 Roadmap
+
+### Planned Features
+- **AI-Powered Analysis**: Machine learning position evaluation
+- **Advanced Pattern Recognition**: Tactical pattern identification
+- **Performance Prediction**: Training outcome forecasting
+- **Social Features**: User communities and sharing
+- **Mobile Apps**: Native mobile applications
+- **Cloud Sync**: Cross-device synchronization
+
+### Technical Improvements
+- **Performance Optimization**: Query optimization and caching
+- **UI/UX Enhancements**: Improved user interface design
+- **API Development**: RESTful API for integrations
+- **Plugin System**: Extensible plugin architecture
+- **Real-time Collaboration**: Multi-user training sessions
+
+## 📄 License
+
+MIT License - See LICENSE file for details.
+
+## 🙏 Acknowledgements
+
+- **Stockfish**: Chess engine for position analysis
+- **Python-Chess**: Chess programming library
+- **Streamlit**: Web application framework
+- **Plotly**: Interactive visualization library
+- **Chess Community**: Training methodologies and insights
+
+---
+
+**Kuikma Chess Engine v1.0.0**  
+*Advanced Chess Training & Analysis Platform*  
+Built with ♟️ for chess enthusiasts worldwide.
+"""
+    
 ## 🎮 Usage Guide
 
 ### Position Training
