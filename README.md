@@ -97,9 +97,12 @@ seaborn>=0.12.2
 plotly>=5.15.0
 requests>=2.31.0
 python-dateutil>=2.8.2
-Pillow>=9.0.0
 python-chess>=1.9.0
 scipy>=1.11.0
+# New dependencies for enhanced features
+weasyprint>=61.0
+# Optional: Enhanced PDF generation
+cffi>=1.15.0
 ```
 
 ### Database Initialization
