@@ -472,8 +472,10 @@ def submit_legal_move(selected_move_data: Dict[str, Any], generate_html: bool = 
     else:
         st.error("❌ Failed to record move. Please try again.")
 
+# Enhanced analysis display functions for training.py
+
 def display_move_analysis_results():
-    """Display comprehensive move analysis results."""
+    """Display comprehensive move analysis results with side-by-side comparison."""
     if 'last_move_analysis' not in st.session_state:
         st.warning("⚠️ No move analysis data available.")
         return
@@ -483,181 +485,259 @@ def display_move_analysis_results():
     found_move_data = analysis.get('move_data', {})
     time_taken = analysis.get('time_taken', 0)
     top_moves = analysis.get('top_moves', [])
+    position_data = analysis.get('position_data', {})
     
-    st.markdown("## 🎯 Move Analysis Results")
+    st.markdown("## 🎯 Comprehensive Move Analysis")
     
     # Result display with enhanced formatting
+    display_result_summary(result, found_move_data, time_taken)
+    
+    # Side-by-side board comparison
+    display_side_by_side_boards(position_data, found_move_data, top_moves)
+    
+    # Tabular comparison stats
+    display_position_comparison_stats(position_data, found_move_data, top_moves)
+    
+    # Top moves analysis
+    display_enhanced_top_moves_table(top_moves, found_move_data)
+    
+    # Performance insights and recommendations
+    display_performance_insights(result, found_move_data, time_taken, top_moves)
+    
+    # HTML generation section
+    display_html_generation_section(analysis)
+    
+    # Continue training section
+    display_continue_training_section()
+
+def display_result_summary(result: str, move_data: Dict[str, Any], time_taken: float):
+    """Display enhanced result summary."""
     result_config = {
-        'excellent': {
-            'icon': '🌟',
-            'color': 'success',
-            'message': 'Excellent move! Perfect execution.',
-            'bg_color': '#d4edda'
-        },
-        'correct': {
-            'icon': '✅',
-            'color': 'success', 
-            'message': 'Good move! Well played.',
-            'bg_color': '#d4edda'
-        },
-        'inaccuracy': {
-            'icon': '⚠️',
-            'color': 'warning',
-            'message': 'Inaccurate move. Could be better.',
-            'bg_color': '#fff3cd'
-        },
-        'blunder': {
-            'icon': '❌',
-            'color': 'error',
-            'message': 'Blunder! This loses material or position.',
-            'bg_color': '#f8d7da'
-        },
-        'incorrect': {
-            'icon': '❌',
-            'color': 'error',
-            'message': 'Incorrect move. Try to find a better option.',
-            'bg_color': '#f8d7da'
-        }
+        'excellent': {'icon': '🌟', 'color': '#28a745', 'bg': '#d4edda', 'message': 'Excellent move! Perfect execution.'},
+        'correct': {'icon': '✅', 'color': '#28a745', 'bg': '#d4edda', 'message': 'Good move! Well played.'},
+        'inaccuracy': {'icon': '⚠️', 'color': '#ffc107', 'bg': '#fff3cd', 'message': 'Inaccurate move. Could be better.'},
+        'blunder': {'icon': '💥', 'color': '#dc3545', 'bg': '#f8d7da', 'message': 'Blunder! This loses material or position.'},
+        'incorrect': {'icon': '❌', 'color': '#dc3545', 'bg': '#f8d7da', 'message': 'Incorrect move. Try to find a better option.'}
     }
     
     config = result_config.get(result, result_config['incorrect'])
     
-    # Display result with proper formatting
     st.markdown(f"""
     <div style="
-        padding: 15px; 
-        border-radius: 10px; 
-        background-color: {config['bg_color']}; 
-        border-left: 5px solid {'#28a745' if config['color'] == 'success' else '#ffc107' if config['color'] == 'warning' else '#dc3545'};
+        padding: 20px; 
+        border-radius: 15px; 
+        background: linear-gradient(135deg, {config['bg']} 0%, {config['bg']}AA 100%);
+        border-left: 8px solid {config['color']};
         margin: 20px 0;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     ">
-        <h3 style="margin: 0; color: #333;">
+        <h2 style="margin: 0; color: {config['color']}; font-size: 1.8rem;">
             {config['icon']} {config['message']}
-        </h3>
+        </h2>
+        <div style="margin-top: 15px; display: flex; gap: 30px; flex-wrap: wrap;">
+            <div><strong>Your Move:</strong> {convert_to_piece_icons(move_data.get('move', 'Unknown'))}</div>
+            <div><strong>Engine Rank:</strong> #{move_data.get('rank', 999)}</div>
+            <div><strong>Time Taken:</strong> {time_taken:.1f}s</div>
+            <div><strong>CP Loss:</strong> {move_data.get('centipawn_loss', 0)}</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
+
+
+def display_position_comparison_stats(position_data: Dict[str, Any], user_move_data: Dict[str, Any], top_moves: List[Dict]):
+    """Display tabular comparison stats with color coding."""
+    st.markdown("### 📊 Position Analysis Comparison")
     
-    # Move details metrics
-    st.markdown("### 📊 Move Statistics")
+    if not top_moves:
+        st.warning("No moves available for comparison")
+        return
     
-    detail_col1, detail_col2, detail_col3, detail_col4 = st.columns(4)
+    # Calculate stats for current position and after best move
+    current_fen = position_data.get('fen', '')
+    best_move = top_moves[0]
+    user_move = user_move_data
     
-    with detail_col1:
-        selected_move = found_move_data.get('move', 'Unknown')
-        formatted_move = convert_to_piece_icons(selected_move)
-        st.metric("Your Move", formatted_move)
-    
-    with detail_col2:
-        rank = found_move_data.get('rank', 999)
-        rank_display = f"#{rank}" if rank < 999 else "Not in top moves"
-        st.metric("Engine Rank", rank_display)
-    
-    with detail_col3:
-        cp_loss = found_move_data.get('centipawn_loss', 0)
-        st.metric("Centipawn Loss", f"{cp_loss}")
-    
-    with detail_col4:
-        st.metric("Time Taken", f"{time_taken:.1f}s")
-    
-    # Top engine moves analysis
-    if top_moves:
-        st.markdown("### 🏆 Top Engine Moves")
+    # Get spatial analysis for both positions
+    try:
+        import spatial_analysis
         
-        # Create a nice table for top moves
-        moves_data = []
-        for i, move in enumerate(top_moves[:5], 1):
-            formatted_move = convert_to_piece_icons(move.get('move', ''))
-            score = move.get('score', 0)
-            cp_loss = move.get('centipawn_loss', 0)
-            classification = move.get('classification', '').title()
-            
-            # Highlight user's move
-            is_user_move = move.get('move') == found_move_data.get('move')
-            
-            moves_data.append({
-                'Rank': f"{'👑' if i == 1 else '🥈' if i == 2 else '🥉' if i == 3 else str(i)}",
-                'Move': f"**{formatted_move}**" + (" ← Your move" if is_user_move else ""),
-                'Score': f"{score}",
-                'CP Loss': f"{cp_loss}",
-                'Quality': classification
-            })
+        current_board = chess.Board(current_fen)
+        current_metrics = spatial_analysis.calculate_comprehensive_spatial_metrics(current_board)
         
-        # Display as formatted table
-        for move_info in moves_data:
-            cols = st.columns([1, 3, 2, 2, 2])
-            with cols[0]:
-                st.markdown(move_info['Rank'])
-            with cols[1]:
-                st.markdown(move_info['Move'])
-            with cols[2]:
-                st.markdown(move_info['Score'])
-            with cols[3]:
-                st.markdown(move_info['CP Loss'])
-            with cols[4]:
-                st.markdown(move_info['Quality'])
-    
-    # Performance insights
-    st.markdown("### 💡 Performance Insights")
-    
-    insights = generate_move_insights(result, found_move_data, time_taken, top_moves)
-    for insight in insights:
-        st.info(f"💡 {insight}")
-    
-    # HTML download if generated
-    if analysis.get('generated_html') and analysis.get('html_path'):
-        st.markdown("### 📥 Download Analysis")
+        # Get position after best move
+        best_move_fen = get_position_after_move(current_fen, best_move.get('uci', ''))
+        if best_move_fen and best_move_fen != current_fen:
+            best_move_board = chess.Board(best_move_fen)
+            best_metrics = spatial_analysis.calculate_comprehensive_spatial_metrics(best_move_board)
+        else:
+            best_metrics = current_metrics
         
-        try:
-            with open(analysis['html_path'], 'r', encoding='utf-8') as f:
-                html_content = f.read()
-            
-            download_col1, download_col2 = st.columns(2)
-            
-            with download_col1:
-                st.download_button(
-                    label="📥 Download HTML Analysis",
-                    data=html_content,
-                    file_name=f"position_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
-                    mime="text/html",
-                    use_container_width=True,
-                    key="download_html_analysis"
-                )
-            
-            with download_col2:
-                st.info(f"✅ Analysis file generated: {analysis['html_path']}")
+        # Create comparison table
+        comparison_data = create_comparison_table_data(current_metrics, best_metrics, user_move, best_move)
+        display_colored_comparison_table(comparison_data)
+        
+    except Exception as e:
+        st.warning(f"Spatial analysis not available: {e}")
+        # Fallback to basic comparison
+        display_basic_move_comparison(user_move, best_move)
+
+def create_comparison_table_data(current_metrics: Dict, best_metrics: Dict, user_move: Dict, best_move: Dict) -> List[Dict]:
+    """Create comparison table data with improvements."""
+    data = []
+    
+    # Material comparison
+    current_material = current_metrics.get('material_balance', {}).get('material_difference', 0)
+    best_material = best_metrics.get('material_balance', {}).get('material_difference', 0)
+    material_improvement = round(best_material - current_material, 2)
+    
+    data.append({
+        'metric': 'Material Balance',
+        'current': f"{current_material:+.1f}",
+        'after_best': f"{best_material:+.1f}",
+        'improvement': material_improvement,
+        'improvement_text': f"{material_improvement:+.1f}",
+        'color': get_improvement_color(material_improvement)
+    })
+    
+    # Center control comparison
+    current_center = current_metrics.get('center_control', {}).get('center_advantage', 0)
+    best_center = best_metrics.get('center_control', {}).get('center_advantage', 0)
+    center_improvement = best_center - current_center
+    
+    data.append({
+        'metric': 'Center Control',
+        'current': f"{current_center:+}",
+        'after_best': f"{best_center:+}",
+        'improvement': center_improvement,
+        'improvement_text': f"{center_improvement:+}",
+        'color': get_improvement_color(center_improvement)
+    })
+    
+    # Space control comparison
+    current_space = current_metrics.get('space_control', {}).get('space_advantage', 0)
+    best_space = best_metrics.get('space_control', {}).get('space_advantage', 0)
+    space_improvement = round(best_space - current_space, 1)
+    
+    data.append({
+        'metric': 'Space Advantage',
+        'current': f"{current_space:+.1f}",
+        'after_best': f"{best_space:+.1f}",
+        'improvement': space_improvement,
+        'improvement_text': f"{space_improvement:+.1f}",
+        'color': get_improvement_color(space_improvement)
+    })
+    
+    # Move quality comparison
+    user_score = user_move.get('score', 0)
+    best_score = best_move.get('score', 0)
+    score_difference = best_score - user_score
+    
+    data.append({
+        'metric': 'Move Evaluation',
+        'current': f"{user_score}",
+        'after_best': f"{best_score}",
+        'improvement': score_difference,
+        'improvement_text': f"{score_difference:+}",
+        'color': get_improvement_color(score_difference)
+    })
+    
+    return data
+
+
+
+
+
+def display_html_generation_section(analysis: Dict[str, Any]):
+    """Display HTML generation section with preview."""
+    st.markdown("### 📚 Comprehensive Analysis Report")
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        if st.button("🎨 Generate Comprehensive HTML Report", type="primary", use_container_width=True):
+            generate_comprehensive_html_report(analysis)
+    
+    with col2:
+        if analysis.get('generated_html') and analysis.get('html_path'):
+            try:
+                with open(analysis['html_path'], 'r', encoding='utf-8') as f:
+                    html_content = f.read()
                 
-        except Exception as e:
-            st.warning(f"⚠️ HTML file not accessible: {e}")
-    
-    # Training recommendations
-    st.markdown("### 🎯 Training Recommendations")
-    
-    recommendations = generate_training_recommendations(result, found_move_data)
-    for rec in recommendations:
-        st.success(f"🎓 {rec}")
-    
-    # Continue training section
-    st.markdown("### ➡️ Continue Training")
-    
-    continue_col1, continue_col2, continue_col3 = st.columns(3)
-    
-    with continue_col1:
-        if st.button("➡️ Next Position", type="primary", key="continue_next_analysis", use_container_width=True):
-            clear_move_analysis()
-            load_next_position()
+                st.download_button(
+                    label="📥 Download HTML Report",
+                    data=html_content,
+                    file_name=f"chess_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+                    mime="text/html",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.warning(f"Download not available: {e}")
+
+def generate_comprehensive_html_report(analysis: Dict[str, Any]):
+    """Generate comprehensive HTML report with enhanced features."""
+    try:
+        position_data = analysis.get('position_data', {})
+        user_move_data = analysis.get('move_data', {})
+        
+        # Use enhanced HTML generator
+        if 'html_generator' not in st.session_state:
+            st.session_state.html_generator = ComprehensiveHTMLGenerator()
+        
+        html_generator = st.session_state.html_generator
+        
+        with st.spinner("🎨 Generating comprehensive chess analysis report..."):
+            # Generate with enhanced features
+            output_path = html_generator.generate_enhanced_comprehensive_analysis(
+                position_data=position_data,
+                selected_move_data=user_move_data,
+                analysis_results=analysis,
+                include_spatial_analysis=True,
+                include_side_by_side=True,
+                include_detailed_stats=True,
+                print_optimized=True
+            )
+        
+        if output_path:
+            st.success(f"✅ Comprehensive HTML report generated!")
+            
+            # Update analysis with new path
+            analysis['generated_html'] = True
+            analysis['html_path'] = output_path
+            st.session_state.last_move_analysis = analysis
+            
             st.rerun()
+        else:
+            st.error("❌ Failed to generate HTML report")
     
-    with continue_col2:
-        if st.button("🎲 Random Position", key="continue_random_analysis", use_container_width=True):
-            clear_move_analysis()
-            load_random_position()
-            st.rerun()
+    except Exception as e:
+        st.error(f"❌ Error generating HTML report: {e}")
+
+# Helper functions
+
+def get_improvement_color(improvement: float) -> str:
+    """Get color class based on improvement value."""
+    if improvement > 0.05:
+        return "improvement-positive"
+    elif improvement < -0.05:
+        return "improvement-negative"
+    else:
+        return "improvement-neutral"
+
+def display_basic_move_comparison(user_move: Dict, best_move: Dict):
+    """Display basic move comparison when spatial analysis is not available."""
+    col1, col2 = st.columns(2)
     
-    with continue_col3:
-        if st.button("🔄 Try This Position Again", key="retry_position", use_container_width=True):
-            clear_move_analysis()
-            start_position_timer()
-            st.rerun()
+    with col1:
+        st.markdown("**Your Move**")
+        st.metric("Score", user_move.get('score', 0))
+        st.metric("CP Loss", user_move.get('centipawn_loss', 0))
+        st.metric("Classification", user_move.get('classification', 'Unknown').title())
+    
+    with col2:
+        st.markdown("**Best Move**")
+        st.metric("Score", best_move.get('score', 0))
+        st.metric("CP Loss", best_move.get('centipawn_loss', 0))
+        st.metric("Classification", best_move.get('classification', 'Unknown').title())
 
 def generate_move_insights(result: str, move_data: Dict[str, Any], time_taken: float, top_moves: List[Dict]) -> List[str]:
     """Generate insights based on move analysis."""
@@ -720,32 +800,450 @@ def generate_training_recommendations(result: str, move_data: Dict[str, Any]) ->
     
     return recommendations
 
-def generate_enhanced_position_analysis(position_data: Dict[str, Any], selected_move_data: Dict[str, Any]) -> Optional[str]:
-    """Generate enhanced HTML analysis."""
+
+# Fixed functions for training.py
+
+def get_position_after_move(fen: str, uci_move: str) -> Optional[str]:
+    """Get FEN position after making a move - FIXED VERSION."""
     try:
-        if 'html_generator' not in st.session_state:
-            st.session_state.html_generator = ComprehensiveHTMLGenerator()
+        if not uci_move:
+            return fen  # Return original FEN if no move
         
-        html_generator = st.session_state.html_generator
+        board = chess.Board(fen)
         
-        with st.spinner("🔄 Generating comprehensive HTML analysis..."):
-            output_path = html_generator.generate_enhanced_analysis(
-                position_data=position_data,
-                selected_move_data=selected_move_data,
-                include_spatial_analysis=True,
-                include_side_by_side=True
-            )
-        
-        if output_path:
-            st.success(f"✅ HTML analysis generated successfully!")
-            return output_path
+        # Handle different move formats
+        if len(uci_move) >= 4:  # UCI format like "e2e4"
+            try:
+                move = chess.Move.from_uci(uci_move)
+            except ValueError:
+                # If UCI parsing fails, try to find the move by SAN
+                try:
+                    move = board.parse_san(uci_move)
+                except ValueError:
+                    return fen
         else:
-            st.error("❌ Failed to generate HTML analysis")
-            return None
+            return fen
+        
+        # Verify move is legal
+        if move in board.legal_moves:
+            board.push(move)
+            return board.fen()
+        else:
+            # Try to find a similar move if exact UCI doesn't work
+            for legal_move in board.legal_moves:
+                if (legal_move.from_square == move.from_square and 
+                    legal_move.to_square == move.to_square):
+                    board.push(legal_move)
+                    return board.fen()
             
+            return fen  # Return original if move not found
+        
     except Exception as e:
-        st.error(f"❌ Error generating analysis: {e}")
-        return None
+        print(f"Error in get_position_after_move: {e}")
+        return fen  # Return original FEN on any error
+
+def display_colored_comparison_table(comparison_data: List[Dict]):
+    """Display comparison table with color coding - FIXED HTML RENDERING."""
+    
+    table_html = f"""
+    <table style="
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+    ">
+        <thead>
+            <tr style="
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+            ">
+                <th style="padding: 15px; text-align: center; font-weight: 600;">Metric</th>
+                <th style="padding: 15px; text-align: center; font-weight: 600;">Current Position</th>
+                <th style="padding: 15px; text-align: center; font-weight: 600;">After Best Move</th>
+                <th style="padding: 15px; text-align: center; font-weight: 600;">Improvement</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    for i, row in enumerate(comparison_data):
+        bg_color = "#f8f9fa" if i % 2 == 0 else "#ffffff"
+        
+        # Determine improvement cell styling
+        improvement = row.get('improvement', 0)
+        if improvement > 0.05:
+            improvement_style = "background-color: #d4edda; color: #155724; font-weight: 600;"
+        elif improvement < -0.05:
+            improvement_style = "background-color: #f8d7da; color: #721c24; font-weight: 600;"
+        else:
+            improvement_style = "background-color: #fff3cd; color: #856404; font-weight: 600;"
+        
+        table_html += f"""
+        <tr style="background-color: {bg_color};">
+            <td style="padding: 12px 15px; text-align: center; font-weight: 600; border-bottom: 1px solid #e0e0e0;">
+                {row['metric']}
+            </td>
+            <td style="padding: 12px 15px; text-align: center; border-bottom: 1px solid #e0e0e0;">
+                {row['current']}
+            </td>
+            <td style="padding: 12px 15px; text-align: center; border-bottom: 1px solid #e0e0e0;">
+                {row['after_best']}
+            </td>
+            <td style="padding: 12px 15px; text-align: center; border-bottom: 1px solid #e0e0e0; {improvement_style}">
+                {row['improvement_text']}
+            </td>
+        </tr>
+        """
+    
+    table_html += """
+        </tbody>
+    </table>
+    """
+    
+    # Use unsafe_allow_html=True to render the HTML
+    st.markdown(table_html, unsafe_allow_html=True)
+
+def display_enhanced_top_moves_table(top_moves: List[Dict], user_move_data: Dict[str, Any]):
+    """Display enhanced top moves table with formatting - FIXED HTML RENDERING."""
+    st.markdown("### 🏆 Top Engine Moves Analysis")
+    
+    if not top_moves:
+        st.warning("No moves available for analysis")
+        return
+    
+    moves_data = []
+    user_move_notation = user_move_data.get('move', '')
+    
+    for i, move in enumerate(top_moves[:10], 1):
+        is_user_move = move.get('move') == user_move_notation
+        formatted_move = convert_to_piece_icons(move.get('move', ''))
+        
+        # Format principal variation
+        pv = move.get('pv', '')
+        formatted_pv = convert_to_piece_icons(pv[:50] + '...' if len(pv) > 50 else pv) if pv else ''
+        
+        moves_data.append({
+            'rank': i,
+            'move': formatted_move,
+            'score': move.get('score', 0),
+            'cp_loss': move.get('centipawn_loss', 0),
+            'classification': move.get('classification', 'unknown').title(),
+            'pv': formatted_pv,
+            'is_user_move': is_user_move
+        })
+    
+    # Generate HTML table
+    table_html = f"""
+    <table style="
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+    ">
+        <thead>
+            <tr style="background: #667eea; color: white;">
+                <th style="padding: 12px; text-align: left; font-weight: 600;">Rank</th>
+                <th style="padding: 12px; text-align: left; font-weight: 600;">Move</th>
+                <th style="padding: 12px; text-align: left; font-weight: 600;">Score</th>
+                <th style="padding: 12px; text-align: left; font-weight: 600;">CP Loss</th>
+                <th style="padding: 12px; text-align: left; font-weight: 600;">Quality</th>
+                <th style="padding: 12px; text-align: left; font-weight: 600;">Principal Variation</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    for move_data in moves_data:
+        # Determine row styling
+        row_style = "background-color: #f8f9fa;" if move_data['rank'] % 2 == 0 else "background-color: #ffffff;"
+        
+        if move_data['is_user_move']:
+            row_style = "background-color: #fff3cd; border-left: 4px solid #ffc107;"
+        elif move_data['rank'] == 1:
+            row_style = "background-color: #d4edda; border-left: 4px solid #28a745;"
+        elif move_data['rank'] == 2:
+            row_style = "background-color: #e3f2fd; border-left: 4px solid #2196f3;"
+        elif move_data['rank'] == 3:
+            row_style = "background-color: #fff8e1; border-left: 4px solid #ff9800;"
+        
+        user_indicator = " ← Your move" if move_data['is_user_move'] else ""
+        
+        table_html += f"""
+        <tr style="{row_style}">
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e0e0e0;">
+                <strong>{move_data['rank']}</strong>
+            </td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e0e0e0; font-family: monospace; font-weight: 600; font-size: 1.1em;">
+                {move_data['move']}{user_indicator}
+            </td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e0e0e0;">
+                {move_data['score']}
+            </td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e0e0e0;">
+                {move_data['cp_loss']}
+            </td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e0e0e0;">
+                <span style="background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 12px; font-size: 0.85em;">
+                    {move_data['classification']}
+                </span>
+            </td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e0e0e0; font-family: monospace; font-size: 0.9em; color: #666;">
+                {move_data['pv']}
+            </td>
+        </tr>
+        """
+    
+    table_html += """
+        </tbody>
+    </table>
+    """
+    
+    # Use unsafe_allow_html=True to render the HTML
+    st.markdown(table_html, unsafe_allow_html=True)
+
+def display_performance_insights(result: str, found_move_data: Dict[str, Any], time_taken: float, top_moves: List[Dict]):
+    """Display performance insights and recommendations - MISSING FUNCTION ADDED."""
+    st.markdown("### 💡 Performance Insights")
+    
+    insights = generate_move_insights(result, found_move_data, time_taken, top_moves)
+    for insight in insights:
+        st.info(f"💡 {insight}")
+    
+    # Training recommendations
+    st.markdown("### 🎯 Training Recommendations")
+    recommendations = generate_training_recommendations(result, found_move_data)
+    for rec in recommendations:
+        st.success(f"🎓 {rec}")
+
+def record_enhanced_user_move(user_id: int, position_data: Dict[str, Any], 
+                            selected_move_data: Dict[str, Any], time_taken: float, result: str) -> bool:
+    """Record user move with proper database schema - FIXED NULL CONSTRAINT."""
+    try:
+        conn = database.get_db_connection()
+        cursor = conn.cursor()
+        
+        position_id = position_data.get('id')
+        move_notation = selected_move_data.get('move')
+        
+        # Find the move_id from the moves table (if exists)
+        move_id = None
+        if move_notation:
+            cursor.execute('''
+                SELECT id FROM moves 
+                WHERE position_id = ? AND move = ?
+                LIMIT 1
+            ''', (position_id, move_notation))
+            
+            move_record = cursor.fetchone()
+            if move_record:
+                move_id = move_record[0]
+            else:
+                # If move not found in moves table, create a temporary entry or use NULL
+                # For now, we'll insert with move_id as NULL and handle it gracefully
+                pass
+        
+        # Insert user move record - handle NULL move_id gracefully
+        if move_id is not None:
+            cursor.execute('''
+                INSERT INTO user_moves (
+                    user_id, position_id, move_id, time_taken, 
+                    result, timestamp, session_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                user_id, 
+                position_id, 
+                move_id, 
+                round(time_taken, 2),
+                result, 
+                datetime.now().isoformat(),
+                st.session_state.get('training_session_id')
+            ))
+        else:
+            # Insert without move_id (handle schema that allows NULL)
+            # Or create a temporary move record first
+            cursor.execute('''
+                INSERT OR IGNORE INTO moves (
+                    position_id, move, uci, score, depth, centipawn_loss, 
+                    classification, rank
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                position_id,
+                move_notation,
+                selected_move_data.get('uci', ''),
+                selected_move_data.get('score', 0),
+                selected_move_data.get('depth', 0),
+                selected_move_data.get('centipawn_loss', 0),
+                selected_move_data.get('classification', 'unknown'),
+                selected_move_data.get('rank', 999)
+            ))
+            
+            # Get the move_id we just created
+            cursor.execute('''
+                SELECT id FROM moves 
+                WHERE position_id = ? AND move = ?
+                LIMIT 1
+            ''', (position_id, move_notation))
+            
+            move_record = cursor.fetchone()
+            if move_record:
+                move_id = move_record[0]
+                
+                # Now insert the user move
+                cursor.execute('''
+                    INSERT INTO user_moves (
+                        user_id, position_id, move_id, time_taken, 
+                        result, timestamp, session_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    user_id, 
+                    position_id, 
+                    move_id, 
+                    round(time_taken, 2),
+                    result, 
+                    datetime.now().isoformat(),
+                    st.session_state.get('training_session_id')
+                ))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Move recorded: {move_notation} - {result}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error recording move: {e}")
+        return False
+
+def display_side_by_side_boards(position_data: Dict[str, Any], user_move_data: Dict[str, Any], top_moves: List[Dict]):
+    """Display side-by-side board comparison - FIXED BEST MOVE BOARD."""
+    st.markdown("### 🎯 Position Comparison: Current vs Best Move Result")
+    
+    # Get current position and best move
+    current_fen = position_data.get('fen', '')
+    best_move = top_moves[0] if top_moves else {}
+    best_move_uci = best_move.get('uci', '')
+    
+    # FIXED: Generate result position after best move
+    result_fen = get_position_after_move(current_fen, best_move_uci)
+    
+    board_col1, board_col2 = st.columns(2)
+    
+    with board_col1:
+        st.markdown("#### 📋 Current Position")
+        try:
+            board = chess.Board(current_fen)
+            current_board_svg = chess.svg.board(
+                board=board,
+                size=350,
+                style=get_enhanced_board_style()
+            )
+            st.markdown(current_board_svg, unsafe_allow_html=True)
+            
+            # Current position info
+            turn = position_data.get('turn', 'Unknown').title()
+            move_num = position_data.get('fullmove_number', 1)
+            phase = position_data.get('game_phase', 'middlegame').title()
+            
+            st.markdown(f"""
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-top: 10px; border: 1px solid #dee2e6;">
+                <strong>Turn:</strong> {turn}<br>
+                <strong>Move:</strong> {move_num}<br>
+                <strong>Phase:</strong> {phase}
+            </div>
+            """, unsafe_allow_html=True)
+            
+        except Exception as e:
+            st.error(f"Error displaying current board: {e}")
+    
+    with board_col2:
+        st.markdown("#### 🌟 After Best Move")
+        try:
+            # FIXED: Check if we have a valid result position
+            if result_fen and result_fen != current_fen:
+                result_board = chess.Board(result_fen)
+                result_board_svg = chess.svg.board(
+                    board=result_board,
+                    size=350,
+                    style=get_enhanced_board_style()
+                )
+                st.markdown(result_board_svg, unsafe_allow_html=True)
+                
+                # Best move info
+                best_move_notation = convert_to_piece_icons(best_move.get('move', 'Unknown'))
+                best_score = best_move.get('score', 0)
+                best_classification = best_move.get('classification', 'Unknown').title()
+                
+                st.markdown(f"""
+                <div style="background: #e6fffa; padding: 12px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #38b2ac;">
+                    <strong>Best Move:</strong> {best_move_notation}<br>
+                    <strong>Score:</strong> {best_score}<br>
+                    <strong>Evaluation:</strong> {best_classification}
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                # Show the same board but with move highlighted
+                board = chess.Board(current_fen)
+                
+                # Try to highlight the best move if possible
+                try:
+                    if best_move_uci:
+                        move = chess.Move.from_uci(best_move_uci)
+                        highlighted_board_svg = chess.svg.board(
+                            board=board,
+                            size=350,
+                            lastmove=move,
+                            style=get_enhanced_board_style()
+                        )
+                        st.markdown(highlighted_board_svg, unsafe_allow_html=True)
+                    else:
+                        st.markdown(current_board_svg, unsafe_allow_html=True)
+                except:
+                    st.markdown(current_board_svg, unsafe_allow_html=True)
+                
+                st.info("Best move highlighted on current position")
+                
+        except Exception as e:
+            st.error(f"Error displaying result board: {e}")
+
+def get_enhanced_board_style() -> str:
+    """Get enhanced board styling."""
+    return """
+    .square.light { fill: #f0d9b5; stroke: #999; stroke-width: 0.5; }
+    .square.dark { fill: #b58863; stroke: #999; stroke-width: 0.5; }
+    .square.light.lastmove { fill: #cdd26a; }
+    .square.dark.lastmove { fill: #aaa23a; }
+    .piece { font-size: 45px; }
+    """
+
+def display_continue_training_section():
+    """Display continue training section."""
+    st.markdown("### ➡️ Continue Training")
+    
+    continue_col1, continue_col2, continue_col3 = st.columns(3)
+    
+    with continue_col1:
+        if st.button("➡️ Next Position", type="primary", key="continue_next_analysis", use_container_width=True):
+            clear_move_analysis()
+            load_next_position()
+            st.rerun()
+    
+    with continue_col2:
+        if st.button("🎲 Random Position", key="continue_random_analysis", use_container_width=True):
+            clear_move_analysis()
+            load_random_position()
+            st.rerun()
+    
+    with continue_col3:
+        if st.button("🔄 Try This Position Again", key="retry_position", use_container_width=True):
+            clear_move_analysis()
+            start_position_timer()
+            st.rerun()
 
 
 def determine_enhanced_move_result(selected_move_data: Dict[str, Any], position_data: Dict[str, Any]) -> str:
@@ -792,51 +1290,6 @@ def determine_enhanced_move_result(selected_move_data: Dict[str, Any], position_
         return 'correct'
     else:
         return 'incorrect'
-
-def record_enhanced_user_move(user_id: int, position_data: Dict[str, Any], 
-                            selected_move_data: Dict[str, Any], time_taken: float, result: str) -> bool:
-    """Record user move with proper database schema."""
-    try:
-        conn = database.get_db_connection()
-        cursor = conn.cursor()
-        
-        position_id = position_data.get('id')
-        
-        # Find the move_id from the moves table (if exists)
-        cursor.execute('''
-            SELECT id FROM moves 
-            WHERE position_id = ? AND move = ?
-            LIMIT 1
-        ''', (position_id, selected_move_data.get('move')))
-        
-        move_record = cursor.fetchone()
-        move_id = move_record[0] if move_record else None
-        
-        # Insert user move record with simplified schema
-        cursor.execute('''
-            INSERT INTO user_moves (
-                user_id, position_id, move_id, time_taken, 
-                result, timestamp, session_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            user_id, 
-            position_id, 
-            move_id, 
-            round(time_taken, 2),
-            result, 
-            datetime.now().isoformat(),
-            st.session_state.get('training_session_id')
-        ))
-        
-        conn.commit()
-        conn.close()
-        
-        print(f"✅ Move recorded: {selected_move_data.get('move')} - {result}")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Error recording move: {e}")
-        return False
 
 def generate_enhanced_position_analysis(position_data: Dict[str, Any], selected_move_data: Dict[str, Any]) -> Optional[str]:
     """Generate enhanced HTML analysis."""
