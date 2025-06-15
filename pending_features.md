@@ -41,5 +41,24 @@ Main navigation from dropdown to normal menu items
 
 
 
+A comprehensive chess training application that helps users improve their chess skills through targeted position practice, game analysis, and insights. It also has a Chess Position Book/HTML Generator feature - Generates HTML templates for chess positions (question, solution, detailed comprehensive analysis formats).
+
+
+
+DO NOT CREATE NEW FILES - WORK SOLELY WITH EXISITNG ONES!! THESE CHANGES DO NOT WARRANT NEW FILE CREATION.
+
+
+DO NOT CREATE BREAKING CHANGES!!
+
+-Ensure existing features are not lost. Do not introduce breaking changes.
+-Return complete code if there're multiple changes which needs to be merged, else just the snippet with details of file name and how to merge.
+-Round all decimal points to 2 or 3 positions at max while saving in db.
+-Always follow best design and coding practices while applying design thinking principles.
+-Keep in mind that there's a context window and message limit. So ensure you get it right first time itself. Avoid further back & forths.
+-If there are chances of exceeding message window limit then ensure you provide working code with placeholders for remaining functionalities.
+-Retain all existing features and functionalities unless otherwise explicitly mentioned.
+
+
+
 
 

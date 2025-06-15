@@ -34,7 +34,7 @@ def display_training_interface():
     
     # Current position display
     if st.session_state.get('current_position'):
-        display_position_interface()
+        display_enhanced_position_interface()
     else:
         load_initial_position()
 
@@ -128,6 +128,270 @@ def display_training_controls():
     if st.session_state.timer_start is not None:
         current_time = get_current_position_time()
         st.info(f"⏱️ Position Time: {current_time:.1f}s")
+
+# Enhanced JSON parsing functions
+def parse_move_history_json(move_history_data):
+    """Parse move_history JSON data safely."""
+    if not move_history_data:
+        return {}
+    
+    if isinstance(move_history_data, str):
+        try:
+            return json.loads(move_history_data)
+        except:
+            return {}
+    
+    return move_history_data if isinstance(move_history_data, dict) else {}
+
+def parse_last_move_json(last_move_data):
+    """Parse last_move JSON data safely."""
+    if not last_move_data:
+        return {}
+    
+    if isinstance(last_move_data, str):
+        try:
+            return json.loads(last_move_data)
+        except:
+            return {}
+    
+    return last_move_data if isinstance(last_move_data, dict) else {}
+
+def convert_pgn_to_piece_icons(pgn_string):
+    """Convert PGN notation to use piece icons."""
+    if not pgn_string:
+        return ""
+    
+    piece_icons = {
+        'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘'
+    }
+    
+    result = pgn_string
+    for piece, icon in piece_icons.items():
+        result = result.replace(piece, icon)
+    
+    return result
+
+def display_position_info_bar(position_data: Dict[str, Any]):
+    """Display the enhanced info bar with position details and timer."""
+    # Parse JSON data from database
+    move_history = parse_move_history_json(position_data.get('move_history'))
+    last_move = parse_last_move_json(position_data.get('last_move'))
+    
+    # Extract info bar data
+    last_move_san = last_move.get('san', 'N/A')
+    move_number = last_move.get('move_number', 1)
+    position_id = position_data.get('id', 'Unknown')
+    side_to_move = position_data.get('turn', 'white').title()
+    
+    # Create styled info bar
+    st.markdown(f"""
+    <div style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 16px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    ">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                <div style="text-align: center;">
+                    <div style="font-size: 12px; opacity: 0.8;">Last Move</div>
+                    <div style="font-size: 18px; font-weight: bold;">{convert_pgn_to_piece_icons(last_move_san)}</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 12px; opacity: 0.8;">Move Number</div>
+                    <div style="font-size: 18px; font-weight: bold;">{move_number}</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 12px; opacity: 0.8;">Position ID</div>
+                    <div style="font-size: 18px; font-weight: bold;">{position_id}</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 12px; opacity: 0.8;">Side to Move</div>
+                    <div style="font-size: 18px; font-weight: bold;">{side_to_move}</div>
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 12px; opacity: 0.8;">Timer</div>
+                <div id="position-timer" style="font-size: 20px; font-weight: bold; font-family: monospace;">00:00</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Add JavaScript for timer functionality
+    st.markdown("""
+    <script>
+    function updateTimer() {
+        const timerElement = document.getElementById('position-timer');
+        if (!timerElement) return;
+        
+        if (!window.timerStartTime) {
+            window.timerStartTime = Date.now();
+        }
+        
+        const elapsed = Math.floor((Date.now() - window.timerStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        const display = minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
+        timerElement.textContent = display;
+    }
+    
+    // Update timer every second
+    if (!window.timerInterval) {
+        window.timerInterval = setInterval(updateTimer, 1000);
+    }
+    updateTimer();
+    </script>
+    """, unsafe_allow_html=True)
+
+def display_previous_moves_section(position_data: Dict[str, Any]):
+    """Display previous moves section with piece icons."""
+    move_history = parse_move_history_json(position_data.get('move_history'))
+    pgn_string = move_history.get('pgn', '')
+    
+    if pgn_string:
+        # Convert PGN to piece icons
+        moves_with_icons = convert_pgn_to_piece_icons(pgn_string)
+        
+        st.markdown(f"""
+        <div style="
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        ">
+            <h4 style="margin-bottom: 12px; color: #495057;">📜 Previous Moves</h4>
+            <div style="
+                font-family: 'Courier New', monospace;
+                font-size: 14px;
+                line-height: 1.6;
+                background: white;
+                padding: 12px;
+                border-radius: 6px;
+                border: 1px solid #e9ecef;
+                word-wrap: break-word;
+            ">{moves_with_icons}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div style="
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        ">
+            <h4 style="margin-bottom: 12px; color: #495057;">📜 Previous Moves</h4>
+            <div style="
+                font-style: italic;
+                color: #6c757d;
+                text-align: center;
+                padding: 20px;
+            ">No previous moves available for this position</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+def display_enhanced_position_interface():
+    """Enhanced position interface with info bar and controlled insights."""
+    position_data = st.session_state.current_position
+    
+    # Display position info bar
+    display_position_info_bar(position_data)
+    
+    # Display previous moves section
+    display_previous_moves_section(position_data)
+    
+    # Position header (simplified since info is in bar)
+    st.markdown("### Chess Training Position")
+    
+    if position_data.get('description'):
+        st.markdown(f"*{position_data['description']}*")
+    
+    st.markdown("---")
+    
+    # Main interface layout
+    board_col, moves_col = st.columns([1, 1])
+    
+    with board_col:
+        display_chess_board(position_data)
+    
+    with moves_col:
+        if not st.session_state.get('move_submitted'):
+            display_legal_move_selection(position_data)
+        else:
+            st.success("✅ Move submitted!")
+            st.info("💡 Click 'Show Analysis' to load insights and statistics")
+            
+            # Analysis control buttons
+            analysis_col1, analysis_col2 = st.columns(2)
+            
+            with analysis_col1:
+                if st.button("📊 Show Analysis", use_container_width=True, type="primary", key="show_analysis_btn"):
+                    st.session_state.show_analysis_requested = True
+                    st.rerun()
+            
+            with analysis_col2:
+                if st.button("📄 Generate HTML", use_container_width=True, key="generate_html_btn"):
+                    st.session_state.show_analysis_requested = True
+                    submit_move_with_html_generation()
+                    st.rerun()
+    
+    # CRITICAL: Only display analysis AFTER user requests it
+    if (st.session_state.get('move_submitted') and 
+        st.session_state.get('show_analysis_requested') and
+        st.session_state.get('last_move_analysis')):
+        st.markdown("---")
+        display_move_analysis_results()
+
+def submit_move_with_html_generation():
+    """Submit move and generate enhanced HTML analysis."""
+    if 'last_move_analysis' not in st.session_state:
+        st.error("No move analysis data available")
+        return
+    
+    analysis = st.session_state.last_move_analysis
+    position_data = analysis.get('position_data', {})
+    move_data = analysis.get('move_data', {})
+    analysis_results = {
+        'result': analysis.get('result'),
+        'time_taken': analysis.get('time_taken'),
+    }
+    
+    try:
+        # Use the enhanced HTML generator
+        html_generator = st.session_state.html_generator
+        html_content = html_generator.generate_enhanced_html_export(
+            position_data, 
+            move_data, 
+            analysis_results, 
+            include_spatial_analysis=True
+        )
+        
+        # Save HTML file
+        import os
+        os.makedirs("kuikma_analysis", exist_ok=True)
+        timestamp = int(time.time())
+        filename = f"kuikma_analysis/enhanced_position_{position_data.get('id', 'unknown')}_{timestamp}.html"
+        
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        st.success(f"✅ Enhanced HTML analysis generated: {filename}")
+        
+        # Offer download
+        st.download_button(
+            label="📥 Download HTML Analysis",
+            data=html_content,
+            file_name=f"position_{position_data.get('id', 'unknown')}_analysis.html",
+            mime="text/html"
+        )
+        
+    except Exception as e:
+        st.error(f"❌ Error generating HTML: {str(e)}")
 
 def display_chess_board(position_data: Dict[str, Any]):
     """Display chess board with flip functionality."""
@@ -325,71 +589,6 @@ def display_fallback_move_selection(position_data: Dict[str, Any]):
                 submit_legal_move(selected_move_data, generate_html=True)
                 st.rerun()
 
-def display_position_interface():
-    """Display the current position with board and move analysis."""
-    position_data = st.session_state.current_position
-    
-    # Position header
-    st.markdown(f"### Position {position_data.get('id', 'Unknown')}")
-    
-    if position_data.get('description'):
-        st.markdown(f"*{position_data['description']}*")
-    
-    # Position info
-    info_col1, info_col2, info_col3, info_col4, info_col5 = st.columns(5)
-    
-    with info_col1:
-        difficulty = position_data.get('difficulty_rating', 1200)
-        st.markdown(f"**Difficulty:** {difficulty}")
-    
-    with info_col2:
-        game_phase = position_data.get('game_phase', 'middlegame').title()
-        st.markdown(f"**Phase:** {game_phase}")
-    
-    with info_col3:
-        turn = position_data.get('turn', 'white').title()
-        st.markdown(f"**Turn:** {turn}")
-    
-    with info_col4:
-        position_id = position_data.get('id', 'Unknown')
-        st.markdown(f"**Position ID:** {position_id}")
-    
-    with info_col5:
-        move_number = position_data.get('fullmove_number', 1)
-        st.markdown(f"**Move:** {move_number}")
-    
-    st.markdown("---")
-    
-    # Main interface layout
-    board_col, moves_col = st.columns([1, 1])
-    
-    with board_col:
-        display_chess_board(position_data)
-    
-    with moves_col:
-        if not st.session_state.get('move_submitted'):
-            display_legal_move_selection(position_data)
-        else:
-            st.success("✅ Move submitted! Check analysis below.")
-            
-            # Continue buttons
-            cont_col1, cont_col2 = st.columns(2)
-            
-            with cont_col1:
-                if st.button("➡️ Get Analysis", use_container_width=True, type="primary", key="legal_submit_move"):
-                    submit_move(position_data, generate_html=False)
-                    st.rerun()
-            
-            with cont_col2:
-                if st.button("🎲 Generate HTML", use_container_width=True, key="legal_submit_html"):
-                    submit_move(position_data, generate_html=True)
-                    st.rerun()
-    
-    # CRITICAL FIX: Display move analysis AFTER the main interface
-    if st.session_state.get('move_submitted') and st.session_state.get('last_move_analysis'):
-        st.markdown("---")
-        display_move_analysis_results()
-
 def submit_legal_move(selected_move_data: Dict[str, Any], generate_html: bool = False):
     """Submit a legal move and evaluate it against the best moves."""
     if 'user_id' not in st.session_state or 'current_position' not in st.session_state:
@@ -421,8 +620,8 @@ def submit_legal_move(selected_move_data: Dict[str, Any], generate_html: bool = 
             'move': selected_move_notation,
             'uci': selected_move_data.get('uci', ''),
             'rank': 999,
-            'score': 0,
-            'centipawn_loss': 50,
+            'score': round(selected_move_data.get('score', 0), 2),
+            'centipawn_loss': round(selected_move_data.get('centipawn_loss', 50), 2),
             'classification': 'inaccuracy',
             'depth': 0,
             'pv': ''
@@ -446,35 +645,32 @@ def submit_legal_move(selected_move_data: Dict[str, Any], generate_html: bool = 
         if result in ['correct', 'excellent']:
             st.session_state.correct_in_session += 1
         
-        # Generate HTML if requested
-        html_path = None
-        if generate_html:
-            html_path = generate_enhanced_position_analysis(position_data, found_move_data)
-        
-        # Store analysis results in session state BEFORE setting flags
+        # Store analysis results for later display
         st.session_state.last_move_analysis = {
             'result': result,
             'move_data': found_move_data,
             'time_taken': round(time_taken, 2),
             'top_moves': top_moves,
             'position_data': position_data,
-            'generated_html': html_path is not None,
-            'html_path': html_path if html_path else None
         }
         
-        # Set flags for UI updates
+        # Set flag that move was submitted (but DON'T auto-show analysis)
         st.session_state.move_submitted = True
-        st.session_state.show_analysis_after_move = True
+        st.session_state.show_analysis_requested = False  # Reset analysis request
         
         # Show immediate success message
-        st.success(f"✅ Move '{convert_to_piece_icons(selected_move_notation)}' submitted successfully!")
+        st.success(f"✅ Move '{convert_to_piece_icons(selected_move_notation)}' submitted!")
         
-        # Force rerun to show results
+        # Generate HTML if requested
+        if generate_html:
+            submit_move_with_html_generation()
+        
+        # Force rerun to update UI
         st.rerun()
     else:
         st.error("❌ Failed to record move. Please try again.")
 
-# Enhanced analysis display functions for training.py
+# Enhanced analysis display functions
 
 def display_move_analysis_results():
     """Display comprehensive move analysis results with side-by-side comparison."""
@@ -544,7 +740,6 @@ def display_result_summary(result: str, move_data: Dict[str, Any], time_taken: f
         </div>
     </div>
     """, unsafe_allow_html=True)
-
 
 def display_position_comparison_stats(position_data: Dict[str, Any], user_move_data: Dict[str, Any], top_moves: List[Dict]):
     """Display tabular comparison stats with color coding."""
@@ -645,207 +840,8 @@ def create_comparison_table_data(current_metrics: Dict, best_metrics: Dict, user
     
     return data
 
-
-
-
-
-def display_html_generation_section(analysis: Dict[str, Any]):
-    """Display HTML generation section with preview."""
-    st.markdown("### 📚 Comprehensive Analysis Report")
-    
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        if st.button("🎨 Generate Comprehensive HTML Report", type="primary", use_container_width=True):
-            generate_comprehensive_html_report(analysis)
-    
-    with col2:
-        if analysis.get('generated_html') and analysis.get('html_path'):
-            try:
-                with open(analysis['html_path'], 'r', encoding='utf-8') as f:
-                    html_content = f.read()
-                
-                st.download_button(
-                    label="📥 Download HTML Report",
-                    data=html_content,
-                    file_name=f"chess_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
-                    mime="text/html",
-                    use_container_width=True
-                )
-            except Exception as e:
-                st.warning(f"Download not available: {e}")
-
-def generate_comprehensive_html_report(analysis: Dict[str, Any]):
-    """Generate comprehensive HTML report with enhanced features."""
-    try:
-        position_data = analysis.get('position_data', {})
-        user_move_data = analysis.get('move_data', {})
-        
-        # Use enhanced HTML generator
-        if 'html_generator' not in st.session_state:
-            st.session_state.html_generator = ComprehensiveHTMLGenerator()
-        
-        html_generator = st.session_state.html_generator
-        
-        with st.spinner("🎨 Generating comprehensive chess analysis report..."):
-            # Generate with enhanced features
-            output_path = html_generator.generate_enhanced_comprehensive_analysis(
-                position_data=position_data,
-                selected_move_data=user_move_data,
-                analysis_results=analysis,
-                include_spatial_analysis=True,
-                include_side_by_side=True,
-                include_detailed_stats=True,
-                print_optimized=True
-            )
-        
-        if output_path:
-            st.success(f"✅ Comprehensive HTML report generated!")
-            
-            # Update analysis with new path
-            analysis['generated_html'] = True
-            analysis['html_path'] = output_path
-            st.session_state.last_move_analysis = analysis
-            
-            st.rerun()
-        else:
-            st.error("❌ Failed to generate HTML report")
-    
-    except Exception as e:
-        st.error(f"❌ Error generating HTML report: {e}")
-
-# Helper functions
-
-def get_improvement_color(improvement: float) -> str:
-    """Get color class based on improvement value."""
-    if improvement > 0.05:
-        return "improvement-positive"
-    elif improvement < -0.05:
-        return "improvement-negative"
-    else:
-        return "improvement-neutral"
-
-def display_basic_move_comparison(user_move: Dict, best_move: Dict):
-    """Display basic move comparison when spatial analysis is not available."""
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("**Your Move**")
-        st.metric("Score", user_move.get('score', 0))
-        st.metric("CP Loss", user_move.get('centipawn_loss', 0))
-        st.metric("Classification", user_move.get('classification', 'Unknown').title())
-    
-    with col2:
-        st.markdown("**Best Move**")
-        st.metric("Score", best_move.get('score', 0))
-        st.metric("CP Loss", best_move.get('centipawn_loss', 0))
-        st.metric("Classification", best_move.get('classification', 'Unknown').title())
-
-def generate_move_insights(result: str, move_data: Dict[str, Any], time_taken: float, top_moves: List[Dict]) -> List[str]:
-    """Generate insights based on move analysis."""
-    insights = []
-    
-    rank = move_data.get('rank', 999)
-    cp_loss = move_data.get('centipawn_loss', 0)
-    
-    # Time-based insights
-    if time_taken < 5:
-        insights.append("You played very quickly! Consider taking more time for complex positions.")
-    elif time_taken > 60:
-        insights.append("You took your time with this position - good for thorough analysis!")
-    
-    # Rank-based insights
-    if rank == 1:
-        insights.append("You found the engine's top choice! Excellent pattern recognition.")
-    elif rank <= 3:
-        insights.append("Your move was among the top engine choices - well done!")
-    elif rank > 10:
-        insights.append("Try to look for more forcing moves or better piece coordination.")
-    
-    # Centipawn loss insights
-    if cp_loss == 0:
-        insights.append("Perfect move with no material loss!")
-    elif cp_loss < 10:
-        insights.append("Excellent move with minimal disadvantage.")
-    elif cp_loss > 50:
-        insights.append("This move loses significant material or position. Review tactical patterns.")
-    
-    # Comparison with other moves
-    if len(top_moves) > 1:
-        best_score = top_moves[0].get('score', 0)
-        user_score = move_data.get('score', 0)
-        if abs(best_score - user_score) < 10:
-            insights.append("Your move was very close in evaluation to the best move!")
-    
-    return insights
-
-def generate_training_recommendations(result: str, move_data: Dict[str, Any]) -> List[str]:
-    """Generate personalized training recommendations."""
-    recommendations = []
-    
-    classification = move_data.get('classification', '').lower()
-    rank = move_data.get('rank', 999)
-    
-    if result in ['excellent', 'correct']:
-        recommendations.append("Great job! Keep practicing similar positions to reinforce these patterns.")
-        if rank == 1:
-            recommendations.append("You're developing strong chess intuition. Try harder positions to challenge yourself.")
-    else:
-        if classification == 'blunder':
-            recommendations.append("Focus on tactical training to avoid blunders. Practice basic tactical motifs.")
-        elif classification == 'mistake':
-            recommendations.append("Review the position for better alternatives. Study similar pawn structures.")
-        else:
-            recommendations.append("Analyze the top engine moves to understand better strategic concepts.")
-        
-        recommendations.append("Consider studying master games with similar positions.")
-    
-    return recommendations
-
-
-# Fixed functions for training.py
-
-def get_position_after_move(fen: str, uci_move: str) -> Optional[str]:
-    """Get FEN position after making a move - FIXED VERSION."""
-    try:
-        if not uci_move:
-            return fen  # Return original FEN if no move
-        
-        board = chess.Board(fen)
-        
-        # Handle different move formats
-        if len(uci_move) >= 4:  # UCI format like "e2e4"
-            try:
-                move = chess.Move.from_uci(uci_move)
-            except ValueError:
-                # If UCI parsing fails, try to find the move by SAN
-                try:
-                    move = board.parse_san(uci_move)
-                except ValueError:
-                    return fen
-        else:
-            return fen
-        
-        # Verify move is legal
-        if move in board.legal_moves:
-            board.push(move)
-            return board.fen()
-        else:
-            # Try to find a similar move if exact UCI doesn't work
-            for legal_move in board.legal_moves:
-                if (legal_move.from_square == move.from_square and 
-                    legal_move.to_square == move.to_square):
-                    board.push(legal_move)
-                    return board.fen()
-            
-            return fen  # Return original if move not found
-        
-    except Exception as e:
-        print(f"Error in get_position_after_move: {e}")
-        return fen  # Return original FEN on any error
-
 def display_colored_comparison_table(comparison_data: List[Dict]):
-    """Display comparison table with color coding - FIXED HTML RENDERING."""
+    """Display comparison table with color coding."""
     
     table_html = f"""
     <table style="
@@ -908,9 +904,8 @@ def display_colored_comparison_table(comparison_data: List[Dict]):
     # Use unsafe_allow_html=True to render the HTML
     html(table_html, height=300, scrolling=True)
 
-
 def display_enhanced_top_moves_table(top_moves: List[Dict], user_move_data: Dict[str, Any]):
-    """Display enhanced top moves table with formatting - FIXED HTML RENDERING."""
+    """Display enhanced top moves table with formatting."""
     st.markdown("### 🏆 Top Engine Moves Analysis")
     
     if not top_moves:
@@ -1011,7 +1006,7 @@ def display_enhanced_top_moves_table(top_moves: List[Dict], user_move_data: Dict
     html(table_html, height=400, scrolling=True)
 
 def display_performance_insights(result: str, found_move_data: Dict[str, Any], time_taken: float, top_moves: List[Dict]):
-    """Display performance insights and recommendations - MISSING FUNCTION ADDED."""
+    """Display performance insights and recommendations."""
     st.markdown("### 💡 Performance Insights")
     
     insights = generate_move_insights(result, found_move_data, time_taken, top_moves)
@@ -1024,107 +1019,97 @@ def display_performance_insights(result: str, found_move_data: Dict[str, Any], t
     for rec in recommendations:
         st.success(f"🎓 {rec}")
 
-def record_enhanced_user_move(user_id: int, position_data: Dict[str, Any], 
-                            selected_move_data: Dict[str, Any], time_taken: float, result: str) -> bool:
-    """Record user move with proper database schema - FIXED NULL CONSTRAINT."""
-    try:
-        conn = database.get_db_connection()
-        cursor = conn.cursor()
-        
-        position_id = position_data.get('id')
-        move_notation = selected_move_data.get('move')
-        
-        # Find the move_id from the moves table (if exists)
-        move_id = None
-        if move_notation:
-            cursor.execute('''
-                SELECT id FROM moves 
-                WHERE position_id = ? AND move = ?
-                LIMIT 1
-            ''', (position_id, move_notation))
-            
-            move_record = cursor.fetchone()
-            if move_record:
-                move_id = move_record[0]
-            else:
-                # If move not found in moves table, create a temporary entry or use NULL
-                # For now, we'll insert with move_id as NULL and handle it gracefully
-                pass
-        
-        # Insert user move record - handle NULL move_id gracefully
-        if move_id is not None:
-            cursor.execute('''
-                INSERT INTO user_moves (
-                    user_id, position_id, move_id, time_taken, 
-                    result, timestamp, session_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                user_id, 
-                position_id, 
-                move_id, 
-                round(time_taken, 2),
-                result, 
-                datetime.now().isoformat(),
-                st.session_state.get('training_session_id')
-            ))
-        else:
-            # Insert without move_id (handle schema that allows NULL)
-            # Or create a temporary move record first
-            cursor.execute('''
-                INSERT OR IGNORE INTO moves (
-                    position_id, move, uci, score, depth, centipawn_loss, 
-                    classification, rank
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                position_id,
-                move_notation,
-                selected_move_data.get('uci', ''),
-                selected_move_data.get('score', 0),
-                selected_move_data.get('depth', 0),
-                selected_move_data.get('centipawn_loss', 0),
-                selected_move_data.get('classification', 'unknown'),
-                selected_move_data.get('rank', 999)
-            ))
-            
-            # Get the move_id we just created
-            cursor.execute('''
-                SELECT id FROM moves 
-                WHERE position_id = ? AND move = ?
-                LIMIT 1
-            ''', (position_id, move_notation))
-            
-            move_record = cursor.fetchone()
-            if move_record:
-                move_id = move_record[0]
+def display_html_generation_section(analysis: Dict[str, Any]):
+    """Display HTML generation section with preview."""
+    st.markdown("### 📚 Comprehensive Analysis Report")
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        if st.button("🎨 Generate Comprehensive HTML Report", type="primary", use_container_width=True):
+            generate_comprehensive_html_report(analysis)
+    
+    with col2:
+        if analysis.get('generated_html') and analysis.get('html_path'):
+            try:
+                with open(analysis['html_path'], 'r', encoding='utf-8') as f:
+                    html_content = f.read()
                 
-                # Now insert the user move
-                cursor.execute('''
-                    INSERT INTO user_moves (
-                        user_id, position_id, move_id, time_taken, 
-                        result, timestamp, session_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    user_id, 
-                    position_id, 
-                    move_id, 
-                    round(time_taken, 2),
-                    result, 
-                    datetime.now().isoformat(),
-                    st.session_state.get('training_session_id')
-                ))
+                st.download_button(
+                    label="📥 Download HTML Report",
+                    data=html_content,
+                    file_name=f"chess_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+                    mime="text/html",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.warning(f"Download not available: {e}")
+
+def generate_comprehensive_html_report(analysis: Dict[str, Any]):
+    """Generate comprehensive HTML report with enhanced features."""
+    try:
+        position_data = analysis.get('position_data', {})
+        user_move_data = analysis.get('move_data', {})
         
-        conn.commit()
-        conn.close()
+        # Use enhanced HTML generator
+        if 'html_generator' not in st.session_state:
+            st.session_state.html_generator = ComprehensiveHTMLGenerator()
         
-        print(f"✅ Move recorded: {move_notation} - {result}")
-        return True
+        html_generator = st.session_state.html_generator
         
+        with st.spinner("🎨 Generating comprehensive chess analysis report..."):
+            # Generate with enhanced features
+            output_path = html_generator.generate_enhanced_comprehensive_analysis(
+                position_data=position_data,
+                selected_move_data=user_move_data,
+                analysis_results=analysis,
+                include_spatial_analysis=True,
+                include_side_by_side=True,
+                include_detailed_stats=True,
+                print_optimized=True
+            )
+        
+        if output_path:
+            st.success(f"✅ Comprehensive HTML report generated!")
+            
+            # Update analysis with new path
+            analysis['generated_html'] = True
+            analysis['html_path'] = output_path
+            st.session_state.last_move_analysis = analysis
+            
+            st.rerun()
+        else:
+            st.error("❌ Failed to generate HTML report")
+    
     except Exception as e:
-        print(f"❌ Error recording move: {e}")
-        return False
+        st.error(f"❌ Error generating HTML report: {e}")
+
+def display_continue_training_section():
+    """Display continue training section."""
+    st.markdown("### ➡️ Continue Training")
+    
+    continue_col1, continue_col2, continue_col3 = st.columns(3)
+    
+    with continue_col1:
+        if st.button("➡️ Next Position", type="primary", key="continue_next_analysis", use_container_width=True):
+            clear_move_analysis()
+            load_next_position()
+            st.rerun()
+    
+    with continue_col2:
+        if st.button("🎲 Random Position", key="continue_random_analysis", use_container_width=True):
+            clear_move_analysis()
+            load_random_position()
+            st.rerun()
+    
+    with continue_col3:
+        if st.button("🔄 Try This Position Again", key="retry_position", use_container_width=True):
+            clear_move_analysis()
+            start_position_timer()
+            st.rerun()
 
 def display_side_by_side_boards(position_data: Dict[str, Any], user_move_data: Dict[str, Any], top_moves: List[Dict]):
-    """Display side-by-side board comparison - FIXED BEST MOVE BOARD."""
+    """Display side-by-side board comparison."""
     st.markdown("### 🎯 Position Comparison: Current vs Best Move Result")
     
     # Get current position and best move
@@ -1132,7 +1117,7 @@ def display_side_by_side_boards(position_data: Dict[str, Any], user_move_data: D
     best_move = top_moves[0] if top_moves else {}
     best_move_uci = best_move.get('uci', '')
     
-    # FIXED: Generate result position after best move
+    # Generate result position after best move
     result_fen = get_position_after_move(current_fen, best_move_uci)
     
     board_col1, board_col2 = st.columns(2)
@@ -1167,7 +1152,7 @@ def display_side_by_side_boards(position_data: Dict[str, Any], user_move_data: D
     with board_col2:
         st.markdown("#### 🌟 After Best Move")
         try:
-            # FIXED: Check if we have a valid result position
+            # Check if we have a valid result position
             if result_fen and result_fen != current_fen:
                 result_board = chess.Board(result_fen)
                 result_board_svg = chess.svg.board(
@@ -1214,6 +1199,33 @@ def display_side_by_side_boards(position_data: Dict[str, Any], user_move_data: D
         except Exception as e:
             st.error(f"Error displaying result board: {e}")
 
+def display_basic_move_comparison(user_move: Dict, best_move: Dict):
+    """Display basic move comparison when spatial analysis is not available."""
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Your Move**")
+        st.metric("Score", user_move.get('score', 0))
+        st.metric("CP Loss", user_move.get('centipawn_loss', 0))
+        st.metric("Classification", user_move.get('classification', 'Unknown').title())
+    
+    with col2:
+        st.markdown("**Best Move**")
+        st.metric("Score", best_move.get('score', 0))
+        st.metric("CP Loss", best_move.get('centipawn_loss', 0))
+        st.metric("Classification", best_move.get('classification', 'Unknown').title())
+
+# Helper functions
+
+def get_improvement_color(improvement: float) -> str:
+    """Get color class based on improvement value."""
+    if improvement > 0.05:
+        return "improvement-positive"
+    elif improvement < -0.05:
+        return "improvement-negative"
+    else:
+        return "improvement-neutral"
+
 def get_enhanced_board_style() -> str:
     """Get enhanced board styling."""
     return """
@@ -1224,30 +1236,183 @@ def get_enhanced_board_style() -> str:
     .piece { font-size: 45px; }
     """
 
-def display_continue_training_section():
-    """Display continue training section."""
-    st.markdown("### ➡️ Continue Training")
+def generate_move_insights(result: str, move_data: Dict[str, Any], time_taken: float, top_moves: List[Dict]) -> List[str]:
+    """Generate insights based on move analysis."""
+    insights = []
     
-    continue_col1, continue_col2, continue_col3 = st.columns(3)
+    rank = move_data.get('rank', 999)
+    cp_loss = move_data.get('centipawn_loss', 0)
     
-    with continue_col1:
-        if st.button("➡️ Next Position", type="primary", key="continue_next_analysis", use_container_width=True):
-            clear_move_analysis()
-            load_next_position()
-            st.rerun()
+    # Time-based insights
+    if time_taken < 5:
+        insights.append("You played very quickly! Consider taking more time for complex positions.")
+    elif time_taken > 60:
+        insights.append("You took your time with this position - good for thorough analysis!")
     
-    with continue_col2:
-        if st.button("🎲 Random Position", key="continue_random_analysis", use_container_width=True):
-            clear_move_analysis()
-            load_random_position()
-            st.rerun()
+    # Rank-based insights
+    if rank == 1:
+        insights.append("You found the engine's top choice! Excellent pattern recognition.")
+    elif rank <= 3:
+        insights.append("Your move was among the top engine choices - well done!")
+    elif rank > 10:
+        insights.append("Try to look for more forcing moves or better piece coordination.")
     
-    with continue_col3:
-        if st.button("🔄 Try This Position Again", key="retry_position", use_container_width=True):
-            clear_move_analysis()
-            start_position_timer()
-            st.rerun()
+    # Centipawn loss insights
+    if cp_loss == 0:
+        insights.append("Perfect move with no material loss!")
+    elif cp_loss < 10:
+        insights.append("Excellent move with minimal disadvantage.")
+    elif cp_loss > 50:
+        insights.append("This move loses significant material or position. Review tactical patterns.")
+    
+    # Comparison with other moves
+    if len(top_moves) > 1:
+        best_score = top_moves[0].get('score', 0)
+        user_score = move_data.get('score', 0)
+        if abs(best_score - user_score) < 10:
+            insights.append("Your move was very close in evaluation to the best move!")
+    
+    return insights
 
+def generate_training_recommendations(result: str, move_data: Dict[str, Any]) -> List[str]:
+    """Generate personalized training recommendations."""
+    recommendations = []
+    
+    classification = move_data.get('classification', '').lower()
+    rank = move_data.get('rank', 999)
+    
+    if result in ['excellent', 'correct']:
+        recommendations.append("Great job! Keep practicing similar positions to reinforce these patterns.")
+        if rank == 1:
+            recommendations.append("You're developing strong chess intuition. Try harder positions to challenge yourself.")
+    else:
+        if classification == 'blunder':
+            recommendations.append("Focus on tactical training to avoid blunders. Practice basic tactical motifs.")
+        elif classification == 'mistake':
+            recommendations.append("Review the position for better alternatives. Study similar pawn structures.")
+        else:
+            recommendations.append("Analyze the top engine moves to understand better strategic concepts.")
+        
+        recommendations.append("Consider studying master games with similar positions.")
+    
+    return recommendations
+
+def get_position_after_move(fen: str, uci_move: str) -> Optional[str]:
+    """Get FEN position after making a move."""
+    try:
+        if not uci_move:
+            return fen
+        
+        board = chess.Board(fen)
+        
+        # Handle different move formats
+        if len(uci_move) >= 4:  # UCI format like "e2e4"
+            try:
+                move = chess.Move.from_uci(uci_move)
+            except ValueError:
+                # If UCI parsing fails, try to find the move by SAN
+                try:
+                    move = board.parse_san(uci_move)
+                except ValueError:
+                    return fen
+        else:
+            return fen
+        
+        # Verify move is legal
+        if move in board.legal_moves:
+            board.push(move)
+            return board.fen()
+        else:
+            # Try to find a similar move if exact UCI doesn't work
+            for legal_move in board.legal_moves:
+                if (legal_move.from_square == move.from_square and 
+                    legal_move.to_square == move.to_square):
+                    board.push(legal_move)
+                    return board.fen()
+            
+            return fen  # Return original if move not found
+        
+    except Exception as e:
+        print(f"Error in get_position_after_move: {e}")
+        return fen
+
+def record_enhanced_user_move(user_id: int, position_data: Dict[str, Any], 
+                            selected_move_data: Dict[str, Any], time_taken: float, result: str) -> bool:
+    """Record user move with proper database schema."""
+    try:
+        conn = database.get_db_connection()
+        cursor = conn.cursor()
+        
+        position_id = position_data.get('id')
+        move_notation = selected_move_data.get('move')
+        
+        # Find the move_id from the moves table (if exists)
+        move_id = None
+        if move_notation:
+            cursor.execute('''
+                SELECT id FROM moves 
+                WHERE position_id = ? AND move = ?
+                LIMIT 1
+            ''', (position_id, move_notation))
+            
+            move_record = cursor.fetchone()
+            if move_record:
+                move_id = move_record[0]
+            else:
+                # Create move record if it doesn't exist
+                cursor.execute('''
+                    INSERT OR IGNORE INTO moves (
+                        position_id, move, uci, score, depth, centipawn_loss, 
+                        classification, rank
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    position_id,
+                    move_notation,
+                    selected_move_data.get('uci', ''),
+                    round(selected_move_data.get('score', 0), 2),
+                    selected_move_data.get('depth', 0),
+                    round(selected_move_data.get('centipawn_loss', 0), 2),
+                    selected_move_data.get('classification', 'unknown'),
+                    selected_move_data.get('rank', 999)
+                ))
+                
+                # Get the move_id we just created
+                cursor.execute('''
+                    SELECT id FROM moves 
+                    WHERE position_id = ? AND move = ?
+                    LIMIT 1
+                ''', (position_id, move_notation))
+                
+                move_record = cursor.fetchone()
+                if move_record:
+                    move_id = move_record[0]
+        
+        # Insert user move record
+        if move_id is not None:
+            cursor.execute('''
+                INSERT INTO user_moves (
+                    user_id, position_id, move_id, time_taken, 
+                    result, timestamp, session_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                user_id, 
+                position_id, 
+                move_id, 
+                round(time_taken, 2),
+                result, 
+                datetime.now().isoformat(),
+                st.session_state.get('training_session_id')
+            ))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Move recorded: {move_notation} - {result}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error recording move: {e}")
+        return False
 
 def determine_enhanced_move_result(selected_move_data: Dict[str, Any], position_data: Dict[str, Any]) -> str:
     """Determine move result using enhanced scoring algorithm."""
@@ -1260,7 +1425,7 @@ def determine_enhanced_move_result(selected_move_data: Dict[str, Any], position_
     top_n_threshold = user_settings.get('top_n_threshold', 3)
     cp_threshold = user_settings.get('score_difference_threshold', 10)
     
-    # Enhanced scoring logic from requirements
+    # Enhanced scoring logic
     top_moves = position_data.get('top_moves', [])
     if top_moves:
         top_n_scores = [move.get('score', 0) for move in top_moves[:top_n_threshold]]
@@ -1294,36 +1459,11 @@ def determine_enhanced_move_result(selected_move_data: Dict[str, Any], position_
     else:
         return 'incorrect'
 
-def generate_enhanced_position_analysis(position_data: Dict[str, Any], selected_move_data: Dict[str, Any]) -> Optional[str]:
-    """Generate enhanced HTML analysis."""
-    try:
-        if 'html_generator' not in st.session_state:
-            st.session_state.html_generator = ComprehensiveHTMLGenerator()
-        
-        html_generator = st.session_state.html_generator
-        
-        output_path = html_generator.generate_enhanced_analysis(
-            position_data=position_data,
-            selected_move_data=selected_move_data,
-            include_spatial_analysis=True,
-            include_side_by_side=True
-        )
-        
-        if output_path:
-            st.success(f"✅ HTML analysis generated: {output_path}")
-            return output_path
-        else:
-            st.error("❌ Failed to generate HTML analysis")
-            return None
-            
-    except Exception as e:
-        st.error(f"❌ Error generating analysis: {e}")
-        return None
-
 def clear_move_analysis():
     """Clear move analysis state."""
     st.session_state.show_analysis_after_move = False
     st.session_state.move_submitted = False
+    st.session_state.show_analysis_requested = False
     if 'last_move_analysis' in st.session_state:
         del st.session_state.last_move_analysis
 
@@ -1407,8 +1547,6 @@ def load_random_position():
             position_data['top_moves'] = [parse_move_json_fields(dict(move)) for move in moves]
             
             st.session_state.current_position = position_data
-            st.session_state.show_analysis_after_move = False
-            st.session_state.show_side_by_side_boards = False
             clear_move_analysis()
             start_position_timer()
         
@@ -1618,3 +1756,4 @@ def convert_to_piece_icons(move_string: str) -> str:
 def submit_move(selected_move_data: Dict[str, Any], generate_html: bool = False):
     """Original submit move function for backward compatibility."""
     submit_legal_move(selected_move_data, generate_html)
+
