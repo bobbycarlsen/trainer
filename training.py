@@ -14,6 +14,8 @@ import chess_board
 from html_generator import ComprehensiveHTMLGenerator
 from jsonl_processor import JSONLProcessor
 import re
+# html table rendering fix
+from streamlit.components.v1 import html
 
 
 def display_training_interface():
@@ -904,7 +906,8 @@ def display_colored_comparison_table(comparison_data: List[Dict]):
     """
     
     # Use unsafe_allow_html=True to render the HTML
-    st.markdown(table_html, unsafe_allow_html=True)
+    html(table_html, height=300, scrolling=True)
+
 
 def display_enhanced_top_moves_table(top_moves: List[Dict], user_move_data: Dict[str, Any]):
     """Display enhanced top moves table with formatting - FIXED HTML RENDERING."""
@@ -922,7 +925,7 @@ def display_enhanced_top_moves_table(top_moves: List[Dict], user_move_data: Dict
         formatted_move = convert_to_piece_icons(move.get('move', ''))
         
         # Format principal variation
-        pv = move.get('pv', '')
+        pv = move.get('principal_variation', '')
         formatted_pv = convert_to_piece_icons(pv[:50] + '...' if len(pv) > 50 else pv) if pv else ''
         
         moves_data.append({
@@ -1005,7 +1008,7 @@ def display_enhanced_top_moves_table(top_moves: List[Dict], user_move_data: Dict
     """
     
     # Use unsafe_allow_html=True to render the HTML
-    st.markdown(table_html, unsafe_allow_html=True)
+    html(table_html, height=400, scrolling=True)
 
 def display_performance_insights(result: str, found_move_data: Dict[str, Any], time_taken: float, top_moves: List[Dict]):
     """Display performance insights and recommendations - MISSING FUNCTION ADDED."""
