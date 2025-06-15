@@ -1207,7 +1207,7 @@ class ComprehensiveHTMLGenerator:
             cp_loss = move_data.get('centipawn_loss', 0)
             classification = move_data.get('classification', 'unknown').lower()
             
-            pv = move_data.get('pv', '')
+            pv = move_data.get('principal_variation', '')
             formatted_pv = self.format_principal_variation(pv, turn, move_number)
             
             # Truncate PV for display
