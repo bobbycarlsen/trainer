@@ -66,7 +66,7 @@ class ComprehensiveHTMLGenerator:
             spatial_analysis_html = self.generate_spatial_analysis_html(fen)
 
         # Generate current position aka problem
-        problem_html = self.generate_problem_html(turn, current_board_svg)
+        problem_html = self.generate_problem_html(current_board_svg, position_data)
 
         # Generate side-by-side comparison
         side_by_side_html = ""
@@ -637,54 +637,76 @@ class ComprehensiveHTMLGenerator:
         </div>
         """
 
+    def generate_problem_html(self, current_board_svg: str, position_data: Dict[str, Any]) -> str:
+        problem_html = f"""
+        <div style="display: flex; align-items: flex-start;">
+            <!-- Left: board -->
+            <div style="flex: 1;">
+                <div class="section">
+                    <div class="section-header">
+                        🎯 Position Training: Find the best move for {position_data.get('turn').title()}
+                    </div>
+                    <div class="section-content">
+                        <div class="board-container">
+                            {current_board_svg}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: previous moves -->
+            <div style="width: 300px; margin-left: 20px; overflow-y: auto; max-height: 400px;">
+                {self.generate_previous_moves_html(position_data)}
+            </div>
+        </div>
+        """
+        return problem_html
+
+
     def generate_previous_moves_html(self, position_data: Dict[str, Any], include_skip_controls: bool = False) -> str:
-        """Generate HTML for previous moves section with optional skip controls."""
+        """Generate HTML for previous moves with numbered pairs."""
         move_history = self.parse_json_field(position_data.get('move_history'))
-        pgn_string = move_history.get('pgn', '')
+        pgn = move_history.get('pgn', '').strip()
+        if not pgn:
+            return "<div>No previous moves</div>"
+
+        # Split into tokens and group by two
+        tokens = pgn.split()
+        pairs = [tokens[i:i+2] for i in range(0, len(tokens), 2)]
         
-        skip_controls_html = ""
+        # Build rows
+        rows_html = ""
+        for idx, pair in enumerate(pairs, start=1):
+            white = pair[0] if len(pair) > 0 else ""
+            black = pair[1] if len(pair) > 1 else ""
+            # convert icons
+            white = self.convert_to_piece_icons(white)
+            black = self.convert_to_piece_icons(black)
+            rows_html += (
+                f"<div style='margin-bottom:8px; line-height:1.4;'>"
+                f"<strong>{idx}.</strong>&nbsp;{white}&nbsp;{black}"
+                f"</div>"
+            )
+
+        # Optional controls
+        controls = ""
         if include_skip_controls:
-            skip_controls_html = """
-            <div class="skip-controls">
-                <button class="skip-btn" onclick="toggleMoveHistory()" title="Show/Hide Previous Moves">
-                    <span class="skip-icon">👁️</span>
-                </button>
-                <button class="collapse-btn" onclick="collapseMoveHistory()" title="Collapse to Summary">
-                    <span class="collapse-icon">📋</span>
-                </button>
+            controls = """
+            <div style="margin-bottom:10px;">
+                <button onclick="toggleMoveHistory()" title="Show/Hide Moves" style="margin-right:5px;">👁️</button>
+                <button onclick="collapseMoveHistory()" title="Collapse Summary">📋</button>
             </div>
             """
-        
-        if pgn_string:
-            moves_with_icons = self.convert_to_piece_icons(pgn_string)
-            move_count = len(pgn_string.split())
-            
-            return f"""
-            <div class="previous-moves-section">
-                <div class="moves-header">
-                    <h3>📜 Previous Moves</h3>
-                    {skip_controls_html}
-                </div>
-                <div class="moves-content" id="moves-content">
-                    <div class="pgn-display">{moves_with_icons}</div>
-                </div>
-                <div class="moves-summary" id="moves-summary" style="display: none;">
-                    <div class="summary-text">Move history available ({move_count} moves) - Click to expand</div>
-                </div>
+
+        return f"""
+        <div>
+            <h3 style="margin-top:0; margin-bottom:10px;">📜 Previous Moves</h3>
+            {controls}
+            <div>
+                {rows_html}
             </div>
-            """
-        else:
-            return f"""
-            <div class="previous-moves-section">
-                <div class="moves-header">
-                    <h3>📜 Previous Moves</h3>
-                    {skip_controls_html}
-                </div>
-                <div class="moves-content">
-                    <div class="no-moves-message">Starting position - no previous moves</div>
-                </div>
-            </div>
-            """
+        </div>
+        """
 
     def generate_enhanced_book_mode_css(self) -> str:
         """Generate CSS for enhanced book mode with skip controls."""
@@ -930,178 +952,6 @@ class ComprehensiveHTMLGenerator:
         });
         """
 
-    def generate_enhanced_html_export(self, position_data: Dict[str, Any], selected_move_data: Dict[str, Any], analysis_results: Dict[str, Any] = None, include_spatial_analysis: bool = True, print_optimized: bool = False) -> str:
-        """Generate enhanced HTML export with new info bar and book mode features."""
-        
-        if analysis_results is None:
-            analysis_results = {}
-        
-        # Extract basic info
-        position_id = position_data.get('id', 'unknown')
-        fen = position_data.get('fen', '')
-        turn = position_data.get('turn', 'white')
-        move_number = position_data.get('fullmove_number', 1)
-        top_moves = position_data.get('top_moves', [])
-        
-        # Generate enhanced sections
-        info_bar_html = self.generate_enhanced_position_info_bar_html(position_data)
-        previous_moves_html = self.generate_previous_moves_html(position_data, include_skip_controls=True)
-        
-        # Generate boards
-        flipped = (turn.lower() == 'black')
-        current_board_svg = self.generate_chess_board_svg(fen, flipped=flipped, size=400)
-        
-        # Generate result board after best move
-        best_move = top_moves[0] if top_moves else {}
-        result_board_svg = self.generate_result_board_svg(fen, best_move.get('uci', ''), flipped)
-        
-        # Generate analysis sections (only if analysis_results provided - controlled display)
-        insights_section = ""
-        if analysis_results:
-            insights_section = self.generate_comprehensive_insights_section(position_data, analysis_results)
-        
-        # Generate other sections
-        problem_section = self.generate_problem_section(position_data, current_board_svg)
-        solution_section = self.generate_solution_section(current_board_svg, result_board_svg, best_move, selected_move_data.get('move', 'Unknown'), analysis_results.get('result', 'unknown'))
-        moves_analysis_section = self.generate_enhanced_moves_analysis(top_moves, selected_move_data)
-        
-        # Enhanced CSS and JavaScript
-        enhanced_css = self.generate_enhanced_book_mode_css()
-        enhanced_js = self.generate_enhanced_book_mode_javascript()
-        
-        template = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chess Analysis Report - Position {position_id}</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
-        :root {{
-            --primary-color: #2c3e50;
-            --secondary-color: #34495e;
-            --accent-color: #3498db;
-            --success-color: #27ae60;
-            --warning-color: #f39c12;
-            --danger-color: #e74c3c;
-            --light-bg: #f8f9fa;
-            --border-color: #dee2e6;
-        }}
-        
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        
-        body {{
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            line-height: 1.6;
-            color: var(--primary-color);
-            background: var(--light-bg);
-            padding: 20px;
-        }}
-        
-        .container {{
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }}
-        
-        .content {{
-            padding: 30px;
-        }}
-        
-        {enhanced_css}
-        
-        /* Existing styles for backward compatibility */
-        .section {{
-            margin-bottom: 40px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }}
-        
-        .section-header {{
-            background: var(--primary-color);
-            color: white;
-            padding: 16px 24px;
-            font-size: 18px;
-            font-weight: 600;
-        }}
-        
-        .section-content {{
-            padding: 24px;
-        }}
-        
-        .board-container {{
-            text-align: center;
-            margin: 20px 0;
-        }}
-        
-        .moves-table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }}
-        
-        .moves-table th,
-        .moves-table td {{
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }}
-        
-        .moves-table th {{
-            background: var(--light-bg);
-            font-weight: 600;
-        }}
-        
-        .footer {{
-            text-align: center;
-            padding: 24px;
-            background: var(--light-bg);
-            color: #6c757d;
-            font-size: 14px;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="content">
-            {info_bar_html}
-            
-            {previous_moves_html}
-            
-            {problem_section}
-            
-            {solution_section}
-            
-            {moves_analysis_section}
-            
-            {insights_section}
-            
-            <div class="footer">
-                <p>Generated by Kuikma Chess Engine • {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-                <p>Enhanced training analysis with comprehensive insights and interactive features.</p>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        {enhanced_js}
-    </script>
-</body>
-</html>
-"""
-        
-        return template
 
     def generate_chess_board_svg(self, fen: str, flipped: bool = False, size: int = 400) -> str:
         """Generate SVG representation of chess board."""
@@ -1137,22 +987,6 @@ class ComprehensiveHTMLGenerator:
         except:
             return '<div style="border: 2px dashed #ddd; padding: 20px; text-align: center;">Result position unavailable</div>'
 
-    def generate_problem_html(self, turn: str, current_board_svg: str) -> str:
-        """Show the position for user to find the best move."""
-        return f"""
-        <div class="section">
-        <div class="section-header">
-            🎯 Position Training: Find the best move for {turn.title()}
-        </div>
-        <div class="section-content">
-            <h3 style="margin-bottom:8px;">Current Position</h3>
-            {current_board_svg}
-            <p>
-            Study this position and pick your move.
-            </p>
-        </div>
-        </div>
-        """
 
     def generate_side_by_side_html(self, current_board_svg: str, result_board_svg: str, best_move: str) -> str:
         """Generate side-by-side board comparison HTML."""
