@@ -902,7 +902,7 @@ def display_colored_comparison_table(comparison_data: List[Dict]):
     """
     
     # Use unsafe_allow_html=True to render the HTML
-    html(table_html, height=300, scrolling=True)
+    html(table_html, height=360, scrolling=True)
 
 def display_enhanced_top_moves_table(top_moves: List[Dict], user_move_data: Dict[str, Any]):
     """Display enhanced top moves table with formatting."""
@@ -1003,7 +1003,7 @@ def display_enhanced_top_moves_table(top_moves: List[Dict], user_move_data: Dict
     """
     
     # Use unsafe_allow_html=True to render the HTML
-    html(table_html, height=400, scrolling=True)
+    html(table_html, height=480, scrolling=True)
 
 def display_performance_insights(result: str, found_move_data: Dict[str, Any], time_taken: float, top_moves: List[Dict]):
     """Display performance insights and recommendations."""
@@ -1116,7 +1116,15 @@ def display_side_by_side_boards(position_data: Dict[str, Any], user_move_data: D
     current_fen = position_data.get('fen', '')
     best_move = top_moves[0] if top_moves else {}
     best_move_uci = best_move.get('uci', '')
-    
+
+    # get turn, default to white
+    turn = position_data.get('turn', 'white').lower()
+
+    # orientation must be 'white' or 'black'
+    orientation = turn if turn in ('white', 'black') else 'white'
+    # some components take a `flipped` boolean; others take `orientation`
+    flipped = not (orientation == 'black')
+
     # Generate result position after best move
     result_fen = get_position_after_move(current_fen, best_move_uci)
     
@@ -1129,6 +1137,7 @@ def display_side_by_side_boards(position_data: Dict[str, Any], user_move_data: D
             current_board_svg = chess.svg.board(
                 board=board,
                 size=350,
+                orientation=flipped,
                 style=get_enhanced_board_style()
             )
             st.markdown(current_board_svg, unsafe_allow_html=True)
@@ -1158,6 +1167,7 @@ def display_side_by_side_boards(position_data: Dict[str, Any], user_move_data: D
                 result_board_svg = chess.svg.board(
                     board=result_board,
                     size=350,
+                    orientation=flipped,
                     style=get_enhanced_board_style()
                 )
                 st.markdown(result_board_svg, unsafe_allow_html=True)

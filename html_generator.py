@@ -39,7 +39,11 @@ class ComprehensiveHTMLGenerator:
         
         position_id = position_data.get('id', 'unknown')
         fen = position_data.get('fen', '')
-        turn = position_data.get('turn', 'white')
+        # get turn, default to white
+        turn = position_data.get('turn', 'white').lower()
+
+        # orientation must be 'white' or 'black'
+        orientation = turn if turn in ('white', 'black') else 'white'
         move_number = position_data.get('fullmove_number', 1)
         top_moves = position_data.get('top_moves', [])
         
@@ -48,8 +52,9 @@ class ComprehensiveHTMLGenerator:
         best_move_notation = best_move.get('move', 'N/A')
         best_move_uci = best_move.get('uci', '')
         
+        # some components take a `flipped` boolean; others take `orientation`
+        flipped = (orientation == 'black')
         # Generate boards
-        flipped = (turn.lower() == 'black')
         current_board_svg = self.generate_chess_board_svg(fen, flipped=flipped)
         
         # Generate result board after best move
@@ -59,7 +64,10 @@ class ComprehensiveHTMLGenerator:
         spatial_analysis_html = ""
         if include_spatial_analysis:
             spatial_analysis_html = self.generate_spatial_analysis_html(fen)
-        
+
+        # Generate current position aka problem
+        problem_html = self.generate_problem_html(turn, current_board_svg)
+
         # Generate side-by-side comparison
         side_by_side_html = ""
         if include_side_by_side:
@@ -478,7 +486,28 @@ class ComprehensiveHTMLGenerator:
             <h1>♟️ Chess Position Analysis</h1>
             <div class="subtitle">Position {position_id} • Comprehensive Strategic Analysis</div>
         </div>
-        
+
+        <div class="position-info">
+            <h2>📋 Position Information</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Position ID</div>
+                    <div class="info-value">{position_id}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Turn to Move</div>
+                    <div class="info-value">{turn.title()}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Move Number</div>
+                    <div class="info-value">{move_number}</div>
+                </div>
+            </div>
+            {problem_html}
+        </div>
+
+
+
         <div class="position-info">
             <h2>📋 Position Information</h2>
             <div class="info-grid">
@@ -502,14 +531,10 @@ class ComprehensiveHTMLGenerator:
                     <div class="info-label">Difficulty</div>
                     <div class="info-value">{position_data.get('difficulty_rating', 1200)}</div>
                 </div>
-                <div class="info-item">
-                    <div class="info-label">Analysis Time</div>
-                    <div class="info-value">{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>
-                </div>
             </div>
             {themes_html}
         </div>
-        
+
         {side_by_side_html}
         
         <div class="section">
@@ -1111,7 +1136,24 @@ class ComprehensiveHTMLGenerator:
             return self.generate_chess_board_svg(board.fen(), flipped=flipped)
         except:
             return '<div style="border: 2px dashed #ddd; padding: 20px; text-align: center;">Result position unavailable</div>'
-    
+
+    def generate_problem_html(self, turn: str, current_board_svg: str) -> str:
+        """Show the position for user to find the best move."""
+        return f"""
+        <div class="section">
+        <div class="section-header">
+            🎯 Position Training: Find the best move for {turn.title()}
+        </div>
+        <div class="section-content">
+            <h3 style="margin-bottom:8px;">Current Position</h3>
+            {current_board_svg}
+            <p>
+            Study this position and pick your move.
+            </p>
+        </div>
+        </div>
+        """
+
     def generate_side_by_side_html(self, current_board_svg: str, result_board_svg: str, best_move: str) -> str:
         """Generate side-by-side board comparison HTML."""
         formatted_move = self.convert_to_piece_icons(best_move)
