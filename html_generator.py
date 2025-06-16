@@ -19,550 +19,6 @@ class ComprehensiveHTMLGenerator:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-    def generate_enhanced_analysis(self, position_data: Dict[str, Any], selected_move_data: Dict[str, Any], analysis_results: Dict[str, Any], include_spatial_analysis: bool = True, print_optimized: bool = False) -> str:
-        """Generate comprehensive training analysis using enhanced format."""
-        
-        # Use the new enhanced export method
-        return self.generate_enhanced_html_export(
-            position_data=position_data,
-            selected_move_data=selected_move_data, 
-            analysis_results=analysis_results,
-            include_spatial_analysis=include_spatial_analysis,
-            print_optimized=print_optimized
-        )
-
-    def create_comprehensive_html_template(self, position_data: Dict[str, Any],
-                                         selected_move_data: Dict[str, Any],
-                                         include_spatial_analysis: bool = True,
-                                         include_side_by_side: bool = True) -> str:
-        """Create comprehensive HTML template with all features."""
-        
-        position_id = position_data.get('id', 'unknown')
-        fen = position_data.get('fen', '')
-        # get turn, default to white
-        turn = position_data.get('turn', 'white').lower()
-
-        # orientation must be 'white' or 'black'
-        orientation = turn if turn in ('white', 'black') else 'white'
-        move_number = position_data.get('fullmove_number', 1)
-        top_moves = position_data.get('top_moves', [])
-        
-        # Get best move
-        best_move = top_moves[0] if top_moves else {}
-        best_move_notation = best_move.get('move', 'N/A')
-        best_move_uci = best_move.get('uci', '')
-        
-        # some components take a `flipped` boolean; others take `orientation`
-        flipped = (orientation == 'black')
-        # Generate boards
-        current_board_svg = self.generate_chess_board_svg(fen, flipped=flipped)
-        
-        # Generate result board after best move
-        result_board_svg = self.generate_result_board_svg(fen, best_move_uci, flipped)
-        
-        # Generate spatial analysis
-        spatial_analysis_html = ""
-        if include_spatial_analysis:
-            spatial_analysis_html = self.generate_spatial_analysis_html(fen)
-
-        # Generate current position aka problem
-        problem_html = self.generate_problem_html(current_board_svg, position_data)
-
-        # Generate side-by-side comparison
-        side_by_side_html = ""
-        if include_side_by_side:
-            side_by_side_html = self.generate_side_by_side_html(
-                current_board_svg, result_board_svg, best_move_notation
-            )
-        
-        # Generate move analysis table
-        moves_table_html = self.generate_enhanced_moves_table(top_moves, turn, move_number)
-        
-        # Generate position comparison
-        comparison_html = self.generate_position_comparison_html(position_data, best_move)
-        
-        # Generate themes and insights
-        themes_html = self.generate_themes_section(position_data)
-        insights_html = self.generate_insights_section(position_data, selected_move_data)
-        
-        template = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Position {position_id} - Comprehensive Analysis</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        
-        body {{
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            line-height: 1.6;
-            color: #1a1a1a;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }}
-        
-        .container {{
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-            background: white;
-            margin-top: 20px;
-            margin-bottom: 20px;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-        }}
-        
-        .header {{
-            text-align: center;
-            margin-bottom: 40px;
-            padding: 30px 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: -20px -20px 40px -20px;
-            border-radius: 20px 20px 0 0;
-            color: white;
-        }}
-        
-        .header h1 {{
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }}
-        
-        .header .subtitle {{
-            font-size: 1.1rem;
-            opacity: 0.9;
-            font-weight: 300;
-        }}
-        
-        .position-info {{
-            background: #f8fafc;
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            border-left: 5px solid #667eea;
-        }}
-        
-        .position-info h2 {{
-            color: #2d3748;
-            margin-bottom: 15px;
-            font-size: 1.4rem;
-            font-weight: 600;
-        }}
-        
-        .info-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 15px;
-        }}
-        
-        .info-item {{
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }}
-        
-        .info-label {{
-            font-weight: 600;
-            color: #4a5568;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }}
-        
-        .info-value {{
-            font-size: 1.1rem;
-            color: #2d3748;
-            margin-top: 5px;
-        }}
-        
-        .section {{
-            margin-bottom: 40px;
-            background: white;
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        }}
-        
-        .section-header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px 30px;
-            font-size: 1.3rem;
-            font-weight: 600;
-        }}
-        
-        .section-content {{
-            padding: 30px;
-        }}
-        
-        .board-container {{
-            text-align: center;
-            margin: 20px 0;
-        }}
-        
-        .board-container svg {{
-            max-width: 100%;
-            height: auto;
-            border: 3px solid #e2e8f0;
-            border-radius: 10px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        }}
-        
-        .side-by-side {{
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            align-items: start;
-        }}
-        
-        .board-comparison {{
-            text-align: center;
-        }}
-        
-        .board-comparison h3 {{
-            margin-bottom: 15px;
-            color: #4a5568;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }}
-        
-        .best-move-info {{
-            background: #e6fffa;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 15px;
-            border-left: 4px solid #38b2ac;
-        }}
-        
-        .moves-table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            font-size: 0.95rem;
-        }}
-        
-        .moves-table th {{
-            background: #667eea;
-            color: white;
-            padding: 15px 12px;
-            text-align: left;
-            font-weight: 600;
-            border-bottom: 2px solid #5a67d8;
-        }}
-        
-        .moves-table td {{
-            padding: 12px;
-            border-bottom: 1px solid #e2e8f0;
-            vertical-align: top;
-        }}
-        
-        .moves-table tr:nth-child(even) {{
-            background: #f7fafc;
-        }}
-        
-        .moves-table tr:hover {{
-            background: #edf2f7;
-        }}
-        
-        .rank-1 {{
-            background: #e6fffa !important;
-            border-left: 4px solid #38b2ac;
-        }}
-        
-        .rank-2 {{
-            background: #f0fff4 !important;
-            border-left: 4px solid #68d391;
-        }}
-        
-        .rank-3 {{
-            background: #fffbf0 !important;
-            border-left: 4px solid #f6e05e;
-        }}
-        
-        .move-notation {{
-            font-family: 'Courier New', monospace;
-            font-weight: 600;
-            font-size: 1.1rem;
-        }}
-        
-        .score-positive {{
-            color: #38a169;
-            font-weight: 600;
-        }}
-        
-        .score-negative {{
-            color: #e53e3e;
-            font-weight: 600;
-        }}
-        
-        .classification {{
-            padding: 4px 8px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }}
-        
-        .classification.excellent {{
-            background: #c6f6d5;
-            color: #22543d;
-        }}
-        
-        .classification.good {{
-            background: #bee3f8;
-            color: #2c5282;
-        }}
-        
-        .classification.inaccuracy {{
-            background: #fef5e7;
-            color: #744210;
-        }}
-        
-        .classification.mistake {{
-            background: #fed7d7;
-            color: #742a2a;
-        }}
-        
-        .classification.blunder {{
-            background: #fed7d7;
-            color: #742a2a;
-            font-weight: 600;
-        }}
-        
-        .theme-tag {{
-            display: inline-block;
-            background: #667eea;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            margin: 4px;
-            font-weight: 500;
-        }}
-        
-        .comparison-table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }}
-        
-        .comparison-table th {{
-            background: #4a5568;
-            color: white;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-        }}
-        
-        .comparison-table td {{
-            padding: 10px 12px;
-            border-bottom: 1px solid #e2e8f0;
-        }}
-        
-        .trend-up {{
-            color: #38a169;
-            font-weight: 600;
-        }}
-        
-        .trend-down {{
-            color: #e53e3e;
-            font-weight: 600;
-        }}
-        
-        .trend-neutral {{
-            color: #718096;
-        }}
-        
-        .spatial-board {{
-            max-width: 400px;
-            margin: 20px auto;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-        }}
-        
-        .insights-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }}
-        
-        .insight-card {{
-            background: #f7fafc;
-            padding: 20px;
-            border-radius: 10px;
-            border-left: 4px solid #667eea;
-        }}
-        
-        .insight-card h4 {{
-            color: #2d3748;
-            margin-bottom: 10px;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }}
-        
-        .insight-card ul {{
-            list-style: none;
-            padding: 0;
-        }}
-        
-        .insight-card li {{
-            margin-bottom: 8px;
-            padding-left: 20px;
-            position: relative;
-        }}
-        
-        .insight-card li:before {{
-            content: "•";
-            color: #667eea;
-            font-weight: 600;
-            position: absolute;
-            left: 0;
-        }}
-        
-        .footer {{
-            text-align: center;
-            margin-top: 40px;
-            padding: 20px;
-            color: #718096;
-            font-size: 0.9rem;
-            border-top: 1px solid #e2e8f0;
-        }}
-        
-        @media (max-width: 768px) {{
-            .side-by-side {{
-                grid-template-columns: 1fr;
-            }}
-            
-            .info-grid {{
-                grid-template-columns: 1fr;
-            }}
-            
-            .insights-grid {{
-                grid-template-columns: 1fr;
-            }}
-            
-            .container {{
-                padding: 15px;
-                margin: 10px;
-            }}
-            
-            .header h1 {{
-                font-size: 2rem;
-            }}
-        }}
-        
-        @media print {{
-            body {{
-                background: white;
-            }}
-            
-            .container {{
-                box-shadow: none;
-                margin: 0;
-            }}
-            
-            .section {{
-                break-inside: avoid;
-            }}
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>♟️ Chess Position Analysis</h1>
-            <div class="subtitle">Position {position_id} • Comprehensive Strategic Analysis</div>
-        </div>
-
-        <div class="position-info">
-            <h2>📋 Position Information</h2>
-            <div class="info-grid">
-                <div class="info-item">
-                    <div class="info-label">Position ID</div>
-                    <div class="info-value">{position_id}</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Turn to Move</div>
-                    <div class="info-value">{turn.title()}</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Move Number</div>
-                    <div class="info-value">{move_number}</div>
-                </div>
-            </div>
-            {problem_html}
-        </div>
-
-
-
-        <div class="position-info">
-            <h2>📋 Position Information</h2>
-            <div class="info-grid">
-                <div class="info-item">
-                    <div class="info-label">Position ID</div>
-                    <div class="info-value">{position_id}</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Turn to Move</div>
-                    <div class="info-value">{turn.title()}</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Move Number</div>
-                    <div class="info-value">{move_number}</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Game Phase</div>
-                    <div class="info-value">{position_data.get('game_phase', 'Middlegame').title()}</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Difficulty</div>
-                    <div class="info-value">{position_data.get('difficulty_rating', 1200)}</div>
-                </div>
-            </div>
-            {themes_html}
-        </div>
-
-        {side_by_side_html}
-        
-        <div class="section">
-            <div class="section-header">
-                🏆 Engine Analysis - Top Moves
-            </div>
-            <div class="section-content">
-                <p>Comprehensive analysis of the best moves in this position, ranked by engine evaluation.</p>
-                {moves_table_html}
-            </div>
-        </div>
-        
-        {comparison_html}
-        
-        {spatial_analysis_html}
-        
-        {insights_html}
-        
-        <div class="footer">
-            <p>Generated by Kuikma Chess Engine • {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-            <p>This analysis combines engine evaluation with strategic insights for comprehensive chess understanding.</p>
-        </div>
-    </div>
-</body>
-</html>
-"""
-        return template
-
     # Enhanced methods for new functionality
 
     def parse_json_field(self, json_data):
@@ -577,381 +33,6 @@ class ComprehensiveHTMLGenerator:
                 return {}
         
         return json_data if isinstance(json_data, dict) else {}
-
-    def convert_to_piece_icons(self, text: str) -> str:
-        """Convert chess notation to use piece icons."""
-        if not text:
-            return text
-        
-        piece_icons = {
-            'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘'
-        }
-        
-        result = text
-        for piece, icon in piece_icons.items():
-            result = result.replace(piece, icon)
-        
-        return result
-
-    def generate_enhanced_position_info_bar_html(self, position_data: Dict[str, Any]) -> str:
-        """Generate HTML for the enhanced position info bar."""
-        # Parse JSON data safely
-        move_history = self.parse_json_field(position_data.get('move_history'))
-        last_move = self.parse_json_field(position_data.get('last_move'))
-        
-        # Extract info bar data
-        last_move_san = last_move.get('san', 'N/A')
-        move_number = last_move.get('move_number', 1)
-        position_id = position_data.get('id', 'Unknown')
-        side_to_move = position_data.get('turn', 'white').title()
-        
-        # Convert last move to piece icons
-        last_move_with_icons = self.convert_to_piece_icons(last_move_san)
-        
-        return f"""
-        <div class="position-info-bar">
-            <div class="info-bar-content">
-                <div class="info-items">
-                    <div class="info-item">
-                        <div class="info-label">Last Move</div>
-                        <div class="info-value">{last_move_with_icons}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Move Number</div>
-                        <div class="info-value">{move_number}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Position ID</div>
-                        <div class="info-value">{position_id}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Side to Move</div>
-                        <div class="info-value">{side_to_move}</div>
-                    </div>
-                </div>
-                <div class="timer-section">
-                    <div class="info-label">Analysis Time</div>
-                    <div class="info-value timer-display" id="analysis-timer">00:00</div>
-                </div>
-            </div>
-        </div>
-        """
-
-    def generate_problem_html(self, current_board_svg: str, position_data: Dict[str, Any]) -> str:
-        problem_html = f"""
-        <div style="display: flex; align-items: flex-start;">
-            <!-- Left: board -->
-            <div style="flex: 1;">
-                <div class="section">
-                    <div class="section-header">
-                        🎯 Position Training: Find the best move for {position_data.get('turn').title()}
-                    </div>
-                    <div class="section-content">
-                        <div class="board-container">
-                            {current_board_svg}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right: previous moves -->
-            <div style="width: 300px; margin-left: 20px; overflow-y: auto; max-height: 400px;">
-                {self.generate_previous_moves_html(position_data)}
-            </div>
-        </div>
-        """
-        return problem_html
-
-
-    def generate_previous_moves_html(self, position_data: Dict[str, Any], include_skip_controls: bool = False) -> str:
-        """Generate HTML for previous moves with numbered pairs."""
-        move_history = self.parse_json_field(position_data.get('move_history'))
-        pgn = move_history.get('pgn', '').strip()
-        if not pgn:
-            return "<div>No previous moves</div>"
-
-        # Split into tokens and group by two
-        tokens = pgn.split()
-        pairs = [tokens[i:i+2] for i in range(0, len(tokens), 2)]
-        
-        # Build rows
-        rows_html = ""
-        for idx, pair in enumerate(pairs, start=1):
-            white = pair[0] if len(pair) > 0 else ""
-            black = pair[1] if len(pair) > 1 else ""
-            # convert icons
-            white = self.convert_to_piece_icons(white)
-            black = self.convert_to_piece_icons(black)
-            rows_html += (
-                f"<div style='margin-bottom:8px; line-height:1.4;'>"
-                f"<strong>{idx}.</strong>&nbsp;{white}&nbsp;{black}"
-                f"</div>"
-            )
-
-        # Optional controls
-        controls = ""
-        if include_skip_controls:
-            controls = """
-            <div style="margin-bottom:10px;">
-                <button onclick="toggleMoveHistory()" title="Show/Hide Moves" style="margin-right:5px;">👁️</button>
-                <button onclick="collapseMoveHistory()" title="Collapse Summary">📋</button>
-            </div>
-            """
-
-        return f"""
-        <div>
-            <h3 style="margin-top:0; margin-bottom:10px;">📜 Previous Moves</h3>
-            {controls}
-            <div>
-                {rows_html}
-            </div>
-        </div>
-        """
-
-    def generate_enhanced_book_mode_css(self) -> str:
-        """Generate CSS for enhanced book mode with skip controls."""
-        return """
-        .position-info-bar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 24px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-        
-        .info-bar-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-        
-        .info-items {
-            display: flex;
-            gap: 30px;
-            flex-wrap: wrap;
-        }
-        
-        .info-item {
-            text-align: center;
-            min-width: 80px;
-        }
-        
-        .info-label {
-            font-size: 12px;
-            opacity: 0.8;
-            margin-bottom: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .info-value {
-            font-size: 18px;
-            font-weight: bold;
-            font-family: 'Courier New', monospace;
-        }
-        
-        .timer-section {
-            text-align: center;
-        }
-        
-        .timer-display {
-            font-size: 24px;
-            font-family: 'Courier New', monospace;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 8px 16px;
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        
-        .previous-moves-section {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 12px;
-            margin-bottom: 24px;
-            overflow: hidden;
-        }
-        
-        .moves-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 20px;
-            background: #e9ecef;
-            border-bottom: 1px solid #dee2e6;
-        }
-        
-        .moves-header h3 {
-            margin: 0;
-            color: #495057;
-            font-size: 16px;
-        }
-        
-        .skip-controls {
-            display: flex;
-            gap: 8px;
-        }
-        
-        .skip-btn, .collapse-btn {
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 8px 12px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        
-        .skip-btn:hover, .collapse-btn:hover {
-            background: #0056b3;
-            transform: translateY(-1px);
-        }
-        
-        .skip-icon, .collapse-icon {
-            font-size: 12px;
-        }
-        
-        .moves-content {
-            padding: 20px;
-            transition: all 0.3s ease;
-        }
-        
-        .pgn-display {
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            line-height: 1.8;
-            background: white;
-            padding: 16px;
-            border-radius: 8px;
-            border: 1px solid #e9ecef;
-            word-wrap: break-word;
-            color: #495057;
-        }
-        
-        .moves-summary {
-            padding: 16px 20px;
-            text-align: center;
-            font-style: italic;
-            color: #6c757d;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .moves-summary:hover {
-            background: #f1f3f4;
-            color: #495057;
-        }
-        
-        .no-moves-message {
-            text-align: center;
-            font-style: italic;
-            color: #6c757d;
-            padding: 20px;
-        }
-        
-        /* Responsive design */
-        @media (max-width: 768px) {
-            .info-bar-content {
-                flex-direction: column;
-                gap: 16px;
-            }
-            
-            .info-items {
-                justify-content: center;
-                gap: 20px;
-            }
-            
-            .moves-header {
-                flex-direction: column;
-                gap: 12px;
-                align-items: flex-start;
-            }
-            
-            .skip-controls {
-                align-self: flex-end;
-            }
-        }
-        
-        /* Print optimizations */
-        @media print {
-            .skip-controls {
-                display: none;
-            }
-            
-            .moves-summary {
-                display: none !important;
-            }
-            
-            .moves-content {
-                display: block !important;
-            }
-        }
-        """
-
-    def generate_enhanced_book_mode_javascript(self) -> str:
-        """Generate JavaScript for book mode interactions."""
-        return """
-        // Timer functionality
-        let timerStartTime = Date.now();
-        
-        function updateTimer() {
-            const timerElement = document.getElementById('analysis-timer');
-            if (!timerElement) return;
-            
-            const elapsed = Math.floor((Date.now() - timerStartTime) / 1000);
-            const minutes = Math.floor(elapsed / 60);
-            const seconds = elapsed % 60;
-            const display = minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
-            timerElement.textContent = display;
-        }
-        
-        // Update timer every second
-        setInterval(updateTimer, 1000);
-        updateTimer();
-        
-        // Move history controls
-        function toggleMoveHistory() {
-            const content = document.getElementById('moves-content');
-            const summary = document.getElementById('moves-summary');
-            
-            if (content && summary) {
-                if (content.style.display === 'none') {
-                    content.style.display = 'block';
-                    summary.style.display = 'none';
-                } else {
-                    content.style.display = 'none';
-                    summary.style.display = 'block';
-                }
-            }
-        }
-        
-        function collapseMoveHistory() {
-            const content = document.getElementById('moves-content');
-            const summary = document.getElementById('moves-summary');
-            
-            if (content && summary) {
-                content.style.display = 'none';
-                summary.style.display = 'block';
-            }
-        }
-        
-        // Click to expand functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            const summary = document.getElementById('moves-summary');
-            if (summary) {
-                summary.addEventListener('click', function() {
-                    toggleMoveHistory();
-                });
-            }
-        });
-        """
-
 
     def generate_chess_board_svg(self, fen: str, flipped: bool = False, size: int = 400) -> str:
         """Generate SVG representation of chess board."""
@@ -987,321 +68,827 @@ class ComprehensiveHTMLGenerator:
         except:
             return '<div style="border: 2px dashed #ddd; padding: 20px; text-align: center;">Result position unavailable</div>'
 
-
-    def generate_side_by_side_html(self, current_board_svg: str, result_board_svg: str, best_move: str) -> str:
-        """Generate side-by-side board comparison HTML."""
-        formatted_move = self.convert_to_piece_icons(best_move)
-        
-        return f"""
-        <div class="section">
-            <div class="section-header">
-                🎯 Position Comparison: Current vs Best Move Result
-            </div>
-            <div class="section-content">
-                <div class="side-by-side">
-                    <div class="board-comparison">
-                        <h3>Current Position</h3>
-                        <div class="board-container">
-                            {current_board_svg}
-                        </div>
-                        <p style="margin-top: 15px; color: #4a5568;">The position as it stands, waiting for the next move.</p>
-                    </div>
-                    <div class="board-comparison">
-                        <h3>After Best Move</h3>
-                        <div class="board-container">
-                            {result_board_svg}
-                        </div>
-                        <div class="best-move-info">
-                            <strong>Best Move: {formatted_move}</strong>
-                            <p style="margin-top: 8px; font-size: 0.9rem;">This is the position that results from playing the engine's top recommendation.</p>
-                        </div>
-                    </div>
-                </div>
-                <p style="margin-top: 30px; text-align: center; color: #718096; font-style: italic;">
-                    Compare these positions to understand why the best move creates superior strategic advantages.
-                </p>
-            </div>
-        </div>
-        """
+    # === ADD THESE NEW METHODS TO THE EXISTING CLASS ===
     
-    def generate_enhanced_moves_table(self, moves: List[Dict], turn: str, move_number: int) -> str:
-        """Generate enhanced moves table with piece icons and formatting."""
-        if not moves:
-            return "<p>No moves available for analysis.</p>"
-        
-        table_rows = []
-        
-        for i, move_data in enumerate(moves[:10], 1):  # Top 10 moves
-            move_notation = move_data.get('move', '')
-            formatted_move = self.convert_to_piece_icons(move_notation)
-            
-            score = move_data.get('score', 0)
-            score_display = self.format_score_display(score)
-            
-            cp_loss = move_data.get('centipawn_loss', 0)
-            classification = move_data.get('classification', 'unknown').lower()
-            
-            pv = move_data.get('principal_variation', '')
-            formatted_pv = self.format_principal_variation(pv, turn, move_number)
-            
-            # Truncate PV for display
-            display_pv = formatted_pv[:60] + '...' if len(formatted_pv) > 60 else formatted_pv
-            
-            rank_class = f"rank-{min(i, 3)}"
-            
-            table_rows.append(f"""
-            <tr class="{rank_class}">
-                <td style="text-align: center; font-weight: 600;">{i}</td>
-                <td class="move-notation">{formatted_move}</td>
-                <td class="{self.get_score_class(score)}">{score_display}</td>
-                <td>{cp_loss}</td>
-                <td><span class="classification {classification}">{classification.title()}</span></td>
-                <td style="font-family: monospace; font-size: 0.9rem;">{display_pv}</td>
-            </tr>
-            """)
-        
-        return f"""
-        <table class="moves-table">
-            <thead>
-                <tr>
-                    <th>Rank</th>
-                    <th>Move</th>
-                    <th>Score</th>
-                    <th>CP Loss</th>
-                    <th>Classification</th>
-                    <th>Principal Variation</th>
-                </tr>
-            </thead>
-            <tbody>
-                {''.join(table_rows)}
-            </tbody>
-        </table>
+    def generate_epic_analysis_report(self, position_data: Dict[str, Any], 
+                                    selected_move_data: Dict[str, Any] = None) -> str:
         """
+        Main method to generate the epic chess analysis report.
+        This is the primary entry point for the enhanced analysis.
+        
+        Args:
+            position_data: Complete position data from database/JSON
+            selected_move_data: User's selected move data (optional)
+            
+        Returns:
+            Path to generated HTML file
+        """
+        return self.generate_comprehensive_strategic_analysis(
+            position_data=position_data,
+            selected_move_data=selected_move_data,
+            include_spatial_analysis=True,
+            include_side_by_side=True,
+            include_detailed_stats=True,
+            print_optimized=True
+        )
+    
+    def generate_comprehensive_strategic_analysis(self, position_data: Dict[str, Any], 
+                                                selected_move_data: Dict[str, Any] = None,
+                                                analysis_results: Dict[str, Any] = None,
+                                                include_spatial_analysis: bool = True,
+                                                include_side_by_side: bool = True,
+                                                include_detailed_stats: bool = True,
+                                                print_optimized: bool = True) -> str:
+        """Generate comprehensive chess position analysis report with enhanced features."""
+        
+        # Extract basic position information
+        position_id = position_data.get('id', 'unknown')
+        fen = position_data.get('fen', '')
+        turn = position_data.get('turn', 'white').lower()
+        move_number = position_data.get('fullmove_number', 1)
+        top_moves = position_data.get('top_moves', [])
+        
+        # Board orientation
+        flipped = (turn == 'black')
+        
+        # Get best move
+        best_move = top_moves[0] if top_moves else {}
+        best_move_notation = best_move.get('move', 'N/A')
+        best_move_uci = best_move.get('uci', '')
+        
+        # Generate boards using existing methods
+        current_board_svg = self.generate_chess_board_svg(fen, flipped=flipped)
+        result_board_svg = self.generate_result_board_svg(fen, best_move_uci, flipped)
+        
+        # Generate all sections using new methods
+        problem_section = self._generate_problem_section(current_board_svg, position_data)
+        solution_section = self._generate_solution_section(current_board_svg, result_board_svg, best_move_notation, position_data)
+        comparative_analysis = self._generate_comparative_analysis_section(position_data, best_move)
+        top_moves_section = self._generate_top_moves_section(top_moves, turn, move_number)
+        variations_section = self._generate_principal_variations_section(position_data)
+        insights_section = self._generate_comprehensive_insights_section(position_data, selected_move_data)
+        
+        # Optional spatial analysis
+        spatial_section = ""
+        if include_spatial_analysis:
+            spatial_section = self._generate_spatial_analysis_section(fen)
+        
+        # Build complete HTML
+        html_template = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Position Analysis - {position_data.get('title', f'Position {position_id}')}</title>
+    <style>
+        {self._generate_comprehensive_css(print_optimized)}
+    </style>
+</head>
+<body>
+    <div class="analysis-container">
+        <header class="report-header">
+            <h1>🏆 Comprehensive Chess Position Analysis</h1>
+            <div class="position-meta">
+                <span class="meta-item">Position #{position_id}</span>
+                <span class="meta-item">Move {move_number}</span>
+                <span class="meta-item">{turn.title()} to Move</span>
+                <span class="meta-item">{position_data.get('game_phase', 'Middlegame').title()}</span>
+                <span class="meta-item">Rating: {position_data.get('difficulty_rating', 1200)}</span>
+            </div>
+        </header>
 
-    def generate_problem_section(self, position_data: Dict[str, Any], board_svg: str) -> str:
-        """Generate the problem section."""
-        difficulty = position_data.get('difficulty_rating', 1200)
-        game_phase = position_data.get('game_phase', 'middlegame').title()
+        {problem_section}
+        {solution_section}
+        {comparative_analysis}
+        {top_moves_section}
+        {variations_section}
+        {insights_section}
+        {spatial_section}
+
+        <footer class="report-footer">
+            <p>Generated by Kuikma Chess Engine • {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p>Comprehensive analysis combining engine evaluation with strategic insights</p>
+        </footer>
+    </div>
+</body>
+</html>
+"""
+        
+        # Save and return path
+        filename = f"comprehensive_analysis_{position_id}_{int(datetime.now().timestamp())}.html"
+        output_path = os.path.join(self.output_dir, filename)
+        
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(html_template)
+        
+        return output_path
+
+    # === UTILITY METHODS ===
+    
+    def format_score_display(self, score) -> str:
+        """Format score for display with proper handling of different score types."""
+        if score is None:
+            return "0.00"
+        
+        if isinstance(score, dict):
+            if 'mate' in score:
+                mate_value = score['mate']
+                return f"M{mate_value}" if mate_value > 0 else f"M{abs(mate_value)}"
+            elif 'cp' in score:
+                return f"{score['cp'] / 100:.2f}"
+            else:
+                return "0.00"
+        elif isinstance(score, (int, float)):
+            if abs(score) > 900:  # Likely centipawns
+                return f"{score / 100:.2f}"
+            else:
+                return f"{score:.2f}"
+        else:
+            try:
+                return f"{float(score):.2f}"
+            except:
+                return str(score)
+    
+    def get_score_class(self, score) -> str:
+        """Get CSS class for score styling based on evaluation."""
+        if score is None:
+            return 'score-neutral'
+        
+        if isinstance(score, dict):
+            if 'mate' in score:
+                return 'score-positive' if score['mate'] > 0 else 'score-negative'
+            elif 'cp' in score:
+                cp = score['cp']
+                if cp > 50:
+                    return 'score-positive'
+                elif cp < -50:
+                    return 'score-negative'
+                else:
+                    return 'score-neutral'
+        elif isinstance(score, (int, float)):
+            if score > 0.5:
+                return 'score-positive'
+            elif score < -0.5:
+                return 'score-negative'
+            else:
+                return 'score-neutral'
+        
+        return 'score-neutral'
+    
+    def get_advantage_class(self, value: float) -> str:
+        """Get CSS class for advantage display."""
+        if value > 0.1:
+            return 'change-positive'
+        elif value < -0.1:
+            return 'change-negative'
+        else:
+            return 'change-neutral'
+        
+    def convert_to_piece_icons(self, move_string: str) -> str:
+        """Convert move notation to use piece icons instead of letters."""
+        piece_icons = {
+            'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘'
+        }
+        
+        if not move_string:
+            return move_string
+        
+        # Handle different move formats
+        result = move_string
+        
+        # Replace piece letters with icons (but not pawns)
+        for piece, icon in piece_icons.items():
+            result = result.replace(piece, icon)
+        
+        return result
+
+    # Copy all the section generation methods from the previous artifacts:
+    # _generate_comprehensive_css
+    # _generate_problem_section  
+    # _generate_solution_section
+    # _generate_comparative_analysis_section
+    # _generate_top_moves_section
+    # _generate_principal_variations_section
+    # _generate_comprehensive_insights_section
+    # _generate_spatial_analysis_section
+    # And all helper methods: _extract_move_history, _generate_list_items, etc.
+    
+    # Complete Helper Methods for Enhanced HTML Generator
+    # Add these methods to the ComprehensiveHTMLGenerator class
+
+    def _generate_problem_section(self, board_svg: str, position_data: Dict[str, Any]) -> str:
+        """Generate the problem presentation section."""
+        move_history = self._extract_move_history(position_data)
         themes = position_data.get('themes', [])
-        description = position_data.get('description', 'Find the best move in this position.')
         
         themes_html = ""
         if themes:
-            theme_tags = ''.join([f'<span style="background: #3498db; color: white; padding: 6px 12px; border-radius: 20px; margin: 3px; display: inline-block; font-size: 0.85rem;">{theme.replace("_", " ").title()}</span>' for theme in themes[:6]])
-            themes_html = f'<div style="margin-top: 15px;"><strong>Themes:</strong><br>{theme_tags}</div>'
+            theme_tags = ''.join([
+                f'<span class="theme-tag">{theme.replace("_", " ").title()}</span>' 
+                for theme in themes[:8]
+            ])
+            themes_html = f'<div style="margin-top: 1rem;">{theme_tags}</div>'
         
         return f"""
-        <div class="section">
+        <section class="section">
             <div class="section-header">
-                🎯 The Problem
+                🎯 The Challenge
             </div>
-            <div class="section-content">
-                <div class="side-by-side">
-                    <div>
-                        <div class="board-container">
-                            {board_svg}
+            <div class="side-by-side">
+                <div>
+                    <div class="board-container">
+                        <div class="board-label">Current Position</div>
+                        {board_svg}
+                    </div>
+                                        
+                    <div style="background: #e3f2fd; padding: 1.5rem; border-radius: 12px; margin-top: 1.5rem; border-left: 4px solid #2196f3;">
+                        <h4 style="color: #1976d2; margin-bottom: 1rem;">Your Task</h4>
+                        <p style="font-size: 1.1rem; line-height: 1.6; color: #424242;">{position_data.get('description', 'Find the best move in this position.')}</p>
+                        {themes_html}
+                    </div>
+                </div>
+                <div>
+                    <h3>Position Information</h3>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">Difficulty Rating</div>
+                            <div class="metric-value">{position_data.get('difficulty_rating', 1200)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Game Phase</div>
+                            <div class="metric-value">{position_data.get('game_phase', 'Middlegame').title()}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Position Type</div>
+                            <div class="metric-value">{position_data.get('position_type', 'Tactical').title()}</div>
                         </div>
                     </div>
-                    <div>
-                        <h3>Position Analysis</h3>
-                        <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div><strong>Difficulty:</strong> {difficulty}</div>
-                                <div><strong>Game Phase:</strong> {game_phase}</div>
-                                <div><strong>Turn:</strong> {position_data.get('turn', 'Unknown').title()}</div>
-                                <div><strong>Move:</strong> {position_data.get('fullmove_number', 1)}</div>
-                            </div>
-                            {themes_html}
-                        </div>
-                        
-                        <div style="background: #e3f2fd; padding: 20px; border-radius: 12px; border-left: 5px solid #2196f3;">
-                            <h4 style="margin-bottom: 10px; color: #1976d2;">Challenge</h4>
-                            <p style="font-style: italic; line-height: 1.6;">{description}</p>
-                        </div>
+
+                    
+                    {move_history}
+                </div>
+            </div>
+        </section>
+        <div class="page-break"></div>
+        """
+
+    def _generate_solution_section(self, current_board_svg: str, result_board_svg: str, 
+                                  best_move: str, position_data: Dict[str, Any]) -> str:
+        """Generate the solution with side-by-side comparison."""
+        top_moves = position_data.get('top_moves', [])
+        best_move_data = top_moves[0] if top_moves else {}
+        
+        score = best_move_data.get('score', 0)
+        score_display = self.format_score_display(score)
+        score_class = self.get_score_class(score)
+        
+        pv = best_move_data.get('principal_variation', '')
+        tactics = best_move_data.get('tactics', [])
+        
+        tactics_html = ""
+        if tactics:
+            tactics_tags = ''.join([
+                f'<span class="theme-tag">{tactic.replace("_", " ").title()}</span>' 
+                for tactic in tactics
+            ])
+            tactics_html = f'<div style="margin-top: 1rem;"><strong>Tactical Elements:</strong><br>{tactics_tags}</div>'
+        
+        # Position impact analysis
+        position_impact = best_move_data.get('position_impact', {})
+        
+        return f"""
+        <section class="section">
+            <div class="section-header">
+                ✅ The Solution
+            </div>
+            <div class="side-by-side">
+                <div>
+                    <div class="board-container">
+                        <div class="board-label">Current Position</div>
+                        {current_board_svg}
+                    </div>
+                </div>
+                <div>
+                    <div class="board-container">
+                        <div class="board-label">After Best Move: {best_move}</div>
+                        {result_board_svg}
                     </div>
                 </div>
             </div>
-        </div>
-        """
-
-    def generate_solution_section(self, current_board_svg: str, result_board_svg: str, 
-                                best_move: Dict[str, Any], user_move: str, result: str) -> str:
-        """Generate the solution section with side-by-side comparison."""
-        best_move_notation = self.convert_to_piece_icons(best_move.get('move', 'Unknown'))
-        user_move_notation = self.convert_to_piece_icons(user_move)
-        
-        result_class = result if result in ['correct', 'excellent'] else 'incorrect'
-        result_icon = {'excellent': '🌟', 'correct': '✅', 'inaccuracy': '⚠️', 'incorrect': '❌', 'blunder': '💥'}.get(result, '❌')
-        result_message = {
-            'excellent': 'Outstanding! You found the perfect move.',
-            'correct': 'Well done! Your move was among the best choices.',
-            'inaccuracy': 'Not quite optimal, but understandable.',
-            'incorrect': 'This move could be improved.',
-            'blunder': 'This move has serious consequences.'
-        }.get(result, 'Move assessment complete.')
-        
-        return f"""
-        <div class="section">
-            <div class="section-header">
-                🎯 The Solution
-            </div>
-            <div class="section-content">
-                <div style="padding: 20px; border-radius: 12px; background: #e3f2fd; border-left: 5px solid #2196f3; margin-bottom: 20px;">
-                    <h3 style="margin-bottom: 15px; font-size: 1.5rem;">
-                        {result_icon} {result_message}
-                    </h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
-                        <div><strong>Your Move:</strong> {user_move_notation}</div>
-                        <div><strong>Best Move:</strong> {best_move_notation}</div>
-                        <div><strong>Best Score:</strong> {best_move.get('score', 0)}</div>
-                        <div><strong>Classification:</strong> {best_move.get('classification', 'Unknown').title()}</div>
+            
+            <div style="margin-top: 2rem;">
+                <h3>Best Move Analysis</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Engine Evaluation</div>
+                        <div class="metric-value {score_class}">{score_display}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Classification</div>
+                        <div class="metric-value">{best_move_data.get('classification', 'N/A').title()}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Search Depth</div>
+                        <div class="metric-value">{best_move_data.get('depth', 0)}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Strategic Value</div>
+                        <div class="metric-value">{best_move_data.get('strategic_value', 0)}/5</div>
                     </div>
                 </div>
                 
-                <div class="side-by-side">
-                    <div class="board-comparison">
-                        <h3>Current Position</h3>
-                        <div class="board-container">
-                            {current_board_svg}
+                <div style="margin-top: 1.5rem;">
+                    <h4>Move Impact Analysis</h4>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">Material Change</div>
+                            <div class="metric-value change-positive">+{position_impact.get('material_change', 0)}</div>
                         </div>
-                        <p style="margin-top: 15px; color: #666; font-style: italic;">
-                            The position as it stands, waiting for the next move.
-                        </p>
-                    </div>
-                    <div class="board-comparison">
-                        <h3>After Best Move: {best_move_notation}</h3>
-                        <div class="board-container">
-                            {result_board_svg}
+                        <div class="metric-card">
+                            <div class="metric-label">King Safety Impact</div>
+                            <div class="metric-value {self.get_advantage_class(position_impact.get('king_safety_impact', 0))}">{position_impact.get('king_safety_impact', 0):+.1f}</div>
                         </div>
-                        <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #27ae60;">
-                            <strong>Engine Evaluation:</strong> {best_move.get('score', 0)}<br>
-                            <strong>Quality:</strong> {best_move.get('classification', 'Unknown').title()}<br>
-                            <strong>CP Loss:</strong> {best_move.get('centipawn_loss', 0)}
+                        <div class="metric-card">
+                            <div class="metric-label">Center Control</div>
+                            <div class="metric-value {self.get_advantage_class(position_impact.get('center_control_change', 0))}">{position_impact.get('center_control_change', 0):+.1f}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Initiative Change</div>
+                            <div class="metric-value {self.get_advantage_class(position_impact.get('initiative_change', 0))}">{position_impact.get('initiative_change', 0):+.1f}</div>
                         </div>
                     </div>
                 </div>
+                
+                {tactics_html}
+                
+                <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 12px; margin-top: 1.5rem; border: 1px solid #e2e8f0;">
+                    <h4>Principal Variation</h4>
+                    <div class="variation-moves">{self.convert_to_piece_icons(pv)}</div>
+                </div>
             </div>
-        </div>
+        </section>
+        <div class="page-break"></div>
+
         """
 
-    def generate_enhanced_moves_analysis(self, top_moves: List[Dict], user_move_data: Dict[str, Any]) -> str:
-        """Generate enhanced moves analysis section."""
+    def _generate_comparative_analysis_section(self, position_data: Dict[str, Any], best_move: Dict[str, Any]) -> str:
+        """Generate comprehensive comparative analysis."""
+        material_analysis = position_data.get('material_analysis', {})
+        mobility_analysis = position_data.get('mobility_analysis', {})
+        king_safety = position_data.get('king_safety_analysis', {})
+        center_control = position_data.get('center_control_analysis', {})
+        pawn_structure = position_data.get('pawn_structure_analysis', {})
+        piece_development = position_data.get('piece_development_analysis', {})
+        
+        # Extract position impact from best move
+        position_impact = best_move.get('position_impact', {})
+        
+        return f"""
+        <section class="section">
+            <div class="section-header">
+                📊 Comprehensive Positional Analysis
+            </div>
+            
+            <h3>Material Balance & Piece Activity</h3>
+            <table class="analysis-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>White</th>
+                        <th>Black</th>
+                        <th>Balance</th>
+                        <th>After Best Move</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Total Material</strong></td>
+                        <td>{material_analysis.get('white_total', 0)}</td>
+                        <td>{material_analysis.get('black_total', 0)}</td>
+                        <td class="{self.get_advantage_class(material_analysis.get('imbalance_score', 0))}">{material_analysis.get('imbalance_score', 0):.2f}</td>
+                        <td class="change-positive">+{position_impact.get('material_change', 0)}</td>
+                    </tr>
+                    <tr>
+                        <td>Pawns</td>
+                        <td>{material_analysis.get('white_pawns', 0)}</td>
+                        <td>{material_analysis.get('black_pawns', 0)}</td>
+                        <td>{material_analysis.get('white_pawns', 0) - material_analysis.get('black_pawns', 0)}</td>
+                        <td>—</td>
+                    </tr>
+                    <tr>
+                        <td>Minor Pieces</td>
+                        <td>{material_analysis.get('white_knights', 0) + material_analysis.get('white_bishops', 0)}</td>
+                        <td>{material_analysis.get('black_knights', 0) + material_analysis.get('black_bishops', 0)}</td>
+                        <td>{(material_analysis.get('white_knights', 0) + material_analysis.get('white_bishops', 0)) - (material_analysis.get('black_knights', 0) + material_analysis.get('black_bishops', 0))}</td>
+                        <td>—</td>
+                    </tr>
+                    <tr>
+                        <td>Major Pieces</td>
+                        <td>{material_analysis.get('white_rooks', 0) + material_analysis.get('white_queens', 0)}</td>
+                        <td>{material_analysis.get('black_rooks', 0) + material_analysis.get('black_queens', 0)}</td>
+                        <td>{(material_analysis.get('white_rooks', 0) + material_analysis.get('white_queens', 0)) - (material_analysis.get('black_rooks', 0) + material_analysis.get('black_queens', 0))}</td>
+                        <td>—</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3>Positional Factors</h3>
+            <table class="analysis-table">
+                <thead>
+                    <tr>
+                        <th>Factor</th>
+                        <th>White</th>
+                        <th>Black</th>
+                        <th>Advantage</th>
+                        <th>Move Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Mobility</strong></td>
+                        <td>{mobility_analysis.get('white_total', 0)}</td>
+                        <td>{mobility_analysis.get('black_total', 0)}</td>
+                        <td class="{self.get_advantage_class(mobility_analysis.get('white_total', 0) - mobility_analysis.get('black_total', 0))}">{mobility_analysis.get('white_total', 0) - mobility_analysis.get('black_total', 0)}</td>
+                        <td>{position_impact.get('space_advantage_change', 0):+.1f}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>King Safety</strong></td>
+                        <td>{king_safety.get('safety_scores', {}).get('true', 0):.1f}</td>
+                        <td>{king_safety.get('safety_scores', {}).get('false', 0):.1f}</td>
+                        <td class="{self.get_advantage_class(king_safety.get('safety_scores', {}).get('true', 0) - king_safety.get('safety_scores', {}).get('false', 0))}">{king_safety.get('safety_scores', {}).get('true', 0) - king_safety.get('safety_scores', {}).get('false', 0):+.1f}</td>
+                        <td>{position_impact.get('king_safety_impact', 0):+.1f}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Center Control</strong></td>
+                        <td>{center_control.get('white', 0)}</td>
+                        <td>{center_control.get('black', 0)}</td>
+                        <td class="{self.get_advantage_class(center_control.get('white', 0) - center_control.get('black', 0))}">{center_control.get('white', 0) - center_control.get('black', 0):+d}</td>
+                        <td>{position_impact.get('center_control_change', 0):+.1f}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Development</strong></td>
+                        <td>{piece_development.get('white', 0):.2f}</td>
+                        <td>{piece_development.get('black', 0):.2f}</td>
+                        <td class="{self.get_advantage_class(piece_development.get('white', 0) - piece_development.get('black', 0))}">{piece_development.get('white', 0) - piece_development.get('black', 0):+.2f}</td>
+                        <td>{position_impact.get('development_impact', 0):+.2f}</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3>Pawn Structure Analysis</h3>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Open Files</div>
+                    <div class="metric-value">{pawn_structure.get('open_files', 0)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Half-Open Files</div>
+                    <div class="metric-value">{pawn_structure.get('half_open_files', 0)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Pawn Islands (W/B)</div>
+                    <div class="metric-value">{pawn_structure.get('white_pawn_islands', 0)}/{pawn_structure.get('black_pawn_islands', 0)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Passed Pawns (W/B)</div>
+                    <div class="metric-value">{pawn_structure.get('white_passed_pawns', 0)}/{pawn_structure.get('black_passed_pawns', 0)}</div>
+                </div>
+            </div>
+            
+        </section>
+        <div class="page-break"></div>
+
+        """
+
+    def _generate_top_moves_section(self, top_moves: List[Dict[str, Any]], turn: str, move_number: int) -> str:
+        """Generate comprehensive top moves analysis."""
         if not top_moves:
             return ""
         
-        user_move_notation = user_move_data.get('move', '')
-        
-        moves_rows = ""
-        for i, move in enumerate(top_moves[:10], 1):
-            is_user_move = move.get('move') == user_move_notation
-            formatted_move = self.convert_to_piece_icons(move.get('move', ''))
-            
-            # Format principal variation
-            pv = move.get('pv', '')
-            formatted_pv = self.convert_to_piece_icons(pv[:60] + '...' if len(pv) > 60 else pv)
-            
-            # Determine row class
-            row_class = ""
-            if is_user_move:
-                row_class = "user-move"
-            elif i <= 3:
-                row_class = f"move-rank-{i}"
-            
-            user_indicator = " ← Your choice" if is_user_move else ""
-            
-            # Score display
+        moves_html = ""
+        for i, move in enumerate(top_moves[:10]):  # Top 10 moves
             score = move.get('score', 0)
-            score_display = f"{score:+}" if isinstance(score, (int, float)) else str(score)
+            score_display = self.format_score_display(score)
+            score_class = self.get_score_class(score)
             
-            moves_rows += f"""
-            <tr class="{row_class}">
-                <td style="text-align: center; font-weight: 600;">{i}</td>
-                <td class="move-notation">{formatted_move}{user_indicator}</td>
-                <td style="text-align: center;">{score_display}</td>
-                <td style="text-align: center;">{move.get('centipawn_loss', 0)}</td>
-                <td style="text-align: center;">
-                    <span style="padding: 4px 8px; border-radius: 12px; background: #e3f2fd; color: #1976d2; font-size: 0.85rem; font-weight: 500;">
-                        {move.get('classification', 'unknown').title()}
-                    </span>
-                </td>
-                <td style="font-family: monospace; font-size: 0.9rem; color: #666;">{formatted_pv}</td>
+            classification = move.get('classification', 'unknown')
+            classification_class = f"classification-{classification.lower()}"
+            
+            centipawn_loss = move.get('centipawn_loss', 0)
+            loss_class = "change-neutral" if centipawn_loss == 0 else "change-negative"
+            
+            tactics = move.get('tactics', [])
+            tactics_text = ", ".join([t.replace("_", " ").title() for t in tactics[:3]]) if tactics else "—"
+            
+            pv = move.get('principal_variation', '')
+            pv_short = self.convert_to_piece_icons(pv)
+            if len(pv_short) > 144:
+                pv_short = pv_short[:144] + "..."
+            
+            strategic_value = move.get('strategic_value', 0)
+            complexity = move.get('move_complexity', 0)
+            
+            moves_html += f"""
+            <tr>
+                <td><strong>#{i+1}</strong></td>
+                <td><strong style="font-size: 1.1rem;">{move.get('move', '')}</strong></td>
+                <td class="{score_class}">{score_display}</td>
+                <td class="{loss_class}">{centipawn_loss}</td>
+                <td><span class="move-classification {classification_class}">{classification}</span></td>
+                <td>{tactics_text}</td>
+                <td>{strategic_value}/5</td>
+                <td>{complexity}/5</td>
+                <td style="font-family: monospace; font-size: 0.85rem; width: 50%;">{pv_short}</td>
             </tr>
             """
         
         return f"""
-        <div class="section">
+        <section class="section">
             <div class="section-header">
-                🏆 Top Engine Moves
+                🏆 Top Engine Moves Analysis
             </div>
-            <div class="section-content">
-                <p style="margin-bottom: 25px; font-size: 1.1rem; color: #666;">
-                    Comprehensive analysis of the best moves in this position, ranked by engine evaluation depth and strategic value.
+            <p>Comprehensive analysis of the best moves in this position, ranked by engine evaluation depth and strategic value.</p>
+            
+            <table class="analysis-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Move</th>
+                        <th>Score</th>
+                        <th>CP Loss</th>
+                        <th>Classification</th>
+                        <th>Tactics</th>
+                        <th>Strategic</th>
+                        <th>Complexity</th>
+                        <th>Principal Variation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {moves_html}
+                </tbody>
+            </table>
+            
+            <div style="margin-top: 1.5rem; background: #f0f8f0; padding: 1rem; border-radius: 8px; border-left: 4px solid #48bb78;">
+                <h4 style="color: #38a169;">Understanding the Rankings</h4>
+                <p style="color: #2d3748; margin-top: 0.5rem;">
+                    Moves are ranked by engine evaluation at depth {top_moves[0].get('depth', 0) if top_moves else 'N/A'}. 
+                    Strategic value and complexity provide additional context for learning. 
+                    Centipawn loss shows how much evaluation drops compared to the best move.
                 </p>
-                
-                <table class="moves-table">
-                    <thead>
-                        <tr>
-                            <th style="text-align: center;">Rank</th>
-                            <th>Move</th>
-                            <th style="text-align: center;">Score</th>
-                            <th style="text-align: center;">CP Loss</th>
-                            <th style="text-align: center;">Quality</th>
-                            <th>Principal Variation</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {moves_rows}
-                    </tbody>
-                </table>
-                
-                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 0.9rem; color: #666;">
-                    <strong>Legend:</strong> CP Loss = Centipawn Loss (lower is better) • 
-                    Principal Variation = Expected continuation • 
-                    Highlighted rows indicate top choices and your selection
-                </div>
             </div>
-        </div>
+        </section>
+        <div class="page-break"></div>
+
         """
 
-    def generate_comprehensive_insights_section(self, position_data: Dict[str, Any], analysis_results: Dict[str, Any]) -> str:
-        """Generate comprehensive insights section."""
-        user_move = analysis_results.get('move_data', {})
-        result = analysis_results.get('result', 'unknown')
-        time_taken = analysis_results.get('time_taken', 0)
+    def _generate_principal_variations_section(self, position_data: Dict[str, Any]) -> str:
+        """Generate detailed analysis of top 3 principal variations."""
+        variation_analysis = position_data.get('variation_analysis', {})
+        variations = variation_analysis.get('variations', [])[:3]  # Top 3 variations
         
-        # Generate insights based on performance
-        insights = self.generate_performance_insights(result, user_move, time_taken, position_data)
+        if not variations:
+            return ""
         
-        insights_html = ""
-        for category, insight_list in insights.items():
-            if insight_list:
-                category_title = category.replace('_', ' ').title()
-                insights_html += f"""
-                <div class="insight-card">
-                    <h4>{category_title}</h4>
-                    <ul>
-                        {"".join([f"<li>{insight}</li>" for insight in insight_list])}
-                    </ul>
+        variations_html = ""
+        for i, variation in enumerate(variations):
+            initial_move = variation.get('initial_move', {})
+            final_eval = variation.get('final_evaluation', {})
+            comprehensive_stats = variation.get('comprehensive_final_stats', {})
+            
+            move_name = initial_move.get('move', f'Variation {i+1}')
+            score = initial_move.get('score', 0)
+            score_display = self.format_score_display(score)
+            score_class = self.get_score_class(score)
+            
+            pv_notation = initial_move.get('pv', '')
+            pv_notation = self.convert_to_piece_icons(pv_notation)
+            
+            tactics = initial_move.get('tactics', [])
+            tactics_text = ", ".join([t.replace("_", " ").title() for t in tactics]) if tactics else "None identified"
+            
+            strategic_assessment = comprehensive_stats.get('strategic_assessment', {})
+            winning_chances = strategic_assessment.get('winning_chances', 'Unknown')
+            complexity_rating = strategic_assessment.get('complexity_rating', 0)
+            position_type = strategic_assessment.get('position_type', 'Unknown')
+            
+            material_trend = final_eval.get('material_trend', 'stable')
+            position_trend = final_eval.get('position_trend', 'stable')
+            final_assessment = final_eval.get('final_assessment', 'Position assessment unavailable')
+            
+            # Position impact details
+            position_impact = initial_move.get('position_impact', {})
+            
+            variations_html += f"""
+            <div class="variation-card">
+                <div class="variation-header">
+                    Variation {i+1}: {move_name} ({score_display})
                 </div>
-                """
+                <div class="variation-content">
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">Engine Score</div>
+                            <div class="metric-value {score_class}">{score_display}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Winning Chances</div>
+                            <div class="metric-value">{winning_chances.replace('_', ' ').title()}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Complexity</div>
+                            <div class="metric-value">{complexity_rating}/10</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Position Type</div>
+                            <div class="metric-value">{position_type.replace('_', ' ').title()}</div>
+                        </div>
+                    </div>
+                    
+                    <h4>Principal Variation</h4>
+                    <div class="variation-moves">{pv_notation}</div>
+                    
+                    <h4>Tactical Elements</h4>
+                    <p style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0; border: 1px solid #e2e8f0;">{tactics_text}</p>
+                    
+                    <h4>Strategic Assessment</h4>
+                    <p style="background: #e3f2fd; padding: 1rem; border-radius: 8px; margin: 1rem 0; border: 1px solid #90caf9;">{final_assessment}</p>
+                    
+                    <h4>Position Impact Analysis</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin: 1rem 0;">
+                        <div style="background: #f0f8f0; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <strong>Material</strong><br>{position_impact.get('material_change', 0):+d}
+                        </div>
+                        <div style="background: #f8f0f8; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <strong>King Safety</strong><br>{position_impact.get('king_safety_impact', 0):+.1f}
+                        </div>
+                        <div style="background: #f0f0f8; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <strong>Center Control</strong><br>{position_impact.get('center_control_change', 0):+.1f}
+                        </div>
+                        <div style="background: #f8f8f0; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <strong>Initiative</strong><br>{position_impact.get('initiative_change', 0):+.1f}
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                        <div style="background: #f0f8f0; padding: 1rem; border-radius: 8px; border-left: 3px solid #48bb78;">
+                            <strong>Material Trend:</strong> {material_trend.replace('_', ' ').title()}
+                        </div>
+                        <div style="background: #f8f0f8; padding: 1rem; border-radius: 8px; border-left: 3px solid #805ad5;">
+                            <strong>Position Trend:</strong> {position_trend.replace('_', ' ').title()}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="page-break"></div>
+
+            """
         
         return f"""
-        <div class="section">
+        <section class="section">
+            <div class="section-header">
+                🎯 Principal Variations Analysis
+            </div>
+            <p>Detailed breakdown of the top three variations with comprehensive evaluation and strategic insights.</p>
+            {variations_html}
+        </section>
+        <div class="page-break"></div>
+
+        """
+
+    def _generate_comprehensive_insights_section(self, position_data: Dict[str, Any], selected_move_data: Dict[str, Any]) -> str:
+        """Generate comprehensive insights and learning section."""
+        learning_insights = position_data.get('learning_insights', {})
+        comprehensive_analysis = position_data.get('comprehensive_analysis', {})
+        
+        # Extract insights by skill level
+        beginner = learning_insights.get('beginner', {})
+        intermediate = learning_insights.get('intermediate', {})
+        advanced = learning_insights.get('advanced', {})
+        universal = learning_insights.get('universal', {})
+        
+        # Strategic themes and tactical motifs
+        strategic_themes = comprehensive_analysis.get('strategic_themes', [])
+        tactical_motifs = comprehensive_analysis.get('tactical_motifs', [])
+        critical_squares = comprehensive_analysis.get('critical_squares', [])
+        
+        return f"""
+        <section class="section">
             <div class="section-header">
                 💡 Strategic Insights & Learning
             </div>
-            <div class="section-content">
-                <h3>Key Learning Points</h3>
-                <div class="insights-grid">
-                    {insights_html}
+            
+            <h3>Position Assessment</h3>
+            <div style="background: linear-gradient(135deg, #e8f5e8, #c6f6d5); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; border-left: 5px solid #48bb78;">
+                <p style="font-size: 1.1rem; line-height: 1.6; color: #2d3748;">
+                    <strong>🔍 Engine Assessment:</strong> {universal.get('position_assessment', 'This is a complex position requiring careful analysis.')}
+                </p>
+            </div>
+            
+            <h3>Best Move Reasoning</h3>
+            <div style="background: linear-gradient(135deg, #e3f2fd, #bbdefb); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; border-left: 5px solid #4299e1;">
+                <p style="font-size: 1.1rem; line-height: 1.6; color: #2d3748;">
+                    <strong>🎯 Why this move:</strong> {universal.get('best_move_reasoning', 'The engine recommends this move based on tactical and positional considerations.')}
+                </p>
+            </div>
+            
+            <div class="insights-grid">
+                <div class="insight-card">
+                    <h4>🎓 For Beginners</h4>
+                    <h5>Key Concepts</h5>
+                    <ul>
+                        {self._generate_list_items(beginner.get('key_concepts', []))}
+                    </ul>
+                    <h5>Development Tips</h5>
+                    <ul>
+                        {self._generate_list_items(beginner.get('development_tips', []))}
+                    </ul>
+                    <h5>Tactical Patterns</h5>
+                    <ul>
+                        {self._generate_list_items(beginner.get('tactical_patterns', [[]])[0] if beginner.get('tactical_patterns') else [])}
+                    </ul>
+                </div>
+                
+                <div class="insight-card">
+                    <h4>📚 For Intermediate Players</h4>
+                    <h5>Positional Concepts</h5>
+                    <ul>
+                        {self._generate_list_items(intermediate.get('positional_concepts', []))}
+                    </ul>
+                    <h5>Strategic Plans</h5>
+                    <ul>
+                        {self._generate_list_items(intermediate.get('strategic_plans', []))}
+                    </ul>
+                    <h5>Calculation Exercises</h5>
+                    <ul>
+                        {self._generate_list_items(intermediate.get('calculation_exercises', []))}
+                    </ul>
+                    <h5>Pattern Recognition</h5>
+                    <ul>
+                        {self._generate_list_items(intermediate.get('pattern_recognition', []))}
+                    </ul>
+                </div>
+                
+                <div class="insight-card">
+                    <h4>🏆 For Advanced Players</h4>
+                    <h5>Deep Strategy</h5>
+                    <ul>
+                        {self._generate_list_items(advanced.get('deep_strategy', []))}
+                    </ul>
+                    <h5>Subtle Tactics</h5>
+                    <ul>
+                        {self._generate_list_items(advanced.get('subtle_tactics', []))}
+                    </ul>
+                    <h5>Psychological Factors</h5>
+                    <ul>
+                        {self._generate_list_items(advanced.get('psychological_factors', []))}
+                    </ul>
+                    <h5>Endgame Theory</h5>
+                    <ul>
+                        {self._generate_list_items(advanced.get('endgame_theory', []))}
+                    </ul>
                 </div>
             </div>
             
-            <div style="margin-top: 30px; padding: 25px; background: #e3f2fd; border-radius: 12px; border-left: 5px solid #2196f3;">
-                <h3>Training Recommendations</h3>
-                {self.generate_training_recommendations_html(result, user_move, position_data)}
+            <div class="page-break"></div>
+
+            <h3>Strategic & Tactical Themes</h3>
+            <div style="margin: 2rem 0;">
+                <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 1px solid #e2e8f0;">
+                    <h4 style="color: #4299e1; margin-bottom: 0.5rem;">📈 Strategic Themes</h4>
+                    <div>
+                        {self._generate_theme_tags(strategic_themes)}
+                    </div>
+                </div>
+                <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 1px solid #e2e8f0;">
+                    <h4 style="color: #ed8936; margin-bottom: 0.5rem;">⚡ Tactical Motifs</h4>
+                    <div>
+                        {self._generate_theme_tags(tactical_motifs)}
+                    </div>
+                </div>
+                <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <h4 style="color: #805ad5; margin-bottom: 0.5rem;">🎯 Critical Squares</h4>
+                    <div style="font-family: 'Monaco', 'Menlo', monospace; font-size: 1.1rem; font-weight: 600; color: #2d3748;">
+                        {", ".join(critical_squares) if critical_squares else "None identified"}
+                    </div>
+                </div>
             </div>
-        </div>
+            
+            <div style="background: linear-gradient(135deg, #fff5f5, #fed7d7); padding: 1.5rem; border-radius: 12px; border-left: 5px solid #e53e3e;">
+                <h3 style="color: #e53e3e;">⚠️ Common Mistakes to Avoid</h3>
+                <ul>
+                    {self._generate_list_items(universal.get('common_mistakes', ['Moving without a plan', 'Ignoring opponent threats', 'Poor time management']))}
+                </ul>
+            </div>
+            
+            <div style="background: linear-gradient(135deg, #f0fff4, #c6f6d5); padding: 1.5rem; border-radius: 12px; border-left: 5px solid #48bb78; margin-top: 1.5rem;">
+                <h3 style="color: #48bb78;">🚀 Areas for Improvement</h3>
+                <ul>
+                    {self._generate_list_items(universal.get('improvement_areas', ['Pattern recognition', 'Calculation accuracy', 'Positional understanding']))}
+                </ul>
+            </div>
+        </section>
+        <div class="page-break"></div>
+
         """
 
     def generate_spatial_analysis_html(self, fen: str) -> str:
@@ -1352,7 +939,33 @@ class ComprehensiveHTMLGenerator:
                 </div>
             </div>
             """
-    
+
+    def _generate_spatial_analysis_section(self, fen: str) -> str:
+        """Generate spatial analysis section if available."""
+        try:
+            return self.generate_spatial_analysis_html(fen)
+        except ImportError:
+            return """
+            <section class="section">
+                <div class="section-header">
+                    🗺️ Advanced Spatial Analysis
+                </div>
+                <div style="text-align: center; color: #718096; font-style: italic; padding: 3rem; background: #f8f9fa; border-radius: 12px; border: 2px dashed #e2e8f0;">
+                    <h4 style="color: #4a5568; margin-bottom: 1rem;">Advanced Spatial Analysis Module</h4>
+                    <p style="font-size: 1.1rem; line-height: 1.6;">
+                        This feature provides detailed territory control visualization, piece activity mapping, 
+                        and strategic factor analysis. The spatial analysis module enhances positional understanding 
+                        through advanced computational geometry and chess-specific algorithms.
+                    </p>
+                    <p style="margin-top: 1rem; color: #4a5568;">
+                        <em>Module not currently available - contact administrator for advanced features.</em>
+                    </p>
+                </div>
+            </section>
+            <div class="page-break"></div>
+
+            """
+
     def generate_space_control_board_html(self, metrics: Dict[str, Any]) -> str:
         """Generate space control board visualization as HTML."""
         try:
@@ -1429,7 +1042,7 @@ class ComprehensiveHTMLGenerator:
             
         except Exception as e:
             return f'<p style="text-align: center; color: #ef4444;">Error generating space control: {str(e)}</p>'
-    
+
     def generate_spatial_metrics_html(self, metrics: Dict[str, Any]) -> str:
         """Generate spatial metrics summary table."""
         try:
@@ -1486,248 +1099,426 @@ class ComprehensiveHTMLGenerator:
         except Exception as e:
             return f'<p>Error generating spatial metrics: {str(e)}</p>'
     
-    def generate_position_comparison_html(self, position_data: Dict[str, Any], best_move: Dict[str, Any]) -> str:
-        """Generate position comparison analysis."""
-        return f"""
-        <div class="section">
-            <div class="section-header">
-                📈 Position Evaluation
-            </div>
-            <div class="section-content">
-                <p>Detailed evaluation comparing key positional factors and the impact of the best move.</p>
-                
-                <div style="margin-top: 30px;">
-                    <h3 style="margin-bottom: 20px; color: #4a5568;">🎯 Move Impact Analysis</h3>
-                    <div class="insights-grid">
-                        <div class="insight-card">
-                            <h4>📊 Evaluation Change</h4>
-                            <p>The best move improves the position by addressing key weaknesses and enhancing strategic advantages.</p>
-                        </div>
-                        <div class="insight-card">
-                            <h4>🎯 Tactical Benefits</h4>
-                            <p>This move creates immediate tactical opportunities while maintaining positional soundness.</p>
-                        </div>
-                        <div class="insight-card">
-                            <h4>📈 Strategic Value</h4>
-                            <p>Long-term positional improvements include better piece coordination and territorial control.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """
-    
-    def generate_themes_section(self, position_data: Dict[str, Any]) -> str:
-        """Generate themes overview section."""
-        themes = position_data.get('themes', [])
-        position_themes = position_data.get('position_themes', [])
-        tactical_motifs = position_data.get('tactical_motifs', [])
-        
-        # Combine all themes
-        all_themes = themes + position_themes + tactical_motifs
-        unique_themes = list(dict.fromkeys(all_themes))[:8]  # Remove duplicates, limit to 8
-        
-        if not unique_themes:
-            unique_themes = ['Positional', 'Strategic']
-        
-        theme_tags = ''.join([f'<span class="theme-tag">{theme.replace("_", " ").title()}</span>' 
-                             for theme in unique_themes])
-        
-        return f"""
-        <div style="margin-top: 20px;">
-            <div class="info-label">Position Themes</div>
-            <div style="margin-top: 10px;">{theme_tags}</div>
-        </div>
-        """
-    
-    def generate_insights_section(self, position_data: Dict[str, Any], selected_move_data: Dict[str, Any]) -> str:
-        """Generate strategic insights section."""
-        user_move = selected_move_data.get('move', 'N/A')
-        user_rank = selected_move_data.get('rank', 999)
-        user_classification = selected_move_data.get('classification', 'unknown')
-        
-        return f"""
-        <div class="section">
-            <div class="section-header">
-                💡 Strategic Insights & Training Analysis
-            </div>
-            <div class="section-content">
-                <div style="background: #e6fffa; padding: 20px; border-radius: 10px; border-left: 4px solid #38b2ac; margin-bottom: 30px;">
-                    <h3 style="margin-bottom: 15px; color: #2d3748;">🎯 Your Move Analysis</h3>
-                    <p><strong>Selected Move:</strong> {self.convert_to_piece_icons(user_move)}</p>
-                    <p><strong>Engine Ranking:</strong> #{user_rank}</p>
-                    <p><strong>Classification:</strong> <span class="classification {user_classification.lower()}">{user_classification.title()}</span></p>
-                </div>
-                
-                <div class="insights-grid">
-                    <div class="insight-card">
-                        <h4>🎓 Learning Points</h4>
-                        <ul>
-                            <li>Compare your move with the top engine recommendations</li>
-                            <li>Analyze the principal variations to understand tactical sequences</li>
-                            <li>Study the position themes to improve pattern recognition</li>
-                        </ul>
-                    </div>
-                    <div class="insight-card">
-                        <h4>📚 Study Recommendations</h4>
-                        <ul>
-                            <li>Practice similar position types to strengthen weak areas</li>
-                            <li>Focus on calculation depth for tactical improvements</li>
-                            <li>Review grandmaster games with similar pawn structures</li>
-                        </ul>
-                    </div>
-                    <div class="insight-card">
-                        <h4>⚡ Key Takeaways</h4>
-                        <ul>
-                            <li>Understanding why certain moves are superior develops chess intuition</li>
-                            <li>Regular analysis of your games accelerates improvement</li>
-                            <li>Pattern recognition from engine analysis builds strategic knowledge</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """
-    
-    def format_principal_variation(self, pv_string: str, turn_color: str, starting_move_number: int = 1) -> str:
-        """Format principal variation with correct PGN numbering and piece icons."""
-        if not pv_string:
-            return ""
-        
-        current_move_num = starting_move_number
-        is_white_turn = (turn_color.lower() == 'white')
-        
-        if not is_white_turn:
-            pv_string = f"{current_move_num}... {pv_string}"
-        
-        # Replace piece letters with icons
-        try:
-            pv_string = self.convert_to_piece_icons(pv_string)
-        except Exception as e:
-            print(f"Error converting string to piece notation: {e}")
-        
-        return pv_string
-    
-    def format_score_display(self, score) -> str:
-        """Format score for display."""
-        if isinstance(score, dict):
-            if 'mate' in score:
-                return f"M{score['mate']}"
-            else:
-                return f"{score.get('cp', 0) / 100:.2f}"
-        elif isinstance(score, (int, float)):
-            return f"{score / 100:.2f}" if abs(score) > 10 else f"{score:.2f}"
-        else:
-            return str(score)
-    
-    def get_score_class(self, score) -> str:
-        """Get CSS class for score styling."""
-        if isinstance(score, dict):
-            if 'mate' in score:
-                return 'score-positive' if score['mate'] > 0 else 'score-negative'
-            else:
-                cp = score.get('cp', 0)
-                return 'score-positive' if cp > 0 else 'score-negative'
-        elif isinstance(score, (int, float)):
-            return 'score-positive' if score > 0 else 'score-negative'
-        return ''
-    
-    def get_advantage_class(self, value: float) -> str:
-        """Get CSS class for advantage display."""
-        if value > 0.1:
-            return 'trend-up'
-        elif value < -0.1:
-            return 'trend-down'
-        else:
-            return 'trend-neutral'
 
-    def generate_enhanced_comprehensive_analysis(self, position_data: Dict[str, Any], 
-                                            selected_move_data: Dict[str, Any],
-                                            analysis_results: Dict[str, Any],
-                                            include_spatial_analysis: bool = True,
-                                            include_side_by_side: bool = True,
-                                            include_detailed_stats: bool = True,
-                                            print_optimized: bool = True) -> str:
-        """Generate comprehensive chess analysis report with enhanced features."""
-        try:
-            position_id = position_data.get('id', 'unknown')
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            
-            # Generate comprehensive analysis using existing method but with enhanced features
-            html_content = self.create_comprehensive_html_template(
-                position_data=position_data,
-                selected_move_data=selected_move_data,
-                include_spatial_analysis=include_spatial_analysis,
-                include_side_by_side=include_side_by_side
-            )
-            
-            # Save to file
-            filename = f"comprehensive_analysis_{position_id}_{timestamp}.html"
-            filepath = os.path.join(self.output_dir, filename)
-            
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(html_content)
-            
-            return filepath
-            
-        except Exception as e:
-            print(f"Error generating comprehensive analysis: {e}")
-            return None
 
-    # Helper methods for performance insights
-    def generate_performance_insights(self, result: str, move_data: Dict, time_taken: float, position_data: Dict) -> Dict[str, List[str]]:
-        """Generate performance insights."""
-        insights = {
-            'move_quality': [],
-            'time_management': [],
-            'pattern_recognition': [],
-            'improvement_areas': []
+    # === HELPER METHODS ===
+    
+    def _extract_move_history(self, position_data: Dict[str, Any]) -> str:
+        """Extract and format move history."""
+        move_history = position_data.get('move_history', '')
+        if isinstance(move_history, str):
+            try:
+                history_data = json.loads(move_history)
+                pgn = history_data.get('pgn', '')
+                pgn = self.convert_to_piece_icons(pgn)
+                if pgn:
+                    return f"""
+                    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 12px; margin-top: 1.5rem; border: 1px solid #e2e8f0;">
+                        <h4 style="color: #4a5568; margin-bottom: 1rem;">📜 Game History</h4>
+                        <div style="font-family: 'Monaco', 'Menlo', monospace; font-size: 0.9rem; line-height: 1.8; color: #2d3748; background: white; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">{pgn}</div>
+                    </div>
+                    """
+            except:
+                pass
+        return ""
+
+    def _generate_list_items(self, items: List[str]) -> str:
+        """Generate HTML list items from a list of strings."""
+        if not items:
+            return "<li style='color: #718096; font-style: italic;'>No specific guidance available for this level.</li>"
+        return "".join([f"<li>{item}</li>" for item in items])
+
+    def _generate_theme_tags(self, themes: List[str]) -> str:
+        """Generate theme tags HTML."""
+        if not themes:
+            return '<span class="theme-tag" style="background: #f0f0f0; color: #718096;">None identified</span>'
+        return "".join([f'<span class="theme-tag">{theme.replace("_", " ").title()}</span>' for theme in themes])
+
+    def _generate_space_control_visualization(self, metrics: Dict[str, Any]) -> str:
+        """Generate space control visualization from spatial analysis metrics."""
+        # This would integrate with the spatial analysis if available
+        return """
+        <div style="text-align: center; padding: 3rem; background: linear-gradient(135deg, #f8f9fa, #e2e8f0); border-radius: 12px; margin: 1rem 0; border: 2px dashed #cbd5e0;">
+            <h4 style="color: #4a5568; margin-bottom: 1rem;">🎯 Enhanced Space Control Analysis</h4>
+            <p style="color: #718096; font-style: italic; font-size: 1.1rem; line-height: 1.6;">
+                Detailed space control visualization with piece influence mapping, 
+                territory analysis, and strategic factor weighting would appear here 
+                when the spatial analysis module is available.
+            </p>
+            <p style="color: #4a5568; margin-top: 1rem; font-size: 0.9rem;">
+                This feature enhances position understanding through advanced computational analysis.
+            </p>
+        </div>
+        """
+    
+    # === ENHANCED COMPATIBILITY METHODS ===
+
+    # Enhanced HTML Generator for Comprehensive Chess Position Analysis
+    # This enhances the existing html_generator.py with comprehensive analysis capabilities
+
+    def _generate_comprehensive_css(self, print_optimized: bool = True) -> str:
+        """Generate comprehensive CSS for mobile and print optimization."""
+        return """
+    /* === RESPONSIVE FOUNDATION === */
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        color: #2d3748;
+        background: #f7fafc;
+        font-size: 16px;
+    }
+
+    .analysis-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: white;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 12px;
+    }
+
+    /* === TYPOGRAPHY === */
+    h1 { font-size: 2.5rem; color: #1a202c; margin-bottom: 1rem; }
+    h2 { font-size: 2rem; color: #2d3748; margin: 2rem 0 1rem; }
+    h3 { font-size: 1.5rem; color: #4a5568; margin: 1.5rem 0 0.75rem; }
+    h4 { font-size: 1.25rem; color: #718096; margin: 1rem 0 0.5rem; }
+
+    /* === HEADER === */
+    .report-header {
+        text-align: center;
+        padding: 2rem 0;
+        border-bottom: 3px solid #e2e8f0;
+        margin-bottom: 2rem;
+    }
+
+    .position-meta {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .meta-item {
+        background: #4299e1;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    /* === SECTIONS === */
+    .section {
+        margin: 3rem 0;
+        padding: 2rem;
+        background: #f8f9fa;
+        border-radius: 12px;
+        border-left: 5px solid #4299e1;
+    }
+
+    .section-header {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* === BOARD LAYOUTS === */
+    .side-by-side {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3rem;
+        align-items: start;
+    }
+
+    .board-container {
+        background: white;
+        padding: 1rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        text-align: center;
+    }
+
+    .board-label {
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 1rem;
+        font-size: 1.1rem;
+    }
+
+    /* === TABLES === */
+    .analysis-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1.5rem 0;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .analysis-table th {
+        background: #4299e1;
+        color: white;
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+    }
+
+    .analysis-table td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .analysis-table tr:nth-child(even) {
+        background: #f8f9fa;
+    }
+
+    .analysis-table tr:hover {
+        background: #e6fffa;
+    }
+
+    /* === SCORE STYLING === */
+    .score-positive { color: #38a169; font-weight: 600; }
+    .score-negative { color: #e53e3e; font-weight: 600; }
+    .score-neutral { color: #718096; font-weight: 600; }
+
+    /* === BADGES AND TAGS === */
+    .move-classification {
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .classification-great { background: #c6f6d5; color: #22543d; }
+    .classification-good { background: #bee3f8; color: #2a4365; }
+    .classification-decent { background: #ffd6cc; color: #9c4221; }
+    .classification-inaccuracy { background: #fef5e7; color: #975a16; }
+    .classification-mistake { background: #fed7e2; color: #97266d; }
+    .classification-blunder { background: #fed7d7; color: #742a2a; }
+
+    .theme-tag {
+        display: inline-block;
+        background: #e6fffa;
+        color: #234e52;
+        padding: 6px 12px;
+        border-radius: 20px;
+        margin: 3px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    /* === METRICS VISUALIZATION === */
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+    }
+
+    .metric-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid #4299e1;
+    }
+
+    .metric-label {
+        font-size: 0.9rem;
+        color: #718096;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #1a202c;
+    }
+
+    .metric-change {
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+    }
+
+    .change-positive { color: #38a169; }
+    .change-negative { color: #e53e3e; }
+    .change-neutral { color: #718096; }
+
+    /* === INSIGHTS === */
+    .insights-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+    }
+
+    .insight-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border-top: 4px solid #48bb78;
+    }
+
+    .insight-card h4 {
+        color: #2d3748;
+        margin-bottom: 0.75rem;
+    }
+
+    .insight-card ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    .insight-card li {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e2e8f0;
+        position: relative;
+        padding-left: 1.5rem;
+    }
+
+    .insight-card li:before {
+        content: "▶";
+        position: absolute;
+        left: 0;
+        color: #4299e1;
+        font-size: 0.8rem;
+    }
+
+    /* === VARIATIONS === */
+    .variation-card {
+        background: white;
+        margin: 1rem 0;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .variation-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem 1.5rem;
+        font-weight: 600;
+    }
+
+    .variation-content {
+        padding: 1.5rem;
+    }
+
+    .variation-moves {
+        font-family: 'Monaco', 'Menlo', monospace;
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+        font-size: 0.9rem;
+        line-height: 1.8;
+        overflow-x: auto;
+    }
+
+    /* === SPATIAL ANALYSIS === */
+    .space-control-board {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 2px;
+        background: #4a5568;
+        padding: 1rem;
+        border-radius: 12px;
+        max-width: 400px;
+        margin: 2rem auto;
+    }
+
+    .space-square {
+        aspect-ratio: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.8rem;
+        border-radius: 4px;
+    }
+
+    .space-white { background: #3182ce; color: white; }
+    .space-black { background: #805ad5; color: white; }
+    .space-contested { background: #ed8936; color: white; }
+    .space-neutral { background: #e2e8f0; color: #4a5568; }
+
+    /* === MOBILE RESPONSIVENESS === */
+    @media (max-width: 768px) {
+        .analysis-container {
+            padding: 1rem;
+            margin: 0;
+            border-radius: 0;
         }
         
-        rank = move_data.get('rank', 999)
-        cp_loss = move_data.get('centipawn_loss', 0)
+        .side-by-side {
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
         
-        # Move quality insights
-        if result == 'excellent':
-            insights['move_quality'].append("Outstanding move selection showing strong positional understanding")
-            insights['pattern_recognition'].append("Excellent pattern recognition - you identified the key ideas quickly")
-        elif result == 'correct':
-            insights['move_quality'].append("Solid move choice demonstrating good chess fundamentals")
-        else:
-            insights['improvement_areas'].append("Focus on deeper calculation to find stronger moves")
+        .position-meta {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
         
-        # Time management insights
-        if time_taken < 10:
-            insights['time_management'].append("Quick decision-making - good for practical play")
-            if result not in ['excellent', 'correct']:
-                insights['improvement_areas'].append("Consider spending more time on complex positions")
-        elif time_taken > 60:
-            insights['time_management'].append("Thorough analysis approach - excellent for training")
+        .metrics-grid {
+            grid-template-columns: 1fr;
+        }
         
-        # Ranking insights
-        if rank == 1:
-            insights['pattern_recognition'].append("You found the engine's top choice - exceptional pattern recognition")
-        elif rank <= 3:
-            insights['pattern_recognition'].append("Your move was among the engine's top choices - strong understanding")
+        .insights-grid {
+            grid-template-columns: 1fr;
+        }
         
-        return insights
+        h1 { font-size: 2rem; }
+        h2 { font-size: 1.5rem; }
+        
+        .analysis-table {
+            font-size: 0.9rem;
+        }
+        
+        .analysis-table th,
+        .analysis-table td {
+            padding: 0.5rem;
+        }
+    }
 
-    def generate_training_recommendations_html(self, result: str, move_data: Dict, position_data: Dict) -> str:
-        """Generate training recommendations HTML."""
-        recommendations = []
+    @media (max-width: 480px) {
+        body { font-size: 14px; }
         
-        if result in ['excellent', 'correct']:
-            recommendations.append("Continue practicing similar positions to reinforce successful patterns")
-            recommendations.append("Challenge yourself with higher difficulty positions")
-        else:
-            recommendations.append("Study the top engine moves to understand better alternatives")
-            recommendations.append("Practice tactical puzzles to improve calculation accuracy")
-            recommendations.append("Analyze master games with similar pawn structures")
+        .section {
+            padding: 1rem;
+            margin: 2rem 0;
+        }
         
-        # Add theme-specific recommendations
-        themes = position_data.get('themes', [])
-        if themes:
-            recommendations.append(f"Focus on {themes[0].replace('_', ' ')} patterns for similar positions")
+        .board-container {
+            padding: 0.5rem;
+        }
         
-        return "<br>".join([f"• {rec}" for rec in recommendations])
+        .space-control-board {
+            max-width: 300px;
+        }
+    }
+
+    /* === PRINT OPTIMIZATION === */
+    @media print {
+    .page-break { 
+        page-break-after: always;   /* older spec */
+        break-after: page;          /* modern spec */
+    }
+    }
+    """
 

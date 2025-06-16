@@ -1,0 +1,2142 @@
+{
+  "id": 5153,
+  "fen": "r1bq1rk1/pp4pp/1bn1pn2/3pN3/1P6/P2B4/1BP2PPP/RN1Q1RK1 w - - 3 12",
+  "turn": "white",
+  "fullmove_number": 12,
+  "halfmove_clock": 3,
+  "castling_rights": "{'white_kingside': False, 'white_queenside': False, 'black_kingside': False, 'black_queenside': False}",
+  "en_passant": null,
+  "move_history": "{\"pgn\": \"0. e4 c6 1. d4 2. e5 c5 3. dxc5 4. Nf3 Bxc5 5. a3 6. b4 Bb6 7. Bd3 8. Bb2 Nf6 9. Nxe5 10. O-O O-O\", \"moves\": [{\"move_number\": 0, \"color\": \"white\", \"san\": \"e4\", \"uci\": \"e2e4\"}, {\"move_number\": 2, \"color\": \"black\", \"san\": \"c6\", \"uci\": \"c7c6\"}, {\"move_number\": 1, \"color\": \"white\", \"san\": \"d4\", \"uci\": \"d2d4\"}, {\"move_number\": 2, \"color\": \"white\", \"san\": \"e5\", \"uci\": \"e4e5\"}, {\"move_number\": 4, \"color\": \"black\", \"san\": \"c5\", \"uci\": \"c6c5\"}, {\"move_number\": 3, \"color\": \"white\", \"san\": \"dxc5\", \"uci\": \"d4c5\"}, {\"move_number\": 4, \"color\": \"white\", \"san\": \"Nf3\", \"uci\": \"g1f3\"}, {\"move_number\": 6, \"color\": \"black\", \"san\": \"Bxc5\", \"uci\": \"f8c5\"}, {\"move_number\": 5, \"color\": \"white\", \"san\": \"a3\", \"uci\": \"a2a3\"}, {\"move_number\": 6, \"color\": \"white\", \"san\": \"b4\", \"uci\": \"b2b4\"}, {\"move_number\": 8, \"color\": \"black\", \"san\": \"Bb6\", \"uci\": \"c5b6\"}, {\"move_number\": 7, \"color\": \"white\", \"san\": \"Bd3\", \"uci\": \"f1d3\"}, {\"move_number\": 8, \"color\": \"white\", \"san\": \"Bb2\", \"uci\": \"c1b2\"}, {\"move_number\": 10, \"color\": \"black\", \"san\": \"Nf6\", \"uci\": \"g8f6\"}, {\"move_number\": 9, \"color\": \"white\", \"san\": \"Nxe5\", \"uci\": \"f3e5\"}, {\"move_number\": 10, \"color\": \"white\", \"san\": \"O-O\", \"uci\": \"e1g1\"}, {\"move_number\": 12, \"color\": \"black\", \"san\": \"O-O\", \"uci\": \"e8g8\"}], \"total_moves\": 17}",
+  "last_move": "{\"color\": \"black\", \"move_number\": 12, \"san\": \"O-O\", \"uci\": \"e8g8\", \"piece_moved\": \"black_king\", \"capture\": false, \"check\": false, \"castling\": true}",
+  "engine_depth": 0,
+  "analysis_time": 0,
+  "material_analysis": {
+    "white_total": 3800,
+    "black_total": 3800,
+    "white_pawns": 6,
+    "black_pawns": 6,
+    "white_knights": 2,
+    "black_knights": 2,
+    "white_bishops": 2,
+    "black_bishops": 2,
+    "white_rooks": 2,
+    "black_rooks": 2,
+    "white_queens": 1,
+    "black_queens": 1,
+    "imbalance": -40,
+    "imbalance_score": -0.2,
+    "piece_value_advantage": {
+      "pawn": 0,
+      "knight": 0,
+      "bishop": 0,
+      "rook": 0,
+      "queen": 0
+    }
+  },
+  "mobility_analysis": {
+    "white_total": 30,
+    "black_total": 0,
+    "white_avg": 3.75,
+    "black_avg": 0,
+    "activity_scores": {
+      "true": {
+        "total_mobility": 30,
+        "active_pieces": 8,
+        "average_mobility": 3.75
+      },
+      "false": {
+        "total_mobility": 0,
+        "active_pieces": 0,
+        "average_mobility": 0
+      }
+    },
+    "space_advantage": {
+      "true": 13,
+      "false": 9
+    }
+  },
+  "king_safety_analysis": {
+    "white": {
+      "attack_count": 1,
+      "defender_count": 9,
+      "pawn_shield": 3,
+      "open_files": 0
+    },
+    "black": {
+      "attack_count": 2,
+      "defender_count": 10,
+      "pawn_shield": 2,
+      "open_files": 0
+    },
+    "safety_scores": {
+      "true": 16.5,
+      "false": 13
+    },
+    "attack_potential": {
+      "true": {
+        "attacking_pieces": 1,
+        "attack_value": 106.66666666666667,
+        "pressure": 1.0666666666666667
+      },
+      "false": {
+        "attacking_pieces": 1,
+        "attack_value": 25,
+        "pressure": 0.25
+      }
+    }
+  },
+  "center_control_analysis": {
+    "white": 5,
+    "black": 10,
+    "control_map": {
+      "c3": {
+        "white_attacks": 2,
+        "black_attacks": 0,
+        "occupied_by": null,
+        "control_balance": 2,
+        "is_center": false
+      },
+      "d3": {
+        "white_attacks": 3,
+        "black_attacks": 0,
+        "occupied_by": "white_bishop",
+        "control_balance": 3,
+        "is_center": false
+      },
+      "e3": {
+        "white_attacks": 1,
+        "black_attacks": 1,
+        "occupied_by": null,
+        "control_balance": 0,
+        "is_center": false
+      },
+      "f3": {
+        "white_attacks": 3,
+        "black_attacks": 0,
+        "occupied_by": null,
+        "control_balance": 3,
+        "is_center": false
+      },
+      "c4": {
+        "white_attacks": 2,
+        "black_attacks": 1,
+        "occupied_by": null,
+        "control_balance": 1,
+        "is_center": false
+      },
+      "d4": {
+        "white_attacks": 1,
+        "black_attacks": 2,
+        "occupied_by": null,
+        "control_balance": -1,
+        "is_center": true
+      },
+      "e4": {
+        "white_attacks": 1,
+        "black_attacks": 2,
+        "occupied_by": null,
+        "control_balance": -1,
+        "is_center": true
+      },
+      "f4": {
+        "white_attacks": 0,
+        "black_attacks": 0,
+        "occupied_by": null,
+        "control_balance": 0,
+        "is_center": false
+      },
+      "c5": {
+        "white_attacks": 1,
+        "black_attacks": 1,
+        "occupied_by": null,
+        "control_balance": 0,
+        "is_center": false
+      },
+      "d5": {
+        "white_attacks": 0,
+        "black_attacks": 3,
+        "occupied_by": "black_pawn",
+        "control_balance": -3,
+        "is_center": true
+      },
+      "e5": {
+        "white_attacks": 1,
+        "black_attacks": 1,
+        "occupied_by": "white_knight",
+        "control_balance": 0,
+        "is_center": true
+      },
+      "f5": {
+        "white_attacks": 1,
+        "black_attacks": 1,
+        "occupied_by": null,
+        "control_balance": 0,
+        "is_center": false
+      },
+      "c6": {
+        "white_attacks": 1,
+        "black_attacks": 1,
+        "occupied_by": "black_knight",
+        "control_balance": 0,
+        "is_center": false
+      },
+      "d6": {
+        "white_attacks": 0,
+        "black_attacks": 1,
+        "occupied_by": null,
+        "control_balance": -1,
+        "is_center": false
+      },
+      "e6": {
+        "white_attacks": 0,
+        "black_attacks": 1,
+        "occupied_by": "black_pawn",
+        "control_balance": -1,
+        "is_center": false
+      },
+      "f6": {
+        "white_attacks": 0,
+        "black_attacks": 3,
+        "occupied_by": "black_knight",
+        "control_balance": -3,
+        "is_center": false
+      }
+    },
+    "initiative": 0.19999999999999973
+  },
+  "pawn_structure_analysis": {
+    "open_files": 0,
+    "half_open_files": 4,
+    "white_pawn_islands": 2,
+    "black_pawn_islands": 3,
+    "white_passed_pawns": 0,
+    "black_passed_pawns": 0,
+    "white_isolated_pawns": 0,
+    "black_isolated_pawns": 0,
+    "white_doubled_pawns": 0,
+    "black_doubled_pawns": 0,
+    "pawn_chains": 1,
+    "structure_evaluation": {
+      "flexibility": 0.8,
+      "strength": 1,
+      "weaknesses_score": 0,
+      "potential": 0.9
+    },
+    "weaknesses": [],
+    "strengths": []
+  },
+  "piece_development_analysis": {
+    "white": 1.0285714285714287,
+    "black": 0.9285714285714286,
+    "coordination": {
+      "true": {
+        "defended_pieces": 7,
+        "total_pieces": 8,
+        "coordination_ratio": 0.875,
+        "coordination_score": 12
+      },
+      "false": {
+        "defended_pieces": 7,
+        "total_pieces": 8,
+        "coordination_ratio": 0.875,
+        "coordination_score": 15
+      }
+    },
+    "harmony": {
+      "true": {
+        "multi_attacked_squares": 16,
+        "total_attacked_squares": 40,
+        "harmony_ratio": 0.4
+      },
+      "false": {
+        "multi_attacked_squares": 18,
+        "total_attacked_squares": 36,
+        "harmony_ratio": 0.5
+      }
+    }
+  },
+  "comprehensive_analysis": {
+    "position_score": 30,
+    "strategic_themes": [
+      "center_control",
+      "piece_activity"
+    ],
+    "tactical_motifs": [
+      "fork_potential",
+      "pin_possibilities",
+      "skewer",
+      "discovered_attack",
+      "trapped_piece"
+    ],
+    "critical_squares": [
+      "d5",
+      "f1",
+      "e4",
+      "f2",
+      "e5",
+      "f7",
+      "d4",
+      "f8"
+    ],
+    "piece_placement_quality": {
+      "white": 0.3875,
+      "black": 0.3375
+    },
+    "tempo_evaluation": 0.2
+  },
+  "variation_analysis": {
+    "variations": [
+      {
+        "move_rank": 1,
+        "initial_move": {
+          "move": "Nd2",
+          "score": 27,
+          "depth": 23,
+          "pv": "12.Nd2 a5 13.Nxc6 bxc6 14.c4 axb4 15.axb4 Rxa1 16.Bxa1 c5 17.bxc5 Bxc5 18.Qe2 Qe7 19.Nb3 dxc4 20.Bxc4 Bb6 21.Bd4 Bxd4 ...",
+          "uci": "b1d2",
+          "centipawn_loss": 0,
+          "classification": "great",
+          "tactics": [
+            "trapped_piece"
+          ],
+          "position_impact": {
+            "material_change": 40,
+            "king_safety_impact": 0,
+            "center_control_change": 1,
+            "development_impact": 0.24285714285714266,
+            "pawn_structure_impact": 0,
+            "piece_coordination_change": 0,
+            "space_advantage_change": 0,
+            "initiative_change": 1.4
+          },
+          "ml_evaluation": {},
+          "move_complexity": 2,
+          "strategic_value": 2
+        },
+        "line_analysis": [],
+        "final_evaluation": {
+          "material_trend": "stable",
+          "position_trend": "stable",
+          "complexity": 0,
+          "tactical_density": 5,
+          "final_assessment": "Black controls the center. Tactically sharp position. Overall assessment: slight advantage."
+        },
+        "key_features": [
+          "positional",
+          "simple"
+        ],
+        "material_evolution": [
+          0
+        ],
+        "positional_evolution": [
+          27
+        ],
+        "comprehensive_final_stats": {
+          "material_imbalance_score": 0,
+          "center_control_scores": {
+            "white": 6,
+            "black": 10,
+            "balance": -4
+          },
+          "tactical_weights": {
+            "total_tactical_elements": 5,
+            "tactical_density": 5,
+            "tactical_progression": "stable",
+            "dominant_tactics": [
+              "fork_potential",
+              "pin_possibilities",
+              "skewer"
+            ]
+          },
+          "king_safety_differential": {
+            "white_safety": 9,
+            "black_safety": 8,
+            "safety_balance": 1
+          },
+          "piece_activity_metrics": {
+            "white_activity": 0,
+            "black_activity": 3.375,
+            "activity_balance": -3.375
+          },
+          "strategic_assessment": {
+            "primary_themes": [
+              "center_control",
+              "piece_activity"
+            ],
+            "position_type": "tactical_middlegame",
+            "winning_chances": "slight_advantage",
+            "complexity_rating": 10
+          },
+          "variation_quality": {
+            "consistency": 0.5,
+            "improvement_trend": "stable",
+            "tactical_sharpness": 5,
+            "positional_stability": 1
+          }
+        }
+      },
+      {
+        "move_rank": 2,
+        "initial_move": {
+          "move": "Nxc6",
+          "score": 23,
+          "depth": 23,
+          "pv": "12.Nxc6 bxc6 13.Nd2 Qe7 14.Qe2 a5 15.Rab1 axb4 16.axb4 Bc7 17.Nf3 Bd6 18.Ne5 Bb7 19.Bc3 c5 20.bxc5 Bxc5 21.Nf3 Ne4 ...",
+          "uci": "e5c6",
+          "centipawn_loss": 4,
+          "classification": "good",
+          "tactics": [
+            "overloaded_piece",
+            "material_imbalance",
+            "queen_fork",
+            "trapped_piece"
+          ],
+          "position_impact": {
+            "material_change": 310,
+            "king_safety_impact": 0,
+            "center_control_change": 0,
+            "development_impact": -0.10000000000000009,
+            "pawn_structure_impact": 0,
+            "piece_coordination_change": 0.1071428571428571,
+            "space_advantage_change": 3,
+            "initiative_change": 0.7000000000000002
+          },
+          "ml_evaluation": {},
+          "move_complexity": 3,
+          "strategic_value": 1
+        },
+        "line_analysis": [],
+        "final_evaluation": {
+          "material_trend": "stable",
+          "position_trend": "stable",
+          "complexity": 0,
+          "tactical_density": 6,
+          "final_assessment": "Tactically sharp position. Overall assessment: significant advantage."
+        },
+        "key_features": [
+          "positional",
+          "simple"
+        ],
+        "material_evolution": [
+          270
+        ],
+        "positional_evolution": [
+          23
+        ],
+        "comprehensive_final_stats": {
+          "material_imbalance_score": 1.35,
+          "center_control_scores": {
+            "white": 5,
+            "black": 8,
+            "balance": -3
+          },
+          "tactical_weights": {
+            "total_tactical_elements": 6,
+            "tactical_density": 6,
+            "tactical_progression": "stable",
+            "dominant_tactics": [
+              "fork_potential",
+              "pin_possibilities",
+              "skewer"
+            ]
+          },
+          "king_safety_differential": {
+            "white_safety": 8,
+            "black_safety": 9,
+            "safety_balance": -1
+          },
+          "piece_activity_metrics": {
+            "white_activity": 0,
+            "black_activity": 3.142857142857143,
+            "activity_balance": -3.142857142857143
+          },
+          "strategic_assessment": {
+            "primary_themes": [
+              "material_imbalance",
+              "piece_activity"
+            ],
+            "position_type": "tactical_middlegame",
+            "winning_chances": "significant_advantage",
+            "complexity_rating": 10
+          },
+          "variation_quality": {
+            "consistency": 0.5,
+            "improvement_trend": "stable",
+            "tactical_sharpness": 6,
+            "positional_stability": 1
+          }
+        }
+      },
+      {
+        "move_rank": 3,
+        "initial_move": {
+          "move": "Qe2",
+          "score": 20,
+          "depth": 23,
+          "pv": "12.Qe2 a5 13.Nd2 axb4 14.Nxc6 bxc6 15.axb4 Rxa1 16.Bxa1 Qe7 17.Bc3 c5 18.bxc5 Bxc5 19.Ba1 Bd6 20.Nf3 Ne4 21.Be5 Bxe5 ...",
+          "uci": "d1e2",
+          "centipawn_loss": 7,
+          "classification": "good",
+          "tactics": [
+            "trapped_piece"
+          ],
+          "position_impact": {
+            "material_change": 0,
+            "king_safety_impact": 0,
+            "center_control_change": 2,
+            "development_impact": 0.24285714285714266,
+            "pawn_structure_impact": 0,
+            "piece_coordination_change": 0,
+            "space_advantage_change": 1,
+            "initiative_change": 1.4
+          },
+          "ml_evaluation": {},
+          "move_complexity": 4,
+          "strategic_value": 2
+        },
+        "line_analysis": [],
+        "final_evaluation": {
+          "material_trend": "stable",
+          "position_trend": "stable",
+          "complexity": 0,
+          "tactical_density": 5,
+          "final_assessment": "Tactically sharp position. Overall assessment: slight advantage."
+        },
+        "key_features": [
+          "positional",
+          "simple"
+        ],
+        "material_evolution": [
+          -40
+        ],
+        "positional_evolution": [
+          20
+        ],
+        "comprehensive_final_stats": {
+          "material_imbalance_score": -0.2,
+          "center_control_scores": {
+            "white": 7,
+            "black": 10,
+            "balance": -3
+          },
+          "tactical_weights": {
+            "total_tactical_elements": 5,
+            "tactical_density": 5,
+            "tactical_progression": "stable",
+            "dominant_tactics": [
+              "fork_potential",
+              "pin_possibilities",
+              "skewer"
+            ]
+          },
+          "king_safety_differential": {
+            "white_safety": 8,
+            "black_safety": 8,
+            "safety_balance": 0
+          },
+          "piece_activity_metrics": {
+            "white_activity": 0,
+            "black_activity": 3.375,
+            "activity_balance": -3.375
+          },
+          "strategic_assessment": {
+            "primary_themes": [
+              "piece_activity"
+            ],
+            "position_type": "tactical_middlegame",
+            "winning_chances": "slight_advantage",
+            "complexity_rating": 10
+          },
+          "variation_quality": {
+            "consistency": 0.5,
+            "improvement_trend": "stable",
+            "tactical_sharpness": 5,
+            "positional_stability": 1
+          }
+        }
+      },
+      {
+        "move_rank": 4,
+        "initial_move": {
+          "move": "Kh1",
+          "score": 4,
+          "depth": 23,
+          "pv": "12.Kh1 a5 13.b5 Nxe5 14.Bxe5 Qe7 15.Nd2 Nd7 16.Bg3 Nc5 17.Nf3 Nxd3 18.cxd3 a4 19.d4 Bd7 20.Re1 Ba5 21.Re3 Bxb5 ...",
+          "uci": "g1h1",
+          "centipawn_loss": 23,
+          "classification": "decent",
+          "tactics": [
+            "trapped_piece"
+          ],
+          "position_impact": {
+            "material_change": 0,
+            "king_safety_impact": 0,
+            "center_control_change": 0,
+            "development_impact": 0,
+            "pawn_structure_impact": 0,
+            "piece_coordination_change": 0,
+            "space_advantage_change": 0,
+            "initiative_change": -0.6000000000000001
+          },
+          "ml_evaluation": {},
+          "move_complexity": 2,
+          "strategic_value": 2
+        },
+        "line_analysis": [],
+        "final_evaluation": {
+          "material_trend": "stable",
+          "position_trend": "stable",
+          "complexity": 0,
+          "tactical_density": 3,
+          "final_assessment": "Black controls the center. Overall assessment: significant advantage."
+        },
+        "key_features": [
+          "positional",
+          "simple"
+        ],
+        "material_evolution": [
+          -40
+        ],
+        "positional_evolution": [
+          4
+        ],
+        "comprehensive_final_stats": {
+          "material_imbalance_score": -0.2,
+          "center_control_scores": {
+            "white": 5,
+            "black": 10,
+            "balance": -5
+          },
+          "tactical_weights": {
+            "total_tactical_elements": 3,
+            "tactical_density": 3,
+            "tactical_progression": "stable",
+            "dominant_tactics": [
+              "fork_potential",
+              "discovered_attack",
+              "trapped_piece"
+            ]
+          },
+          "king_safety_differential": {
+            "white_safety": 5,
+            "black_safety": 8,
+            "safety_balance": -3
+          },
+          "piece_activity_metrics": {
+            "white_activity": 0,
+            "black_activity": 3.375,
+            "activity_balance": -3.375
+          },
+          "strategic_assessment": {
+            "primary_themes": [
+              "center_control",
+              "piece_activity"
+            ],
+            "position_type": "tactical_middlegame",
+            "winning_chances": "significant_advantage",
+            "complexity_rating": 10
+          },
+          "variation_quality": {
+            "consistency": 0.5,
+            "improvement_trend": "stable",
+            "tactical_sharpness": 3,
+            "positional_stability": 1
+          }
+        }
+      },
+      {
+        "move_rank": 5,
+        "initial_move": {
+          "move": "h3",
+          "score": -2,
+          "depth": 23,
+          "pv": "12.h3 Qc7 13.Nxc6 bxc6 14.Qe2 Qf7 15.Be5 Nh5 16.Nc3 Nf4 17.Qd2 Ng6 18.Bd6 Rd8 19.Bg3 e5 20.Na4 Bc7 21.Bxg6 Qxg6 ...",
+          "uci": "h2h3",
+          "centipawn_loss": 29,
+          "classification": "decent",
+          "tactics": [
+            "trapped_piece"
+          ],
+          "position_impact": {
+            "material_change": -30,
+            "king_safety_impact": 0,
+            "center_control_change": 0,
+            "development_impact": 0,
+            "pawn_structure_impact": 1,
+            "piece_coordination_change": 0,
+            "space_advantage_change": 0,
+            "initiative_change": 1.4
+          },
+          "ml_evaluation": {},
+          "move_complexity": 1,
+          "strategic_value": 0
+        },
+        "line_analysis": [],
+        "final_evaluation": {
+          "material_trend": "stable",
+          "position_trend": "stable",
+          "complexity": 0,
+          "tactical_density": 5,
+          "final_assessment": "Black controls the center. Tactically sharp position. Overall assessment: significant advantage."
+        },
+        "key_features": [
+          "positional",
+          "simple"
+        ],
+        "material_evolution": [
+          -70
+        ],
+        "positional_evolution": [
+          -2
+        ],
+        "comprehensive_final_stats": {
+          "material_imbalance_score": -0.35,
+          "center_control_scores": {
+            "white": 5,
+            "black": 10,
+            "balance": -5
+          },
+          "tactical_weights": {
+            "total_tactical_elements": 5,
+            "tactical_density": 5,
+            "tactical_progression": "stable",
+            "dominant_tactics": [
+              "fork_potential",
+              "pin_possibilities",
+              "skewer"
+            ]
+          },
+          "king_safety_differential": {
+            "white_safety": 8,
+            "black_safety": 8,
+            "safety_balance": 0
+          },
+          "piece_activity_metrics": {
+            "white_activity": 0,
+            "black_activity": 3.375,
+            "activity_balance": -3.375
+          },
+          "strategic_assessment": {
+            "primary_themes": [
+              "center_control",
+              "piece_activity"
+            ],
+            "position_type": "tactical_middlegame",
+            "winning_chances": "significant_advantage",
+            "complexity_rating": 10
+          },
+          "variation_quality": {
+            "consistency": 0.5,
+            "improvement_trend": "stable",
+            "tactical_sharpness": 5,
+            "positional_stability": 1
+          }
+        }
+      },
+      {
+        "move_rank": 6,
+        "initial_move": {
+          "move": "Bc3",
+          "score": -18,
+          "depth": 23,
+          "pv": "12.Bc3 Qc7 13.Nxc6 bxc6 14.Qe2 e5 15.Bxe5 Qf7 16.Bxf6 Qxf6 17.Nd2 Qh6 18.Nb3 Bc7 19.g3 Bh3 20.Rfe1 Bb6 21.Nc5 a5 ...",
+          "uci": "b2c3",
+          "centipawn_loss": 45,
+          "classification": "inaccuracy",
+          "tactics": [
+            "piece_improvement",
+            "trapped_piece"
+          ],
+          "position_impact": {
+            "material_change": 0,
+            "king_safety_impact": 0,
+            "center_control_change": 0,
+            "development_impact": 0.09999999999999987,
+            "pawn_structure_impact": 0,
+            "piece_coordination_change": -0.125,
+            "space_advantage_change": 0,
+            "initiative_change": 1.4
+          },
+          "ml_evaluation": {},
+          "move_complexity": 2,
+          "strategic_value": 1
+        },
+        "line_analysis": [],
+        "final_evaluation": {
+          "material_trend": "stable",
+          "position_trend": "stable",
+          "complexity": 0,
+          "tactical_density": 5,
+          "final_assessment": "Black controls the center. Tactically sharp position. Overall assessment: significant advantage."
+        },
+        "key_features": [
+          "positional",
+          "simple"
+        ],
+        "material_evolution": [
+          -40
+        ],
+        "positional_evolution": [
+          -18
+        ],
+        "comprehensive_final_stats": {
+          "material_imbalance_score": -0.2,
+          "center_control_scores": {
+            "white": 5,
+            "black": 10,
+            "balance": -5
+          },
+          "tactical_weights": {
+            "total_tactical_elements": 5,
+            "tactical_density": 5,
+            "tactical_progression": "stable",
+            "dominant_tactics": [
+              "fork_potential",
+              "pin_possibilities",
+              "skewer"
+            ]
+          },
+          "king_safety_differential": {
+            "white_safety": 8,
+            "black_safety": 8,
+            "safety_balance": 0
+          },
+          "piece_activity_metrics": {
+            "white_activity": 0,
+            "black_activity": 3.375,
+            "activity_balance": -3.375
+          },
+          "strategic_assessment": {
+            "primary_themes": [
+              "center_control",
+              "piece_activity"
+            ],
+            "position_type": "tactical_middlegame",
+            "winning_chances": "significant_advantage",
+            "complexity_rating": 10
+          },
+          "variation_quality": {
+            "consistency": 0.5,
+            "improvement_trend": "stable",
+            "tactical_sharpness": 5,
+            "positional_stability": 1
+          }
+        }
+      },
+      {
+        "move_rank": 7,
+        "initial_move": {
+          "move": "Ra2",
+          "score": -30,
+          "depth": 23,
+          "pv": "12.Ra2 a5 13.b5 Nxe5 14.Bxe5 a4 15.Nd2 Bd7 16.Qf3 Qe7 17.Qg3 Bc5 18.c3 Be8 19.Nf3 Ne4 20.Bxe4 dxe4 21.Nd4 Bg6 ...",
+          "uci": "a1a2",
+          "centipawn_loss": 57,
+          "classification": "inaccuracy",
+          "tactics": [
+            "trapped_piece"
+          ],
+          "position_impact": {
+            "material_change": 0,
+            "king_safety_impact": 0,
+            "center_control_change": 0,
+            "development_impact": 0.1428571428571428,
+            "pawn_structure_impact": 0,
+            "piece_coordination_change": 0,
+            "space_advantage_change": 0,
+            "initiative_change": 1.4
+          },
+          "ml_evaluation": {},
+          "move_complexity": 3,
+          "strategic_value": 2
+        },
+        "line_analysis": [],
+        "final_evaluation": {
+          "material_trend": "stable",
+          "position_trend": "stable",
+          "complexity": 0,
+          "tactical_density": 5,
+          "final_assessment": "Black controls the center. Tactically sharp position. Overall assessment: significant advantage."
+        },
+        "key_features": [
+          "positional",
+          "simple"
+        ],
+        "material_evolution": [
+          -40
+        ],
+        "positional_evolution": [
+          -30
+        ],
+        "comprehensive_final_stats": {
+          "material_imbalance_score": -0.2,
+          "center_control_scores": {
+            "white": 5,
+            "black": 10,
+            "balance": -5
+          },
+          "tactical_weights": {
+            "total_tactical_elements": 5,
+            "tactical_density": 5,
+            "tactical_progression": "stable",
+            "dominant_tactics": [
+              "fork_potential",
+              "pin_possibilities",
+              "skewer"
+            ]
+          },
+          "king_safety_differential": {
+            "white_safety": 8,
+            "black_safety": 8,
+            "safety_balance": 0
+          },
+          "piece_activity_metrics": {
+            "white_activity": 0,
+            "black_activity": 3.375,
+            "activity_balance": -3.375
+          },
+          "strategic_assessment": {
+            "primary_themes": [
+              "center_control",
+              "piece_activity"
+            ],
+            "position_type": "tactical_middlegame",
+            "winning_chances": "significant_advantage",
+            "complexity_rating": 10
+          },
+          "variation_quality": {
+            "consistency": 0.5,
+            "improvement_trend": "stable",
+            "tactical_sharpness": 5,
+            "positional_stability": 1
+          }
+        }
+      },
+      {
+        "move_rank": 8,
+        "initial_move": {
+          "move": "Qe1",
+          "score": -34,
+          "depth": 23,
+          "pv": "12.Qe1 Nxe5 13.Qxe5 Bc7 14.Qe2 e5 15.Bxe5 Ng4 16.Bxc7 Qxc7 17.f4 Bd7 18.Qf3 Qb6+ 19.Kh1 Ne3 20.Re1 d4 21.Nd2 Bc6 ...",
+          "uci": "d1e1",
+          "centipawn_loss": 61,
+          "classification": "inaccuracy",
+          "tactics": [
+            "trapped_piece"
+          ],
+          "position_impact": {
+            "material_change": 0,
+            "king_safety_impact": 0,
+            "center_control_change": 2,
+            "development_impact": 0,
+            "pawn_structure_impact": 0,
+            "piece_coordination_change": 0,
+            "space_advantage_change": 0,
+            "initiative_change": 1.4
+          },
+          "ml_evaluation": {},
+          "move_complexity": 4,
+          "strategic_value": 2
+        },
+        "line_analysis": [],
+        "final_evaluation": {
+          "material_trend": "stable",
+          "position_trend": "stable",
+          "complexity": 0,
+          "tactical_density": 5,
+          "final_assessment": "Tactically sharp position. Overall assessment: slight advantage."
+        },
+        "key_features": [
+          "positional",
+          "simple"
+        ],
+        "material_evolution": [
+          -40
+        ],
+        "positional_evolution": [
+          -34
+        ],
+        "comprehensive_final_stats": {
+          "material_imbalance_score": -0.2,
+          "center_control_scores": {
+            "white": 7,
+            "black": 10,
+            "balance": -3
+          },
+          "tactical_weights": {
+            "total_tactical_elements": 5,
+            "tactical_density": 5,
+            "tactical_progression": "stable",
+            "dominant_tactics": [
+              "fork_potential",
+              "pin_possibilities",
+              "skewer"
+            ]
+          },
+          "king_safety_differential": {
+            "white_safety": 9,
+            "black_safety": 8,
+            "safety_balance": 1
+          },
+          "piece_activity_metrics": {
+            "white_activity": 0,
+            "black_activity": 3.375,
+            "activity_balance": -3.375
+          },
+          "strategic_assessment": {
+            "primary_themes": [
+              "piece_activity"
+            ],
+            "position_type": "tactical_middlegame",
+            "winning_chances": "slight_advantage",
+            "complexity_rating": 10
+          },
+          "variation_quality": {
+            "consistency": 0.5,
+            "improvement_trend": "stable",
+            "tactical_sharpness": 5,
+            "positional_stability": 1
+          }
+        }
+      },
+      {
+        "move_rank": 9,
+        "initial_move": {
+          "move": "b5",
+          "score": -35,
+          "depth": 23,
+          "pv": "12.b5 Nxe5 13.Bxe5 Nd7 14.Bg3 Nc5 15.a4 Nxd3 16.Qxd3 Bd7 17.Nd2 Rc8 18.Rae1 Be8 19.Rxe6 Bg6 20.Qb3 Bxc2 21.Qa2 Bf5 ...",
+          "uci": "b4b5",
+          "centipawn_loss": 62,
+          "classification": "inaccuracy",
+          "tactics": [
+            "hanging_piece",
+            "weak_square_exploitation",
+            "trapped_piece"
+          ],
+          "position_impact": {
+            "material_change": -30,
+            "king_safety_impact": 0,
+            "center_control_change": 0,
+            "development_impact": 0,
+            "pawn_structure_impact": 1,
+            "piece_coordination_change": 0,
+            "space_advantage_change": -1,
+            "initiative_change": 0.3999999999999999
+          },
+          "ml_evaluation": {},
+          "move_complexity": 1,
+          "strategic_value": 0
+        },
+        "line_analysis": [],
+        "final_evaluation": {
+          "material_trend": "stable",
+          "position_trend": "stable",
+          "complexity": 0,
+          "tactical_density": 4,
+          "final_assessment": "Black controls the center. Tactically sharp position. Overall assessment: significant advantage."
+        },
+        "key_features": [
+          "positional",
+          "simple"
+        ],
+        "material_evolution": [
+          -70
+        ],
+        "positional_evolution": [
+          -35
+        ],
+        "comprehensive_final_stats": {
+          "material_imbalance_score": -0.35,
+          "center_control_scores": {
+            "white": 5,
+            "black": 10,
+            "balance": -5
+          },
+          "tactical_weights": {
+            "total_tactical_elements": 4,
+            "tactical_density": 4,
+            "tactical_progression": "stable",
+            "dominant_tactics": [
+              "pin_possibilities",
+              "skewer",
+              "discovered_attack"
+            ]
+          },
+          "king_safety_differential": {
+            "white_safety": 8,
+            "black_safety": 8,
+            "safety_balance": 0
+          },
+          "piece_activity_metrics": {
+            "white_activity": 0,
+            "black_activity": 3.375,
+            "activity_balance": -3.375
+          },
+          "strategic_assessment": {
+            "primary_themes": [
+              "center_control",
+              "piece_activity"
+            ],
+            "position_type": "tactical_middlegame",
+            "winning_chances": "significant_advantage",
+            "complexity_rating": 10
+          },
+          "variation_quality": {
+            "consistency": 0.5,
+            "improvement_trend": "stable",
+            "tactical_sharpness": 4,
+            "positional_stability": 1
+          }
+        }
+      },
+      {
+        "move_rank": 10,
+        "initial_move": {
+          "move": "a4",
+          "score": -56,
+          "depth": 23,
+          "pv": "12.a4 Bc7 13.f4 Nxb4 14.Nd2 Bd6 15.Ndf3 Ne4 16.Qe2 Rxf4 17.g3 Bc5+ 18.Kg2 Rf5 19.Rad1 Nxd3 20.cxd3 Nd6 21.Rc1 b6 ...",
+          "uci": "a3a4",
+          "centipawn_loss": 83,
+          "classification": "mistake",
+          "tactics": [
+            "trapped_piece"
+          ],
+          "position_impact": {
+            "material_change": -30,
+            "king_safety_impact": 0,
+            "center_control_change": 0,
+            "development_impact": 0,
+            "pawn_structure_impact": 1,
+            "piece_coordination_change": 0,
+            "space_advantage_change": 1,
+            "initiative_change": 1.4
+          },
+          "ml_evaluation": {},
+          "move_complexity": 1,
+          "strategic_value": 0
+        },
+        "line_analysis": [],
+        "final_evaluation": {
+          "material_trend": "stable",
+          "position_trend": "stable",
+          "complexity": 0,
+          "tactical_density": 6,
+          "final_assessment": "Black controls the center. Tactically sharp position. Overall assessment: significant advantage."
+        },
+        "key_features": [
+          "positional",
+          "simple"
+        ],
+        "material_evolution": [
+          -70
+        ],
+        "positional_evolution": [
+          -56
+        ],
+        "comprehensive_final_stats": {
+          "material_imbalance_score": -0.35,
+          "center_control_scores": {
+            "white": 5,
+            "black": 10,
+            "balance": -5
+          },
+          "tactical_weights": {
+            "total_tactical_elements": 6,
+            "tactical_density": 6,
+            "tactical_progression": "stable",
+            "dominant_tactics": [
+              "fork_potential",
+              "pin_possibilities",
+              "skewer"
+            ]
+          },
+          "king_safety_differential": {
+            "white_safety": 8,
+            "black_safety": 8,
+            "safety_balance": 0
+          },
+          "piece_activity_metrics": {
+            "white_activity": 0,
+            "black_activity": 3.375,
+            "activity_balance": -3.375
+          },
+          "strategic_assessment": {
+            "primary_themes": [
+              "center_control",
+              "piece_activity"
+            ],
+            "position_type": "tactical_middlegame",
+            "winning_chances": "significant_advantage",
+            "complexity_rating": 10
+          },
+          "variation_quality": {
+            "consistency": 0.5,
+            "improvement_trend": "stable",
+            "tactical_sharpness": 6,
+            "positional_stability": 1
+          }
+        }
+      }
+    ],
+    "key_moments": [
+      {
+        "variation_rank": 2,
+        "type": "tactical_explosion",
+        "description": "Variation 2 becomes highly tactical"
+      },
+      {
+        "variation_rank": 10,
+        "type": "tactical_explosion",
+        "description": "Variation 10 becomes highly tactical"
+      }
+    ],
+    "tactical_patterns": [
+      "fork_potential",
+      "pin_possibilities",
+      "skewer",
+      "discovered_attack",
+      "trapped_piece"
+    ],
+    "strategic_evolution": [
+      {
+        "variation_rank": 1,
+        "themes": [
+          "center_control",
+          "piece_activity"
+        ],
+        "position_type": "tactical_middlegame"
+      },
+      {
+        "variation_rank": 2,
+        "themes": [
+          "material_imbalance",
+          "piece_activity"
+        ],
+        "position_type": "tactical_middlegame"
+      },
+      {
+        "variation_rank": 3,
+        "themes": [
+          "piece_activity"
+        ],
+        "position_type": "tactical_middlegame"
+      },
+      {
+        "variation_rank": 4,
+        "themes": [
+          "center_control",
+          "piece_activity"
+        ],
+        "position_type": "tactical_middlegame"
+      },
+      {
+        "variation_rank": 5,
+        "themes": [
+          "center_control",
+          "piece_activity"
+        ],
+        "position_type": "tactical_middlegame"
+      },
+      {
+        "variation_rank": 6,
+        "themes": [
+          "center_control",
+          "piece_activity"
+        ],
+        "position_type": "tactical_middlegame"
+      },
+      {
+        "variation_rank": 7,
+        "themes": [
+          "center_control",
+          "piece_activity"
+        ],
+        "position_type": "tactical_middlegame"
+      },
+      {
+        "variation_rank": 8,
+        "themes": [
+          "piece_activity"
+        ],
+        "position_type": "tactical_middlegame"
+      },
+      {
+        "variation_rank": 9,
+        "themes": [
+          "center_control",
+          "piece_activity"
+        ],
+        "position_type": "tactical_middlegame"
+      },
+      {
+        "variation_rank": 10,
+        "themes": [
+          "center_control",
+          "piece_activity"
+        ],
+        "position_type": "tactical_middlegame"
+      }
+    ]
+  },
+  "learning_insights": {
+    "beginner": {
+      "key_concepts": [
+        "Control the center",
+        "Develop pieces quickly",
+        "Castle early"
+      ],
+      "tactical_patterns": [
+        [
+          "fork_potential",
+          "pin_possibilities",
+          "skewer",
+          "discovered_attack",
+          "trapped_piece"
+        ]
+      ],
+      "development_tips": [
+        "Develop knights before bishops",
+        "Control the center with pawns and pieces"
+      ],
+      "safety_warnings": []
+    },
+    "intermediate": {
+      "positional_concepts": [
+        "center_control",
+        "piece_activity"
+      ],
+      "strategic_plans": [
+        "Complete development",
+        "Control center",
+        "Castle king"
+      ],
+      "pattern_recognition": [
+        "central_control_patterns",
+        "tactical_patterns"
+      ],
+      "calculation_exercises": [
+        "Calculate consequences of Nd2 - look for trapped_piece",
+        "Calculate consequences of Nxc6 - look for overloaded_piece",
+        "Look for fork opportunities in this position"
+      ]
+    },
+    "advanced": {
+      "deep_strategy": [
+        "Maintain central dominance for positional pressure",
+        "Long-term planning considerations"
+      ],
+      "subtle_tactics": [
+        "Subtle trapped_piece",
+        "Subtle overloaded_piece"
+      ],
+      "endgame_theory": [],
+      "psychological_factors": [
+        "Create imbalances to complicate the game",
+        "Sharp position requires concrete calculation"
+      ]
+    },
+    "universal": {
+      "position_assessment": "Balanced position with equal chances with center_control being key",
+      "best_move_reasoning": "Nd2 creates trapped_piece is the engine's top choice improves center control develops pieces actively",
+      "common_mistakes": [
+        "Moving same piece twice",
+        "Neglecting development",
+        "Ignoring king safety"
+      ],
+      "improvement_areas": [
+        "Positional understanding",
+        "Calculation accuracy"
+      ]
+    }
+  },
+  "visualization_data": {
+    "heatmaps": {
+      "piece_activity": {
+        "a1": 1,
+        "b1": 2,
+        "d1": 7,
+        "f1": 1,
+        "g1": 1,
+        "b2": 3,
+        "c2": 2,
+        "f2": 0,
+        "g2": 2,
+        "h2": 2,
+        "a3": 1,
+        "d3": 8,
+        "b4": 1,
+        "d5": 0,
+        "e5": 7,
+        "b6": 0,
+        "c6": 0,
+        "e6": 0,
+        "f6": 0,
+        "a7": 0,
+        "b7": 0,
+        "g7": 0,
+        "h7": 0,
+        "a8": 0,
+        "c8": 0,
+        "d8": 0,
+        "f8": 0,
+        "g8": 0
+      },
+      "attack_density": {
+        "a1": {
+          "white": 1,
+          "black": 0,
+          "total": 1
+        },
+        "b1": {
+          "white": 2,
+          "black": 0,
+          "total": 2
+        },
+        "c1": {
+          "white": 2,
+          "black": 0,
+          "total": 2
+        },
+        "d1": {
+          "white": 1,
+          "black": 0,
+          "total": 1
+        },
+        "e1": {
+          "white": 2,
+          "black": 0,
+          "total": 2
+        },
+        "f1": {
+          "white": 3,
+          "black": 0,
+          "total": 3
+        },
+        "g1": {
+          "white": 1,
+          "black": 0,
+          "total": 1
+        },
+        "h1": {
+          "white": 1,
+          "black": 0,
+          "total": 1
+        },
+        "a2": {
+          "white": 1,
+          "black": 0,
+          "total": 1
+        },
+        "b2": {
+          "white": 0,
+          "black": 0,
+          "total": 0
+        },
+        "c2": {
+          "white": 2,
+          "black": 0,
+          "total": 2
+        },
+        "d2": {
+          "white": 2,
+          "black": 0,
+          "total": 2
+        },
+        "e2": {
+          "white": 2,
+          "black": 0,
+          "total": 2
+        },
+        "f2": {
+          "white": 2,
+          "black": 1,
+          "total": 3
+        },
+        "g2": {
+          "white": 1,
+          "black": 0,
+          "total": 1
+        },
+        "h2": {
+          "white": 1,
+          "black": 0,
+          "total": 1
+        },
+        "a3": {
+          "white": 3,
+          "black": 0,
+          "total": 3
+        },
+        "b3": {
+          "white": 1,
+          "black": 0,
+          "total": 1
+        },
+        "c3": {
+          "white": 2,
+          "black": 0,
+          "total": 2
+        },
+        "d3": {
+          "white": 3,
+          "black": 0,
+          "total": 3
+        },
+        "e3": {
+          "white": 1,
+          "black": 1,
+          "total": 2
+        },
+        "f3": {
+          "white": 3,
+          "black": 0,
+          "total": 3
+        },
+        "g3": {
+          "white": 2,
+          "black": 0,
+          "total": 2
+        },
+        "h3": {
+          "white": 1,
+          "black": 0,
+          "total": 1
+        },
+        "a4": {
+          "white": 0,
+          "black": 0,
+          "total": 0
+        },
+        "b4": {
+          "white": 1,
+          "black": 1,
+          "total": 2
+        },
+        "c4": {
+          "white": 2,
+          "black": 1,
+          "total": 3
+        },
+        "d4": {
+          "white": 1,
+          "black": 2,
+          "total": 3
+        },
+        "e4": {
+          "white": 1,
+          "black": 2,
+          "total": 3
+        },
+        "f4": {
+          "white": 0,
+          "black": 0,
+          "total": 0
+        },
+        "g4": {
+          "white": 2,
+          "black": 1,
+          "total": 3
+        },
+        "h4": {
+          "white": 0,
+          "black": 0,
+          "total": 0
+        },
+        "a5": {
+          "white": 1,
+          "black": 2,
+          "total": 3
+        },
+        "b5": {
+          "white": 1,
+          "black": 0,
+          "total": 1
+        },
+        "c5": {
+          "white": 1,
+          "black": 1,
+          "total": 2
+        },
+        "d5": {
+          "white": 0,
+          "black": 3,
+          "total": 3
+        },
+        "e5": {
+          "white": 1,
+          "black": 1,
+          "total": 2
+        },
+        "f5": {
+          "white": 1,
+          "black": 1,
+          "total": 2
+        },
+        "g5": {
+          "white": 0,
+          "black": 0,
+          "total": 0
+        },
+        "h5": {
+          "white": 1,
+          "black": 1,
+          "total": 2
+        },
+        "a6": {
+          "white": 1,
+          "black": 1,
+          "total": 2
+        },
+        "b6": {
+          "white": 0,
+          "black": 2,
+          "total": 2
+        },
+        "c6": {
+          "white": 1,
+          "black": 1,
+          "total": 2
+        },
+        "d6": {
+          "white": 0,
+          "black": 1,
+          "total": 1
+        },
+        "e6": {
+          "white": 0,
+          "black": 1,
+          "total": 1
+        },
+        "f6": {
+          "white": 0,
+          "black": 3,
+          "total": 3
+        },
+        "g6": {
+          "white": 2,
+          "black": 1,
+          "total": 3
+        },
+        "h6": {
+          "white": 0,
+          "black": 1,
+          "total": 1
+        },
+        "a7": {
+          "white": 0,
+          "black": 3,
+          "total": 3
+        },
+        "b7": {
+          "white": 0,
+          "black": 1,
+          "total": 1
+        },
+        "c7": {
+          "white": 0,
+          "black": 2,
+          "total": 2
+        },
+        "d7": {
+          "white": 1,
+          "black": 3,
+          "total": 4
+        },
+        "e7": {
+          "white": 0,
+          "black": 2,
+          "total": 2
+        },
+        "f7": {
+          "white": 1,
+          "black": 2,
+          "total": 3
+        },
+        "g7": {
+          "white": 0,
+          "black": 1,
+          "total": 1
+        },
+        "h7": {
+          "white": 1,
+          "black": 2,
+          "total": 3
+        },
+        "a8": {
+          "white": 0,
+          "black": 0,
+          "total": 0
+        },
+        "b8": {
+          "white": 0,
+          "black": 2,
+          "total": 2
+        },
+        "c8": {
+          "white": 0,
+          "black": 2,
+          "total": 2
+        },
+        "d8": {
+          "white": 0,
+          "black": 3,
+          "total": 3
+        },
+        "e8": {
+          "white": 0,
+          "black": 3,
+          "total": 3
+        },
+        "f8": {
+          "white": 0,
+          "black": 2,
+          "total": 2
+        },
+        "g8": {
+          "white": 0,
+          "black": 2,
+          "total": 2
+        },
+        "h8": {
+          "white": 0,
+          "black": 1,
+          "total": 1
+        }
+      },
+      "control_zones": {
+        "central": {
+          "white": 47.94520547945205,
+          "black": 52.054794520547944
+        },
+        "kingside": {
+          "white": 56.52173913043478,
+          "black": 43.47826086956522
+        },
+        "queenside": {
+          "white": 50,
+          "black": 50
+        }
+      },
+      "critical_squares": {
+        "d5": 1,
+        "f1": 0.6000000000000001,
+        "e4": 1,
+        "f2": 0.6000000000000001,
+        "e5": 1,
+        "f7": 0.30000000000000004,
+        "d4": 1,
+        "f8": 0.5
+      }
+    },
+    "vectors": {
+      "attack_lines": [
+        {
+          "from": "d3",
+          "to": "h7",
+          "type": "bishop_attack",
+          "target": "pawn"
+        },
+        {
+          "from": "b6",
+          "to": "f2",
+          "type": "bishop_attack",
+          "target": "pawn"
+        }
+      ],
+      "piece_relations": [],
+      "pawn_structure": [
+        {
+          "file": "a",
+          "tension": true,
+          "advanced": true
+        },
+        {
+          "file": "b",
+          "tension": true,
+          "advanced": true
+        },
+        {
+          "file": "g",
+          "tension": true,
+          "advanced": true
+        },
+        {
+          "file": "h",
+          "tension": true,
+          "advanced": true
+        }
+      ]
+    },
+    "metrics": {
+      "position_balance": -0.08,
+      "dynamic_factor": 0.10526315789473684,
+      "complexity_score": 0.66,
+      "tension_level": 0
+    },
+    "highlights": {
+      "best_squares": [
+        "d2",
+        "c6",
+        "e2"
+      ],
+      "danger_zones": [
+        "f1",
+        "f2",
+        "a3",
+        "d3",
+        "f3",
+        "c4",
+        "d4",
+        "e4",
+        "g4",
+        "a5",
+        "d5",
+        "f6",
+        "g6",
+        "a7",
+        "d7",
+        "f7",
+        "h7",
+        "d8",
+        "e8"
+      ],
+      "key_pieces": [
+        "d1",
+        "g1",
+        "d8",
+        "g8"
+      ],
+      "critical_files": [
+        "d",
+        "e"
+      ]
+    }
+  },
+  "position_classification": [
+    "middlegame",
+    "tactical",
+    "defensive"
+  ],
+  "game_phase": "opening",
+  "difficulty_rating": 1600,
+  "themes": [
+    "queen_fork",
+    "hanging_piece",
+    "skewer",
+    "defensive",
+    "material_imbalance",
+    "center_control",
+    "pin_possibilities",
+    "weak_square_exploitation",
+    "piece_improvement",
+    "piece_activity",
+    "fork_potential",
+    "middlegame",
+    "overloaded_piece",
+    "discovered_attack",
+    "trapped_piece",
+    "tactical"
+  ],
+  "position_type": "tactical",
+  "source_type": "upload",
+  "title": "Opening - Queen Fork",
+  "description": "Balanced position with equal chances with center_control being key",
+  "solution_moves": [
+    "Nxc6",
+    "Qe2"
+  ],
+  "timestamp": null,
+  "processed_timestamp": "2025-06-14 09:49:56",
+  "processing_quality": "high",
+  "top_moves": [
+    {
+      "id": 48977,
+      "position_id": 5153,
+      "move": "Nd2",
+      "uci": "b1d2",
+      "score": 27,
+      "depth": 23,
+      "centipawn_loss": 0,
+      "classification": "great",
+      "principal_variation": "12.Nd2 a5 13.Nxc6 bxc6 14.c4 axb4 15.axb4 Rxa1 16.Bxa1 c5 17.bxc5 Bxc5 18.Qe2 Qe7 19.Nb3 dxc4 20.Bxc4 Bb6 21.Bd4 Bxd4 ...",
+      "tactics": [
+        "trapped_piece"
+      ],
+      "position_impact": {
+        "material_change": 40,
+        "king_safety_impact": 0,
+        "center_control_change": 1,
+        "development_impact": 0.24285714285714266,
+        "pawn_structure_impact": 0,
+        "piece_coordination_change": 0,
+        "space_advantage_change": 0,
+        "initiative_change": 1.4
+      },
+      "ml_evaluation": {},
+      "move_complexity": 2,
+      "strategic_value": 2,
+      "rank": 1
+    },
+    {
+      "id": 48978,
+      "position_id": 5153,
+      "move": "Nxc6",
+      "uci": "e5c6",
+      "score": 23,
+      "depth": 23,
+      "centipawn_loss": 4,
+      "classification": "good",
+      "principal_variation": "12.Nxc6 bxc6 13.Nd2 Qe7 14.Qe2 a5 15.Rab1 axb4 16.axb4 Bc7 17.Nf3 Bd6 18.Ne5 Bb7 19.Bc3 c5 20.bxc5 Bxc5 21.Nf3 Ne4 ...",
+      "tactics": [
+        "overloaded_piece",
+        "material_imbalance",
+        "queen_fork",
+        "trapped_piece"
+      ],
+      "position_impact": {
+        "material_change": 310,
+        "king_safety_impact": 0,
+        "center_control_change": 0,
+        "development_impact": -0.10000000000000009,
+        "pawn_structure_impact": 0,
+        "piece_coordination_change": 0.1071428571428571,
+        "space_advantage_change": 3,
+        "initiative_change": 0.7000000000000002
+      },
+      "ml_evaluation": {},
+      "move_complexity": 3,
+      "strategic_value": 1,
+      "rank": 1
+    },
+    {
+      "id": 48979,
+      "position_id": 5153,
+      "move": "Qe2",
+      "uci": "d1e2",
+      "score": 20,
+      "depth": 23,
+      "centipawn_loss": 7,
+      "classification": "good",
+      "principal_variation": "12.Qe2 a5 13.Nd2 axb4 14.Nxc6 bxc6 15.axb4 Rxa1 16.Bxa1 Qe7 17.Bc3 c5 18.bxc5 Bxc5 19.Ba1 Bd6 20.Nf3 Ne4 21.Be5 Bxe5 ...",
+      "tactics": [
+        "trapped_piece"
+      ],
+      "position_impact": {
+        "material_change": 0,
+        "king_safety_impact": 0,
+        "center_control_change": 2,
+        "development_impact": 0.24285714285714266,
+        "pawn_structure_impact": 0,
+        "piece_coordination_change": 0,
+        "space_advantage_change": 1,
+        "initiative_change": 1.4
+      },
+      "ml_evaluation": {},
+      "move_complexity": 4,
+      "strategic_value": 2,
+      "rank": 1
+    },
+    {
+      "id": 48980,
+      "position_id": 5153,
+      "move": "Kh1",
+      "uci": "g1h1",
+      "score": 4,
+      "depth": 23,
+      "centipawn_loss": 23,
+      "classification": "decent",
+      "principal_variation": "12.Kh1 a5 13.b5 Nxe5 14.Bxe5 Qe7 15.Nd2 Nd7 16.Bg3 Nc5 17.Nf3 Nxd3 18.cxd3 a4 19.d4 Bd7 20.Re1 Ba5 21.Re3 Bxb5 ...",
+      "tactics": [
+        "trapped_piece"
+      ],
+      "position_impact": {
+        "material_change": 0,
+        "king_safety_impact": 0,
+        "center_control_change": 0,
+        "development_impact": 0,
+        "pawn_structure_impact": 0,
+        "piece_coordination_change": 0,
+        "space_advantage_change": 0,
+        "initiative_change": -0.6000000000000001
+      },
+      "ml_evaluation": {},
+      "move_complexity": 2,
+      "strategic_value": 2,
+      "rank": 1
+    },
+    {
+      "id": 48981,
+      "position_id": 5153,
+      "move": "h3",
+      "uci": "h2h3",
+      "score": -2,
+      "depth": 23,
+      "centipawn_loss": 29,
+      "classification": "decent",
+      "principal_variation": "12.h3 Qc7 13.Nxc6 bxc6 14.Qe2 Qf7 15.Be5 Nh5 16.Nc3 Nf4 17.Qd2 Ng6 18.Bd6 Rd8 19.Bg3 e5 20.Na4 Bc7 21.Bxg6 Qxg6 ...",
+      "tactics": [
+        "trapped_piece"
+      ],
+      "position_impact": {
+        "material_change": -30,
+        "king_safety_impact": 0,
+        "center_control_change": 0,
+        "development_impact": 0,
+        "pawn_structure_impact": 1,
+        "piece_coordination_change": 0,
+        "space_advantage_change": 0,
+        "initiative_change": 1.4
+      },
+      "ml_evaluation": {},
+      "move_complexity": 1,
+      "strategic_value": 0,
+      "rank": 1
+    },
+    {
+      "id": 48982,
+      "position_id": 5153,
+      "move": "Bc3",
+      "uci": "b2c3",
+      "score": -18,
+      "depth": 23,
+      "centipawn_loss": 45,
+      "classification": "inaccuracy",
+      "principal_variation": "12.Bc3 Qc7 13.Nxc6 bxc6 14.Qe2 e5 15.Bxe5 Qf7 16.Bxf6 Qxf6 17.Nd2 Qh6 18.Nb3 Bc7 19.g3 Bh3 20.Rfe1 Bb6 21.Nc5 a5 ...",
+      "tactics": [
+        "piece_improvement",
+        "trapped_piece"
+      ],
+      "position_impact": {
+        "material_change": 0,
+        "king_safety_impact": 0,
+        "center_control_change": 0,
+        "development_impact": 0.09999999999999987,
+        "pawn_structure_impact": 0,
+        "piece_coordination_change": -0.125,
+        "space_advantage_change": 0,
+        "initiative_change": 1.4
+      },
+      "ml_evaluation": {},
+      "move_complexity": 2,
+      "strategic_value": 1,
+      "rank": 1
+    },
+    {
+      "id": 48983,
+      "position_id": 5153,
+      "move": "Ra2",
+      "uci": "a1a2",
+      "score": -30,
+      "depth": 23,
+      "centipawn_loss": 57,
+      "classification": "inaccuracy",
+      "principal_variation": "12.Ra2 a5 13.b5 Nxe5 14.Bxe5 a4 15.Nd2 Bd7 16.Qf3 Qe7 17.Qg3 Bc5 18.c3 Be8 19.Nf3 Ne4 20.Bxe4 dxe4 21.Nd4 Bg6 ...",
+      "tactics": [
+        "trapped_piece"
+      ],
+      "position_impact": {
+        "material_change": 0,
+        "king_safety_impact": 0,
+        "center_control_change": 0,
+        "development_impact": 0.1428571428571428,
+        "pawn_structure_impact": 0,
+        "piece_coordination_change": 0,
+        "space_advantage_change": 0,
+        "initiative_change": 1.4
+      },
+      "ml_evaluation": {},
+      "move_complexity": 3,
+      "strategic_value": 2,
+      "rank": 1
+    },
+    {
+      "id": 48984,
+      "position_id": 5153,
+      "move": "Qe1",
+      "uci": "d1e1",
+      "score": -34,
+      "depth": 23,
+      "centipawn_loss": 61,
+      "classification": "inaccuracy",
+      "principal_variation": "12.Qe1 Nxe5 13.Qxe5 Bc7 14.Qe2 e5 15.Bxe5 Ng4 16.Bxc7 Qxc7 17.f4 Bd7 18.Qf3 Qb6+ 19.Kh1 Ne3 20.Re1 d4 21.Nd2 Bc6 ...",
+      "tactics": [
+        "trapped_piece"
+      ],
+      "position_impact": {
+        "material_change": 0,
+        "king_safety_impact": 0,
+        "center_control_change": 2,
+        "development_impact": 0,
+        "pawn_structure_impact": 0,
+        "piece_coordination_change": 0,
+        "space_advantage_change": 0,
+        "initiative_change": 1.4
+      },
+      "ml_evaluation": {},
+      "move_complexity": 4,
+      "strategic_value": 2,
+      "rank": 1
+    },
+    {
+      "id": 48985,
+      "position_id": 5153,
+      "move": "b5",
+      "uci": "b4b5",
+      "score": -35,
+      "depth": 23,
+      "centipawn_loss": 62,
+      "classification": "inaccuracy",
+      "principal_variation": "12.b5 Nxe5 13.Bxe5 Nd7 14.Bg3 Nc5 15.a4 Nxd3 16.Qxd3 Bd7 17.Nd2 Rc8 18.Rae1 Be8 19.Rxe6 Bg6 20.Qb3 Bxc2 21.Qa2 Bf5 ...",
+      "tactics": [
+        "hanging_piece",
+        "weak_square_exploitation",
+        "trapped_piece"
+      ],
+      "position_impact": {
+        "material_change": -30,
+        "king_safety_impact": 0,
+        "center_control_change": 0,
+        "development_impact": 0,
+        "pawn_structure_impact": 1,
+        "piece_coordination_change": 0,
+        "space_advantage_change": -1,
+        "initiative_change": 0.3999999999999999
+      },
+      "ml_evaluation": {},
+      "move_complexity": 1,
+      "strategic_value": 0,
+      "rank": 1
+    },
+    {
+      "id": 48986,
+      "position_id": 5153,
+      "move": "a4",
+      "uci": "a3a4",
+      "score": -56,
+      "depth": 23,
+      "centipawn_loss": 83,
+      "classification": "mistake",
+      "principal_variation": "12.a4 Bc7 13.f4 Nxb4 14.Nd2 Bd6 15.Ndf3 Ne4 16.Qe2 Rxf4 17.g3 Bc5+ 18.Kg2 Rf5 19.Rad1 Nxd3 20.cxd3 Nd6 21.Rc1 b6 ...",
+      "tactics": [
+        "trapped_piece"
+      ],
+      "position_impact": {
+        "material_change": -30,
+        "king_safety_impact": 0,
+        "center_control_change": 0,
+        "development_impact": 0,
+        "pawn_structure_impact": 1,
+        "piece_coordination_change": 0,
+        "space_advantage_change": 1,
+        "initiative_change": 1.4
+      },
+      "ml_evaluation": {},
+      "move_complexity": 1,
+      "strategic_value": 0,
+      "rank": 1
+    }
+  ]
+}

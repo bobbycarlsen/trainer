@@ -151,9 +151,9 @@ def parse_last_move_json(last_move_data):
     if isinstance(last_move_data, str):
         try:
             return json.loads(last_move_data)
-        except:
+        except Exception as e:
+            print(e)
             return {}
-    
     return last_move_data if isinstance(last_move_data, dict) else {}
 
 def convert_pgn_to_piece_icons(pgn_string):
@@ -164,11 +164,9 @@ def convert_pgn_to_piece_icons(pgn_string):
     piece_icons = {
         'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘'
     }
-    
     result = pgn_string
     for piece, icon in piece_icons.items():
         result = result.replace(piece, icon)
-    
     return result
 
 def display_position_info_bar(position_data: Dict[str, Any]):
@@ -176,13 +174,12 @@ def display_position_info_bar(position_data: Dict[str, Any]):
     # Parse JSON data from database
     move_history = parse_move_history_json(position_data.get('move_history'))
     last_move = parse_last_move_json(position_data.get('last_move'))
-    
     # Extract info bar data
     last_move_san = last_move.get('san', 'N/A')
     move_number = last_move.get('move_number', 1)
     position_id = position_data.get('id', 'Unknown')
     side_to_move = position_data.get('turn', 'white').title()
-    
+
     # Create styled info bar
     st.markdown(f"""
     <div style="
@@ -250,11 +247,11 @@ def display_previous_moves_section(position_data: Dict[str, Any]):
     """Display previous moves section with piece icons."""
     move_history = parse_move_history_json(position_data.get('move_history'))
     pgn_string = move_history.get('pgn', '')
-    
+
     if pgn_string:
         # Convert PGN to piece icons
         moves_with_icons = convert_pgn_to_piece_icons(pgn_string)
-        
+
         st.markdown(f"""
         <div style="
             background: #f8f9fa;
@@ -298,7 +295,6 @@ def display_previous_moves_section(position_data: Dict[str, Any]):
 def display_enhanced_position_interface():
     """Enhanced position interface with info bar and controlled insights."""
     position_data = st.session_state.current_position
-    
     # Display position info bar
     display_position_info_bar(position_data)
     
@@ -348,7 +344,7 @@ def display_enhanced_position_interface():
         display_move_analysis_results()
 
 def submit_move_with_html_generation():
-    """Submit move and generate enhanced HTML analysis."""
+    '''Submit move and generate enhanced HTML analysis.'''
     if 'last_move_analysis' not in st.session_state:
         st.error("No move analysis data available")
         return
@@ -356,42 +352,36 @@ def submit_move_with_html_generation():
     analysis = st.session_state.last_move_analysis
     position_data = analysis.get('position_data', {})
     move_data = analysis.get('move_data', {})
-    analysis_results = {
-        'result': analysis.get('result'),
-        'time_taken': analysis.get('time_taken'),
-    }
     
     try:
         # Use the enhanced HTML generator
+        if 'html_generator' not in st.session_state:
+            st.session_state.html_generator = ComprehensiveHTMLGenerator()
+            
         html_generator = st.session_state.html_generator
-        html_content = html_generator.generate_enhanced_html_export(
-            position_data, 
-            move_data, 
-            analysis_results, 
-            include_spatial_analysis=True
-        )
         
-        # Save HTML file
-        import os
-        os.makedirs("kuikma_analysis", exist_ok=True)
-        timestamp = int(time.time())
-        filename = f"kuikma_analysis/enhanced_position_{position_data.get('id', 'unknown')}_{timestamp}.html"
+        with st.spinner("🎨 Generating epic analysis..."):
+            output_path = html_generator.generate_epic_analysis_report(
+                position_data=position_data,
+                selected_move_data=move_data
+            )
         
-        with open(filename, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-        
-        st.success(f"✅ Enhanced HTML analysis generated: {filename}")
-        
-        # Offer download
-        st.download_button(
-            label="📥 Download HTML Analysis",
-            data=html_content,
-            file_name=f"position_{position_data.get('id', 'unknown')}_analysis.html",
-            mime="text/html"
-        )
+        if output_path:
+            st.success(f"✅ Epic HTML analysis generated!")
+            
+            # Read and offer download
+            with open(output_path, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            
+            st.download_button(
+                label="📥 Download Epic Analysis",
+                data=html_content,
+                file_name=f"epic_position_{position_data.get('id', 'unknown')}_analysis.html",
+                mime="text/html"
+            )
         
     except Exception as e:
-        st.error(f"❌ Error generating HTML: {str(e)}")
+        st.error(f"❌ Error generating epic HTML: {str(e)}")
 
 def display_chess_board(position_data: Dict[str, Any]):
     """Display chess board with flip functionality."""
@@ -921,7 +911,7 @@ def display_enhanced_top_moves_table(top_moves: List[Dict], user_move_data: Dict
         
         # Format principal variation
         pv = move.get('principal_variation', '')
-        formatted_pv = convert_to_piece_icons(pv[:50] + '...' if len(pv) > 50 else pv) if pv else ''
+        formatted_pv = convert_to_piece_icons(pv)
         
         moves_data.append({
             'rank': i,
@@ -1046,7 +1036,7 @@ def display_html_generation_section(analysis: Dict[str, Any]):
                 st.warning(f"Download not available: {e}")
 
 def generate_comprehensive_html_report(analysis: Dict[str, Any]):
-    """Generate comprehensive HTML report with enhanced features."""
+    '''Generate comprehensive HTML report with enhanced features.'''
     try:
         position_data = analysis.get('position_data', {})
         user_move_data = analysis.get('move_data', {})
@@ -1057,25 +1047,35 @@ def generate_comprehensive_html_report(analysis: Dict[str, Any]):
         
         html_generator = st.session_state.html_generator
         
-        with st.spinner("🎨 Generating comprehensive chess analysis report..."):
-            # Generate with enhanced features
-            output_path = html_generator.generate_enhanced_comprehensive_analysis(
+        with st.spinner("🎨 Generating epic chess analysis report..."):
+            # Generate with enhanced features - this is the key change
+            output_path = html_generator.generate_epic_analysis_report(
                 position_data=position_data,
-                selected_move_data=user_move_data,
-                analysis_results=analysis,
-                include_spatial_analysis=True,
-                include_side_by_side=True,
-                include_detailed_stats=True,
-                print_optimized=True
+                selected_move_data=user_move_data
             )
         
         if output_path:
-            st.success(f"✅ Comprehensive HTML report generated!")
+            st.success(f"✅ Epic comprehensive HTML report generated!")
             
             # Update analysis with new path
             analysis['generated_html'] = True
             analysis['html_path'] = output_path
             st.session_state.last_move_analysis = analysis
+            
+            # Offer download
+            try:
+                with open(output_path, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+                
+                st.download_button(
+                    label="📥 Download Epic Analysis Report",
+                    data=html_content,
+                    file_name=f"epic_chess_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+                    mime="text/html",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.warning(f"Download not available: {e}")
             
             st.rerun()
         else:
@@ -1083,6 +1083,8 @@ def generate_comprehensive_html_report(analysis: Dict[str, Any]):
     
     except Exception as e:
         st.error(f"❌ Error generating HTML report: {e}")
+        import traceback
+        st.error(traceback.format_exc())
 
 def display_continue_training_section():
     """Display continue training section."""
@@ -1687,7 +1689,7 @@ def load_first_position():
 
 def load_initial_position():
     """Load initial position on app start."""
-    load_random_position()
+    load_first_position()
 
 # Utility functions
 def parse_position_json_fields(position_data: Dict[str, Any]) -> Dict[str, Any]:
